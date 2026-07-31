@@ -150,6 +150,7 @@ export const mockArticles: Article[] = titles.map((title, i) => {
       `${pick(summaries, i)}\n\nEducation authorities have been closely monitoring the situation, and officials say the new guidelines aim to bring consistency across institutions. Students are advised to regularly check official portals for updates.\n\nIn related developments, several state boards have indicated they may adopt similar frameworks over the coming academic year, citing improved outcomes in pilot programs conducted earlier.`,
     banner: bannerFor(seed),
     images: [bannerFor(`${seed}-1`, 600, 400), bannerFor(`${seed}-2`, 600, 400)],
+    advertisements: i % 2 === 0 ? [bannerFor(`${seed}-ad`, 800, 500)] : [],
     category: pick(categories, i),
     status,
     reporterId: reporter.id,

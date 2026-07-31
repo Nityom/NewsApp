@@ -1,20 +1,21 @@
-import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
+import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { StatusBadge } from '@/components/ui/Badge';
 import { ErrorState } from '@/components/ui/StateViews';
-import { mockArticles } from '@/mocks/data';
+import { mockArticles, mockReporters } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 
 export default function ArticleDetailScreen() {
   const theme = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const article = mockArticles.find((a) => a.id === id);
+  const reporterPhone = mockReporters.find((r) => r.id === article?.reporterId)?.phone;
 
   if (!article) {
     return (
@@ -32,11 +33,9 @@ export default function ArticleDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Image source={{ uri: article.banner }} style={[styles.banner, { borderRadius: theme.radius.lg }]} contentFit="cover" />
         <View style={[styles.categoryPill, { backgroundColor: theme.colors.primaryMuted }]}>
           <Text style={{ color: theme.colors.primary, fontSize: 11.5, fontWeight: '700' }}>{article.category}</Text>
         </View>
-        <Text style={[styles.title, { color: theme.colors.text }]}>{article.title}</Text>
 
         <View style={styles.metaRow}>
           <Icon name="time-outline" size={14} color={theme.colors.textMuted} />
@@ -61,15 +60,7 @@ export default function ArticleDetailScreen() {
           </Card>
         ) : null}
 
-        <Text style={[styles.body, { color: theme.colors.text }]}>{article.content}</Text>
-
-        {article.images.length > 0 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 18 }}>
-            {article.images.map((uri, i) => (
-              <Image key={`${uri}-${i}`} source={{ uri }} style={styles.galleryImage} contentFit="cover" />
-            ))}
-          </ScrollView>
-        ) : null}
+        <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} />
       </ScrollView>
     </ScreenContainer>
   );

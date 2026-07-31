@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -8,17 +9,20 @@ import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
+import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ErrorState } from '@/components/ui/StateViews';
-import { mockArticles } from '@/mocks/data';
+import { mockArticles, mockReporters } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 
 export default function AdminArticleDetailScreen() {
   const theme = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const article = mockArticles.find((a) => a.id === id);
+  const reporterPhone = mockReporters.find((r) => r.id === article?.reporterId)?.phone;
   const [rejectVisible, setRejectVisible] = useState(false);
   const [reason, setReason] = useState('');
+  const [advertisements, setAdvertisements] = useState<string[]>(article?.advertisements ?? []);
 
   if (!article) {
     return (
@@ -27,6 +31,26 @@ export default function AdminArticleDetailScreen() {
       </ScreenContainer>
     );
   }
+
+  const pickAd = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Please allow photo library access to upload ad photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsMultipleSelection: true,
+    });
+    if (result.canceled) return;
+    setAdvertisements((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
+  };
+
+  const saveAdvertisements = () => {
+    article.advertisements = advertisements;
+    Alert.alert('Advertisements Saved', 'The ad photos for this article have been updated.');
+  };
 
   const approve = () => {
     Alert.alert('Article Approved', 'The article has been published successfully.', [
@@ -50,8 +74,6 @@ export default function AdminArticleDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Image source={{ uri: article.banner }} style={[styles.banner, { borderRadius: theme.radius.lg }]} contentFit="cover" />
-
         <View style={styles.authorRow}>
           <Image source={{ uri: article.reporterAvatar }} style={styles.authorAvatar} />
           <View>
@@ -60,17 +82,36 @@ export default function AdminArticleDetailScreen() {
           </View>
         </View>
 
-        <Text style={[styles.title, { color: theme.colors.text }]}>{article.title}</Text>
-        <Text style={[styles.summary, { color: theme.colors.textSecondary }]}>{article.summary}</Text>
-        <Text style={[styles.body, { color: theme.colors.text }]}>{article.content}</Text>
+        <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} />
 
-        {article.images.length > 0 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 16 }}>
-            {article.images.map((uri, i) => (
-              <Image key={`${uri}-${i}`} source={{ uri }} style={styles.galleryImage} contentFit="cover" />
+        <View style={{ marginTop: 24 }}>
+          <Text style={[styles.summary, { color: theme.colors.textSecondary, marginTop: 0, fontWeight: '700' }]}>
+            Advertisements ({advertisements.length})
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+            <View
+              style={[
+                styles.adAddTile,
+                { borderColor: theme.colors.border, backgroundColor: theme.colors.backgroundSubtle },
+              ]}
+              onTouchEnd={pickAd}>
+              <Icon name="add" size={24} color={theme.colors.textMuted} />
+            </View>
+            {advertisements.map((uri, i) => (
+              <View key={`${uri}-${i}`} style={styles.adTile}>
+                <Image source={{ uri }} style={styles.adThumb} contentFit="cover" />
+                <View
+                  style={styles.removeBadge}
+                  onTouchEnd={() => setAdvertisements((prev) => prev.filter((_, idx) => idx !== i))}>
+                  <Icon name="close" size={12} color="#fff" />
+                </View>
+              </View>
             ))}
           </ScrollView>
-        ) : null}
+          <View style={{ marginTop: 12 }}>
+            <Button label="Save Advertisements" variant="outline" onPress={saveAdvertisements} />
+          </View>
+        </View>
 
         {article.status === 'pending' ? (
           <>
@@ -166,5 +207,36 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 12,
     marginRight: 10,
+  },
+  adAddTile: {
+    width: 76,
+    height: 76,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  adTile: {
+    width: 76,
+    height: 76,
+    marginRight: 10,
+  },
+  adThumb: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+  },
+  removeBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

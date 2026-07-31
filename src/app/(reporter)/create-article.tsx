@@ -9,6 +9,7 @@ import { IconButton } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { useAuth } from '@/context/AuthContext';
 import { allCategories, mockArticles } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 import type { Category } from '@/types/models';
@@ -22,6 +23,7 @@ const formatTools: { icon: IconName; token: string; label: string }[] = [
 
 export default function CreateArticleScreen() {
   const theme = useAppTheme();
+  const { user } = useAuth();
   const params = useLocalSearchParams<{ id?: string }>();
   const editingDraft = useMemo(
     () => (params.id ? mockArticles.find((a) => a.id === params.id) : undefined),
@@ -33,9 +35,10 @@ export default function CreateArticleScreen() {
   const [category, setCategory] = useState<Category>(editingDraft?.category ?? 'Education');
   const [content, setContent] = useState(editingDraft?.content ?? '');
   const [images, setImages] = useState<string[]>(editingDraft?.images ?? []);
+  const [advertisements, setAdvertisements] = useState<string[]>(editingDraft?.advertisements ?? []);
   const [submitting, setSubmitting] = useState<'draft' | 'submit' | null>(null);
 
-  const pickImage = async (mode: 'banner' | 'gallery') => {
+  const pickImage = async (mode: 'banner' | 'gallery' | 'ad') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission required', 'Please allow photo library access to upload images.');
@@ -46,14 +49,16 @@ export default function CreateArticleScreen() {
       allowsEditing: mode === 'banner',
       aspect: mode === 'banner' ? [16, 9] : undefined,
       quality: 0.8,
-      allowsMultipleSelection: mode === 'gallery',
+      allowsMultipleSelection: mode !== 'banner',
     });
     if (result.canceled) return;
 
     if (mode === 'banner') {
       setBanner(result.assets[0]?.uri);
-    } else {
+    } else if (mode === 'gallery') {
       setImages((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
+    } else {
+      setAdvertisements((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
     }
   };
 
@@ -88,7 +93,7 @@ export default function CreateArticleScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Banner Image</Text>
+        <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>News Photo</Text>
         <View
           style={[
             styles.bannerWrap,
@@ -156,7 +161,7 @@ export default function CreateArticleScreen() {
 
         <View style={styles.imagesHeader}>
           <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
-            Gallery Images ({images.length})
+            Add Photo ({images.length})
           </Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
@@ -177,6 +182,47 @@ export default function CreateArticleScreen() {
             </View>
           ))}
         </ScrollView>
+
+        <View style={[styles.imagesHeader, { marginTop: 20 }]}>
+          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
+            Add Advertisement Photo ({advertisements.length})
+          </Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+          <View
+            style={[
+              styles.addImageTile,
+              { borderColor: theme.colors.border, backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md },
+            ]}
+            onTouchEnd={() => pickImage('ad')}>
+            <Icon name="add" size={24} color={theme.colors.textMuted} />
+          </View>
+          {advertisements.map((uri, i) => (
+            <View key={`${uri}-${i}`} style={styles.imageTile}>
+              <Image source={{ uri }} style={styles.imageThumb} contentFit="cover" />
+              <View
+                style={styles.removeBadge}
+                onTouchEnd={() => setAdvertisements((prev) => prev.filter((_, idx) => idx !== i))}>
+                <Icon name="close" size={12} color="#fff" />
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+
+        {user ? (
+          <View
+            style={[
+              styles.reporterFooter,
+              { backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md },
+            ]}>
+            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
+              Published Footer
+            </Text>
+            <Text style={[styles.reporterFooterText, { color: theme.colors.text }]}>
+              {user.name} : {user.phone}
+            </Text>
+          </View>
+        ) : null}
 
         <View style={{ height: 24 }} />
         <ButtonRow>
@@ -242,6 +288,15 @@ const styles = StyleSheet.create({
   bannerText: {
     fontSize: 12.5,
     fontWeight: '600',
+  },
+  reporterFooter: {
+    marginTop: 20,
+    padding: 14,
+  },
+  reporterFooterText: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: 4,
   },
   titleInput: {
     fontSize: 17,

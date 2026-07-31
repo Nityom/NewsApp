@@ -35,6 +35,7 @@ export interface Article {
   content: string;
   banner: string;
   images: string[];
+  advertisements: string[];
   category: Category;
   status: ArticleStatus;
   reporterId: string;

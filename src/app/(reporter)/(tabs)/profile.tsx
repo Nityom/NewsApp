@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Card } from '@/components/ui/Card';
@@ -25,8 +25,17 @@ function MenuRow({ icon, label, onPress, danger }: { icon: IconName; label: stri
 
 export default function ReporterProfileScreen() {
   const theme = useAppTheme();
-  const { user, logout } = useAuth();
+  const { user, logout, resendVerificationEmail } = useAuth();
   const [logoutVisible, setLogoutVisible] = useState(false);
+
+  const handleResendVerification = async () => {
+    try {
+      await resendVerificationEmail();
+      Alert.alert('Verification Email Sent', 'Please check your inbox (and spam folder).');
+    } catch (error) {
+      Alert.alert('Could not send email', error instanceof Error ? error.message : 'Please try again.');
+    }
+  };
 
   const stats = [
     { label: 'Articles', value: 42 },
@@ -51,15 +60,16 @@ export default function ReporterProfileScreen() {
       </View>
 
       <Card style={styles.menuCard} padded={false}>
-        <MenuRow icon="person-outline" label="Edit Profile" onPress={() => {}} />
+        <MenuRow icon="person-outline" label="Edit Profile" onPress={() => router.push('/(reporter)/edit-profile')} />
+        {/* <MenuRow icon="mail-unread-outline" label="Resend Verification Email" onPress={handleResendVerification} /> */}
         <MenuRow icon="card-outline" label="Payments & Payouts" onPress={() => router.push('/(reporter)/payment')} />
         <MenuRow icon="lock-closed-outline" label="Change Password" onPress={() => router.push('/(reporter)/change-password')} />
         <MenuRow icon="settings-outline" label="Settings" onPress={() => router.push('/(reporter)/settings')} />
       </Card>
 
       <Card style={styles.menuCard} padded={false}>
-        <MenuRow icon="help-circle-outline" label="Help & Support" onPress={() => {}} />
-        <MenuRow icon="document-lock-outline" label="Terms & Privacy" onPress={() => {}} />
+        <MenuRow icon="help-circle-outline" label="Help & Support" onPress={() => router.push('/(reporter)/help-support')} />
+        <MenuRow icon="document-lock-outline" label="Terms & Privacy" onPress={() => router.push('/(reporter)/terms-privacy')} />
         <MenuRow icon="log-out-outline" label="Logout" onPress={() => setLogoutVisible(true)} danger />
       </Card>
 

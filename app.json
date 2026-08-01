@@ -22,7 +22,8 @@
       "permissions": [
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.anonymous.NewsApp"
+      "package": "com.anonymous.NewsApp",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -45,7 +46,10 @@
           "imageWidth": 76
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true

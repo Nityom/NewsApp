@@ -112,7 +112,9 @@ export default function AdminArticleDetailScreen() {
           <Image source={{ uri: article.reporterAvatar }} style={styles.authorAvatar} />
           <View>
             <Text style={[styles.authorName, { color: theme.colors.text }]}>{article.reporterName}</Text>
-            <Text style={[styles.authorMeta, { color: theme.colors.textMuted }]}>{article.category}</Text>
+            {reporterPhone ? (
+              <Text style={[styles.authorMeta, { color: theme.colors.textMuted }]}>{reporterPhone}</Text>
+            ) : null}
           </View>
         </View>
 

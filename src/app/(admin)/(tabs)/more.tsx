@@ -69,8 +69,8 @@ export default function AdminMoreScreen() {
       </Card>
 
       <Card style={styles.menuCard} padded={false}>
-        <MenuRow icon="help-circle-outline" label="Help & Support" onPress={() => {}} />
-        <MenuRow icon="document-lock-outline" label="Terms & Privacy" onPress={() => {}} />
+        <MenuRow icon="help-circle-outline" label="Help & Support" onPress={() => router.push('/(admin)/help-support')} />
+        <MenuRow icon="document-lock-outline" label="Terms & Privacy" onPress={() => router.push('/(admin)/terms-privacy')} />
         <MenuRow icon="log-out-outline" label="Logout" onPress={() => setLogoutVisible(true)} danger />
       </Card>
 

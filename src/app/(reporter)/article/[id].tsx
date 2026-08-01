@@ -64,10 +64,6 @@ export default function ArticleDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={[styles.categoryPill, { backgroundColor: theme.colors.primaryMuted }]}>
-          <Text style={{ color: theme.colors.primary, fontSize: 11.5, fontWeight: '700' }}>{article.category}</Text>
-        </View>
-
         {article.status === 'rejected' && article.rejectionReason ? (
           <Card style={[styles.rejectionCard, { backgroundColor: theme.colors.dangerMuted, borderColor: theme.colors.danger }]}>
             <View style={styles.rejectionHeader}>
@@ -106,13 +102,6 @@ const styles = StyleSheet.create({
   banner: {
     width: '100%',
     height: 200,
-  },
-  categoryPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    marginTop: 16,
   },
   title: {
     fontSize: 21,

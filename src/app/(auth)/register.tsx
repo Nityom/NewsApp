@@ -1,9 +1,8 @@
 import { Link, router } from 'expo-router';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Button } from '@/components/ui/Button';
-import { IconButton } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useAuth } from '@/context/AuthContext';
@@ -11,24 +10,60 @@ import { useAppTheme } from '@/theme';
 
 export default function RegisterScreen() {
   const theme = useAppTheme();
-  const { loginAsReporter, isLoading } = useAuth();
+  const { register, loginWithGoogle, isLoading } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
+
+  const scrollToInput = (inputRef: React.RefObject<TextInput | null>) => () => {
+    const scrollNode = scrollRef.current?.getNativeScrollRef();
+    if (!scrollNode) return;
+    inputRef.current?.measureLayout(
+      scrollNode,
+      (_x, y) => scrollRef.current?.scrollTo({ y: y - 24, animated: true }),
+      () => {},
+    );
+  };
 
   const handleRegister = async () => {
     const nextErrors: Record<string, string> = {};
     if (name.trim().length < 3) nextErrors.name = 'Enter your full name';
     if (!email.includes('@')) nextErrors.email = 'Enter a valid email';
-    if (phone.trim().length < 10) nextErrors.phone = 'Enter a valid phone number';
-    if (password.length < 6) nextErrors.password = 'Minimum 6 characters required';
+    if (phone.replace(/\D/g, '').length < 10) nextErrors.phone = 'Enter a valid phone number with country code';
+    if (password.length < 6) nextErrors.password = 'Password must be at least 6 characters';
+    if (confirmPassword !== password) nextErrors.confirmPassword = 'Passwords do not match';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    await loginAsReporter();
-    router.replace('/(reporter)/(tabs)');
+    setSubmitting(true);
+    try {
+      await register(name.trim(), email.trim(), phone.trim(), password);
+      router.replace('/(reporter)/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Could not create account', error?.message ?? 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogleRegister = async () => {
+    setGoogleSubmitting(true);
+    try {
+      await loginWithGoogle('reporter');
+      router.replace('/(reporter)/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Could not sign in with Google', error?.message ?? 'Please try again.');
+    } finally {
+      setGoogleSubmitting(false);
+    }
   };
 
   return (
@@ -39,8 +74,8 @@ export default function RegisterScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
             Join our network of education reporters and start publishing.
           </Text>
@@ -75,16 +110,44 @@ export default function RegisterScreen() {
             />
             <Input
               label="Password"
+              ref={passwordRef}
               leftIcon="lock-closed-outline"
-              placeholder="Create a password"
-              isPassword
+              placeholder="••••••••"
+              secureTextEntry
               value={password}
               onChangeText={setPassword}
+              onFocus={scrollToInput(passwordRef)}
               error={errors.password}
-              hint="Use at least 6 characters"
+            />
+            <Input
+              label="Confirm Password"
+              ref={confirmPasswordRef}
+              leftIcon="lock-closed-outline"
+              placeholder="••••••••"
+              secureTextEntry
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              onFocus={scrollToInput(confirmPasswordRef)}
+              error={errors.confirmPassword}
             />
 
-            <Button label="Create Account" onPress={handleRegister} loading={isLoading} fullWidth size="lg" />
+            <Button label="Create Account" onPress={handleRegister} loading={submitting || isLoading} fullWidth size="lg" />
+
+            <View style={styles.dividerRow}>
+              <View style={[styles.dividerLine, { backgroundColor: theme.colors.border }]} />
+              <Text style={{ color: theme.colors.textMuted, fontSize: 12.5 }}>or</Text>
+              <View style={[styles.dividerLine, { backgroundColor: theme.colors.border }]} />
+            </View>
+
+            <Button
+              label="Continue with Google"
+              variant="outline"
+              icon="logo-google"
+              onPress={handleGoogleRegister}
+              loading={googleSubmitting}
+              fullWidth
+              size="lg"
+            />
           </View>
 
           <View style={styles.footerRow}>
@@ -126,9 +189,25 @@ const styles = StyleSheet.create({
   form: {
     gap: 16,
   },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
   footerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 24,
+  },
+  changeNumber: {
+    textAlign: 'center',
+    marginTop: 4,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

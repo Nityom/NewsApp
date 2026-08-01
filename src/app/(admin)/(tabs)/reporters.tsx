@@ -9,16 +9,17 @@ import { Icon } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { EmptyState } from '@/components/ui/StateViews';
-import { mockReporters } from '@/mocks/data';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 
 export default function AdminReportersScreen() {
   const theme = useAppTheme();
+  const { reporters } = useReporters();
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(
-    () => mockReporters.filter((r) => r.name.toLowerCase().includes(query.toLowerCase())),
-    [query],
+    () => reporters.filter((r) => r.name.toLowerCase().includes(query.toLowerCase())),
+    [reporters, query],
   );
 
   return (

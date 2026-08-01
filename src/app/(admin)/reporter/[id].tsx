@@ -1,21 +1,28 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ErrorState } from '@/components/ui/StateViews';
-import { mockArticles, mockReporters } from '@/mocks/data';
+import { useArticles } from '@/context/ArticlesContext';
+import { useReporters } from '@/context/ReportersContext';
+import { mockArticles } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 
 export default function ReporterDetailsScreen() {
   const theme = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const reporter = mockReporters.find((r) => r.id === id);
-  const articles = mockArticles.filter((a) => a.reporterId === id).slice(0, 5);
+  const { getReporter, deleteReporter } = useReporters();
+  const { articles: allArticles } = useArticles();
+  const reporter = getReporter(id);
+  const articles = (allArticles.length ? allArticles : mockArticles).filter((a) => a.reporterId === id).slice(0, 5);
+  const [deleteVisible, setDeleteVisible] = useState(false);
 
   if (!reporter) {
     return (
@@ -24,6 +31,12 @@ export default function ReporterDetailsScreen() {
       </ScreenContainer>
     );
   }
+
+  const handleDelete = async () => {
+    setDeleteVisible(false);
+    await deleteReporter(reporter.id);
+    router.back();
+  };
 
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
@@ -94,7 +107,21 @@ export default function ReporterDetailsScreen() {
             <Button label="Message" onPress={() => {}} fullWidth />
           </View>
         </ButtonRow>
+
+        <View style={{ height: 12 }} />
+        <Button label="Delete Account" variant="danger" onPress={() => setDeleteVisible(true)} fullWidth />
       </ScrollView>
+
+      <Dialog
+        visible={deleteVisible}
+        title="Delete Reporter Account?"
+        message={`This will permanently remove ${reporter.name}'s account from the app. This action cannot be undone.`}
+        onRequestClose={() => setDeleteVisible(false)}
+        actions={[
+          { label: 'Cancel', variant: 'outline', onPress: () => setDeleteVisible(false) },
+          { label: 'Delete', variant: 'danger', onPress: handleDelete },
+        ]}
+      />
     </ScreenContainer>
   );
 }

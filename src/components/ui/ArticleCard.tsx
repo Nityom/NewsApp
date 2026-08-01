@@ -40,14 +40,11 @@ export function ArticleCard({ article, onPress, showStatus = true, showAuthor = 
       ]}>
       <Image source={{ uri: article.banner }} style={styles.banner} contentFit="cover" transition={200} />
       <View style={styles.body}>
-        <View style={styles.topRow}>
-          <View style={[styles.categoryPill, { backgroundColor: theme.colors.primaryMuted }]}>
-            <Text style={{ color: theme.colors.primary, fontSize: 11, fontWeight: '700' }}>
-              {article.category}
-            </Text>
+        {showStatus ? (
+          <View style={styles.topRow}>
+            <StatusBadge status={article.status} size="sm" />
           </View>
-          {showStatus ? <StatusBadge status={article.status} size="sm" /> : null}
-        </View>
+        ) : null}
         <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={2}>
           {article.title}
         </Text>
@@ -97,13 +94,7 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  categoryPill: {
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 999,
-    alignSelf: 'flex-start',
+    justifyContent: 'flex-end',
   },
   title: {
     fontSize: 15.5,

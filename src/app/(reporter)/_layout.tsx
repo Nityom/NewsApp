@@ -9,6 +9,8 @@ export default function ReporterLayout() {
       <Stack.Screen name="settings" />
       <Stack.Screen name="change-password" />
       <Stack.Screen name="payment" />
+      <Stack.Screen name="help-support" />
+      <Stack.Screen name="terms-privacy" />
     </Stack>
   );
 }

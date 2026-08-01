@@ -1,9 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 
-import { Button } from '@/components/ui/Button';
-import { IconButton } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
@@ -12,20 +11,28 @@ import { palette, useAppTheme } from '@/theme';
 
 export default function AdminLoginScreen() {
   const theme = useAppTheme();
-  const { loginAsAdmin, isLoading } = useAuth();
-  const [email, setEmail] = useState('rahul.mehta@enr.app');
+  const { login, isLoading } = useAuth();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [submitting, setSubmitting] = useState(false);
 
   const handleLogin = async () => {
-    const nextErrors: typeof errors = {};
+    const nextErrors: { email?: string; password?: string } = {};
     if (!email.includes('@')) nextErrors.email = 'Enter a valid email address';
-    if (password.length < 4) nextErrors.password = 'Password must be at least 4 characters';
+    if (password.length < 6) nextErrors.password = 'Password must be at least 6 characters';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    await loginAsAdmin();
-    router.replace('/(admin)/(tabs)');
+    setSubmitting(true);
+    try {
+      await login(email.trim(), password, 'admin');
+      router.replace('/(admin)/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Could not sign in', error?.message ?? 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -34,15 +41,13 @@ export default function AdminLoginScreen() {
         <IconButton icon="arrow-back" color="#fff" onPress={() => router.back()} />
       </View>
 
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.content}>
           <View style={[styles.iconCircle, { backgroundColor: 'rgba(99,102,241,0.2)' }]}>
             <Icon name="shield-checkmark" size={34} color={palette.primary400} />
           </View>
           <Text style={styles.title}>Admin Console</Text>
-          <Text style={styles.subtitle}>
-            Restricted access for editorial administrators only.
-          </Text>
+          <Text style={styles.subtitle}>Restricted access for editorial administrators only.</Text>
 
           <View style={styles.form}>
             <Input
@@ -59,12 +64,12 @@ export default function AdminLoginScreen() {
               label="Password"
               leftIcon="lock-closed-outline"
               placeholder="••••••••"
-              isPassword
+              secureTextEntry
               value={password}
               onChangeText={setPassword}
               error={errors.password}
             />
-            <Button label="Sign In as Admin" onPress={handleLogin} loading={isLoading} fullWidth size="lg" />
+            <Button label="Sign In" onPress={handleLogin} loading={submitting || isLoading} fullWidth size="lg" />
           </View>
 
           <Text

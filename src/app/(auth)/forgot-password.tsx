@@ -1,32 +1,37 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { Button } from '@/components/ui/Button';
-import { IconButton } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { useAuth } from '@/context/AuthContext';
 import { useAppTheme } from '@/theme';
 
 export default function ForgotPasswordScreen() {
   const theme = useAppTheme();
+  const { resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | undefined>();
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!email.includes('@')) {
       setError('Enter a valid email address');
       return;
     }
     setError(undefined);
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await resetPassword(email.trim());
       setSent(true);
-    }, 1000);
+    } catch (err: any) {
+      Alert.alert('Could not send reset email', err?.message ?? 'Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

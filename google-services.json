@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "522828191876",
+    "project_id": "education-news-7f9bf",
+    "storage_bucket": "education-news-7f9bf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:522828191876:android:bc40778bce241e63430ad1",
+        "android_client_info": {
+          "package_name": "com.anonymous.NewsApp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "522828191876-v94gv1fuvi22gdp71k9n43cat25cg5aq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.anonymous.NewsApp",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "522828191876-mg6jcrm23hda7tvbsesa14cjm11sco3e.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBnCQ5Mw2avxAkxgjgaO6QFITRPvesc4Ds"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "522828191876-mg6jcrm23hda7tvbsesa14cjm11sco3e.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

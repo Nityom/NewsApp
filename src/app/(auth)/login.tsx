@@ -1,44 +1,77 @@
 import { Link, router } from 'expo-router';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Icon } from '@/components/ui/Icon';
+import { Input } from '@/components/ui/Input';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useAuth } from '@/context/AuthContext';
 import { useAppTheme } from '@/theme';
 
 export default function LoginScreen() {
   const theme = useAppTheme();
-  const { loginAsReporter, isLoading } = useAuth();
-  const [email, setEmail] = useState('ananya.sharma@enr.app');
+  const { login, loginWithGoogle, isLoading } = useAuth();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  const passwordRef = useRef<TextInput>(null);
+
+  const scrollToInput = (inputRef: React.RefObject<TextInput | null>) => () => {
+    const scrollNode = scrollRef.current?.getNativeScrollRef();
+    if (!scrollNode) return;
+    inputRef.current?.measureLayout(
+      scrollNode,
+      (_x, y) => scrollRef.current?.scrollTo({ y: y - 24, animated: true }),
+      () => {},
+    );
+  };
 
   const handleLogin = async () => {
-    const nextErrors: typeof errors = {};
+    const nextErrors: { email?: string; password?: string } = {};
     if (!email.includes('@')) nextErrors.email = 'Enter a valid email address';
-    if (password.length < 4) nextErrors.password = 'Password must be at least 4 characters';
+    if (password.length < 6) nextErrors.password = 'Password must be at least 6 characters';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    await loginAsReporter();
-    router.replace('/(reporter)/(tabs)');
+    setSubmitting(true);
+    try {
+      await login(email.trim(), password, 'reporter');
+      router.replace('/(reporter)/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Could not sign in', error?.message ?? 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setGoogleSubmitting(true);
+    try {
+      await loginWithGoogle('reporter');
+      router.replace('/(reporter)/(tabs)');
+    } catch (error: any) {
+      Alert.alert('Could not sign in with Google', error?.message ?? 'Please try again.');
+    } finally {
+      setGoogleSubmitting(false);
+    }
   };
 
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={[styles.logoCircle, { backgroundColor: theme.colors.primaryMuted }]}>
             <Icon name="newspaper" size={32} color={theme.colors.primary} />
           </View>
           <Text style={[styles.title, { color: theme.colors.text }]}>Welcome back</Text>
           <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-            Sign in to continue reporting education news.
+            Sign in with your email to continue reporting education news.
           </Text>
 
           <View style={styles.form}>
@@ -54,18 +87,37 @@ export default function LoginScreen() {
             />
             <Input
               label="Password"
+              ref={passwordRef}
               leftIcon="lock-closed-outline"
               placeholder="••••••••"
-              isPassword
+              secureTextEntry
               value={password}
               onChangeText={setPassword}
+              onFocus={scrollToInput(passwordRef)}
               error={errors.password}
             />
-            <Link href="/(auth)/forgot-password" style={[styles.forgot, { color: theme.colors.primary }]}>
+            <Link
+              href="/(auth)/forgot-password"
+              style={[styles.forgot, { color: theme.colors.primary, alignSelf: 'flex-end' }]}>
               Forgot password?
             </Link>
+            <Button label="Sign In" onPress={handleLogin} loading={submitting || isLoading} fullWidth size="lg" />
 
-            <Button label="Sign In" onPress={handleLogin} loading={isLoading} fullWidth size="lg" />
+            <View style={styles.dividerRow}>
+              <View style={[styles.dividerLine, { backgroundColor: theme.colors.border }]} />
+              <Text style={{ color: theme.colors.textMuted, fontSize: 12.5 }}>or</Text>
+              <View style={[styles.dividerLine, { backgroundColor: theme.colors.border }]} />
+            </View>
+
+            <Button
+              label="Continue with Google"
+              variant="outline"
+              icon="logo-google"
+              onPress={handleGoogleLogin}
+              loading={googleSubmitting}
+              fullWidth
+              size="lg"
+            />
           </View>
 
           <View style={styles.footerRow}>
@@ -111,6 +163,16 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: 16,
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
   },
   forgot: {
     alignSelf: 'flex-end',

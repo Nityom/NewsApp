@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image as RNImage, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useAppTheme } from '@/theme';
 import type { Article } from '@/types/models';
@@ -9,6 +10,36 @@ const logoBanner = require('../../../assets/images/logoBanner.jpeg');
 interface ArticleNewspaperLayoutProps {
   article: Article;
   reporterPhone?: string;
+}
+
+function AdImage({ uri, radius }: { uri: string; radius: number }) {
+  const theme = useAppTheme();
+  const [ratio, setRatio] = useState(4 / 3);
+
+  useEffect(() => {
+    let cancelled = false;
+    RNImage.getSize(
+      uri,
+      (w, h) => {
+        if (!cancelled && w > 0 && h > 0) setRatio(w / h);
+      },
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [uri]);
+
+  return (
+    <Image
+      source={{ uri }}
+      style={[
+        styles.adImage,
+        { aspectRatio: ratio, borderRadius: radius, backgroundColor: theme.colors.backgroundSubtle },
+      ]}
+      contentFit="contain"
+    />
+  );
 }
 
 /**
@@ -37,6 +68,20 @@ export function ArticleNewspaperLayout({ article, reporterPhone }: ArticleNewspa
       <Text style={[styles.title, { color: theme.colors.text }]}>{article.title}</Text>
       <Text style={[styles.body, { color: theme.colors.text }]}>{article.content}</Text>
 
+      {article.sections?.map((section) => (
+        <View key={section.id} style={[styles.sectionBlock, { borderTopColor: theme.colors.border }]}>
+          {section.image ? (
+            <Image
+              source={{ uri: section.image }}
+              style={[styles.sectionImage, { borderRadius: theme.radius.md }]}
+              contentFit="cover"
+            />
+          ) : null}
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{section.title}</Text>
+          <Text style={[styles.body, { color: theme.colors.text }]}>{section.content}</Text>
+        </View>
+      ))}
+
       {article.images.length > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.gallery}>
           {article.images.map((uri, i) => (
@@ -54,15 +99,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone }: ArticleNewspa
         <View style={styles.adSection}>
           <Text style={[styles.adLabel, { color: theme.colors.textMuted }]}>Advertisement</Text>
           {article.advertisements.map((uri, i) => (
-            <Image
-              key={`${uri}-${i}`}
-              source={{ uri }}
-              style={[
-                styles.adImage,
-                { borderRadius: theme.radius.md, backgroundColor: theme.colors.backgroundSubtle },
-              ]}
-              contentFit="contain"
-            />
+            <AdImage key={`${uri}-${i}`} uri={uri} radius={theme.radius.md} />
           ))}
         </View>
       ) : null}
@@ -123,8 +160,22 @@ const styles = StyleSheet.create({
   },
   adImage: {
     width: '100%',
-    height: 280,
     marginBottom: 10,
+  },
+  sectionBlock: {
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  sectionImage: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 24,
   },
   footer: {
     borderTopWidth: StyleSheet.hairlineWidth,

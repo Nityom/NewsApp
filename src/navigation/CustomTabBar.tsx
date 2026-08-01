@@ -1,10 +1,10 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { Pressable } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useAppTheme } from '@/theme';
 import { Icon, IconName } from '@/components/ui/Icon';
+import { useNotifications } from '@/context/NotificationsContext';
+import { useAppTheme } from '@/theme';
 
 export interface TabBarIconMap {
   [routeName: string]: { active: IconName; inactive: IconName; badge?: number };
@@ -76,9 +76,9 @@ function TabBarButton({
 /** expo-router's js-tabs `tabBar` render prop is invoked as a plain function call inside a
  * Context.Consumer, which does not set up the hooks dispatcher. Keep the returned function
  * hook-free and defer all hook usage to a JSX-rendered inner component instead. */
-export function createCustomTabBar(iconMap: TabBarIconMap) {
+export function createCustomTabBar(iconMap: TabBarIconMap, options?: { notificationsAudience?: 'reporter' | 'admin' }) {
   return function CustomTabBar(props: CustomTabBarProps) {
-    return <CustomTabBarInner {...props} iconMap={iconMap} />;
+    return <CustomTabBarInner {...props} iconMap={iconMap} notificationsAudience={options?.notificationsAudience} />;
   };
 }
 
@@ -87,9 +87,11 @@ function CustomTabBarInner({
   descriptors,
   navigation,
   iconMap,
-}: CustomTabBarProps & { iconMap: TabBarIconMap }) {
+  notificationsAudience,
+}: CustomTabBarProps & { iconMap: TabBarIconMap; notificationsAudience?: 'reporter' | 'admin' }) {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { unreadCount } = useNotifications();
 
   return (
     <View
@@ -107,6 +109,10 @@ function CustomTabBarInner({
         const label = (options.title ?? route.name) as string;
         const focused = state.index === index;
         const config = iconMap[route.name] ?? { active: 'ellipse', inactive: 'ellipse-outline' };
+        const badge =
+          route.name === 'notifications' && notificationsAudience
+            ? unreadCount(notificationsAudience)
+            : config.badge;
 
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -121,7 +127,7 @@ function CustomTabBarInner({
             focused={focused}
             label={label}
             icon={focused ? config.active : config.inactive}
-            badge={config.badge}
+            badge={badge}
             onPress={onPress}
             color={theme.colors.primary}
             inactiveColor={theme.colors.tabBarInactive}

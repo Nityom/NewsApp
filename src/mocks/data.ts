@@ -1,11 +1,11 @@
 import {
-  AnalyticsSummary,
-  AppNotification,
-  Article,
-  Category,
-  CurrentUser,
-  Payment,
-  Reporter,
+    AnalyticsSummary,
+    AppNotification,
+    Article,
+    Category,
+    CurrentUser,
+    Payment,
+    Reporter,
 } from '@/types/models';
 
 const categories: Category[] = [
@@ -178,6 +178,7 @@ export const mockNotifications: AppNotification[] = [
     createdAt: daysAgo(0),
     isRead: false,
     articleId: 'art-1',
+    audience: 'reporter',
   },
   {
     id: 'ntf-2',
@@ -186,6 +187,7 @@ export const mockNotifications: AppNotification[] = [
     message: 'You received a payout of ₹4,850 for October articles.',
     createdAt: daysAgo(1),
     isRead: false,
+    audience: 'reporter',
   },
   {
     id: 'ntf-3',
@@ -195,6 +197,7 @@ export const mockNotifications: AppNotification[] = [
     createdAt: daysAgo(2),
     isRead: true,
     articleId: 'art-6',
+    audience: 'reporter',
   },
   {
     id: 'ntf-4',
@@ -204,6 +207,7 @@ export const mockNotifications: AppNotification[] = [
     createdAt: daysAgo(3),
     isRead: true,
     articleId: 'art-2',
+    audience: 'reporter',
   },
   {
     id: 'ntf-5',
@@ -212,6 +216,7 @@ export const mockNotifications: AppNotification[] = [
     message: 'Congratulations! Your reporter profile has been verified by our editorial team.',
     createdAt: daysAgo(6),
     isRead: true,
+    audience: 'reporter',
   },
   {
     id: 'ntf-6',
@@ -220,6 +225,7 @@ export const mockNotifications: AppNotification[] = [
     message: 'Sneha Kulkarni just joined the platform from Chennai.',
     createdAt: daysAgo(7),
     isRead: true,
+    audience: 'admin',
   },
 ];
 

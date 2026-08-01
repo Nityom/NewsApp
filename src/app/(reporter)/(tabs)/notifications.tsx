@@ -4,7 +4,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { EmptyState } from '@/components/ui/StateViews';
-import { mockNotifications } from '@/mocks/data';
+import { useNotifications } from '@/context/NotificationsContext';
 import { useAppTheme } from '@/theme';
 import type { NotificationType } from '@/types/models';
 
@@ -35,6 +35,8 @@ function timeAgo(iso: string) {
 
 export default function ReporterNotificationsScreen() {
   const theme = useAppTheme();
+  const { getForAudience, markRead } = useNotifications();
+  const notifications = getForAudience('reporter');
 
   return (
     <ScreenContainer>
@@ -42,14 +44,17 @@ export default function ReporterNotificationsScreen() {
         <Text style={[styles.title, { color: theme.colors.text }]}>Notifications</Text>
       </View>
       <FlatList
-        data={mockNotifications}
+        data={notifications}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => {
           const tone = toneMap[item.type];
           return (
             <Pressable
-              onPress={() => item.articleId && router.push(`/(reporter)/article/${item.articleId}`)}
+              onPress={() => {
+                if (!item.isRead) markRead(item.id);
+                if (item.articleId) router.push(`/(reporter)/article/${item.articleId}`);
+              }}
               style={[
                 styles.row,
                 {

@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ArticlesProvider } from '@/context/ArticlesContext';
 import { AuthProvider } from '@/context/AuthContext';
+import { NotificationsProvider } from '@/context/NotificationsContext';
 import { AppThemeProvider, useAppTheme } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -54,9 +55,11 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AppThemeProvider>
           <AuthProvider>
-            <ArticlesProvider>
-              <RootNavigator />
-            </ArticlesProvider>
+            <NotificationsProvider>
+              <ArticlesProvider>
+                <RootNavigator />
+              </ArticlesProvider>
+            </NotificationsProvider>
           </AuthProvider>
         </AppThemeProvider>
       </SafeAreaProvider>

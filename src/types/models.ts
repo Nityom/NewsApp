@@ -28,6 +28,13 @@ export interface Reporter {
   totalEarnings: number;
 }
 
+export interface ArticleSection {
+  id: string;
+  title: string;
+  content: string;
+  image?: string;
+}
+
 export interface Article {
   id: string;
   title: string;
@@ -36,6 +43,7 @@ export interface Article {
   banner: string;
   images: string[];
   advertisements: string[];
+  sections?: ArticleSection[];
   category: Category;
   status: ArticleStatus;
   reporterId: string;
@@ -69,6 +77,7 @@ export interface AppNotification {
   createdAt: string;
   isRead: boolean;
   articleId?: string;
+  audience: 'reporter' | 'admin';
 }
 
 export type PaymentStatus = 'paid' | 'pending' | 'failed';

@@ -2,12 +2,15 @@ import { Tabs } from 'expo-router/js-tabs';
 
 import { createCustomTabBar } from '@/navigation/CustomTabBar';
 
-const tabBar = createCustomTabBar({
-  index: { active: 'grid', inactive: 'grid-outline' },
-  articles: { active: 'document-text', inactive: 'document-text-outline' },
-  notifications: { active: 'notifications', inactive: 'notifications-outline', badge: 2 },
-  profile: { active: 'person', inactive: 'person-outline' },
-});
+const tabBar = createCustomTabBar(
+  {
+    index: { active: 'grid', inactive: 'grid-outline' },
+    articles: { active: 'document-text', inactive: 'document-text-outline' },
+    notifications: { active: 'notifications', inactive: 'notifications-outline' },
+    profile: { active: 'person', inactive: 'person-outline' },
+  },
+  { notificationsAudience: 'reporter' },
+);
 
 export default function ReporterTabsLayout() {
   return (

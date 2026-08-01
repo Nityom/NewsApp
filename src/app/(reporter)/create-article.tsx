@@ -12,7 +12,7 @@ import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
 import { allCategories } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
-import type { Article, Category } from '@/types/models';
+import type { Article, ArticleSection, Category } from '@/types/models';
 
 const formatTools: { icon: IconName; token: string; label: string }[] = [
   { icon: 'text', token: '# ', label: 'Heading' },
@@ -37,6 +37,7 @@ export default function CreateArticleScreen() {
   const [content, setContent] = useState(editingDraft?.content ?? '');
   const [images, setImages] = useState<string[]>(editingDraft?.images ?? []);
   const [advertisements, setAdvertisements] = useState<string[]>(editingDraft?.advertisements ?? []);
+  const [sections, setSections] = useState<ArticleSection[]>(editingDraft?.sections ?? []);
   const [submitting, setSubmitting] = useState<'draft' | 'submit' | null>(null);
 
   const pickImage = async (mode: 'banner' | 'gallery' | 'ad') => {
@@ -49,7 +50,7 @@ export default function CreateArticleScreen() {
       mediaTypes: ['images'],
       allowsEditing: mode !== 'ad',
       aspect: mode === 'banner' ? [16, 9] : mode === 'gallery' ? [4, 3] : undefined,
-      quality: 0.8,
+      quality: mode === 'ad' ? 1 : 0.8,
       allowsMultipleSelection: false,
     });
     if (result.canceled) return;
@@ -65,6 +66,35 @@ export default function CreateArticleScreen() {
 
   const insertToken = (token: string) => setContent((prev) => `${prev}${token}`);
 
+  const addSection = () => {
+    setSections((prev) => [...prev, { id: `sec-${Date.now()}`, title: '', content: '' }]);
+  };
+
+  const updateSection = (id: string, patch: Partial<ArticleSection>) => {
+    setSections((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  };
+
+  const removeSection = (id: string) => {
+    setSections((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const pickSectionImage = async (id: string) => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Please allow photo library access to upload images.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+      allowsMultipleSelection: false,
+    });
+    if (result.canceled) return;
+    updateSection(id, { image: result.assets[0]?.uri });
+  };
+
   const handleSave = async (kind: 'draft' | 'submit') => {
     if (!title.trim()) {
       Alert.alert('Title required', 'Please enter an article title before continuing.');
@@ -77,6 +107,7 @@ export default function CreateArticleScreen() {
     setSubmitting(kind);
     const now = new Date().toISOString();
     const status = kind === 'draft' ? 'draft' : 'pending';
+    const cleanSections = sections.filter((s) => s.title.trim() || s.content.trim() || s.image);
 
     try {
       if (editingDraft) {
@@ -87,6 +118,7 @@ export default function CreateArticleScreen() {
           banner,
           images,
           advertisements,
+          sections: cleanSections,
           category,
           status,
           reporterPhone: user?.phone ?? editingDraft.reporterPhone,
@@ -102,6 +134,7 @@ export default function CreateArticleScreen() {
           banner,
           images,
           advertisements,
+          sections: cleanSections,
           category,
           status,
           reporterId: user?.id ?? 'unknown',
@@ -259,6 +292,61 @@ export default function CreateArticleScreen() {
           ))}
         </ScrollView>
 
+        <View style={[styles.imagesHeader, { marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
+            Additional Articles ({sections.length})
+          </Text>
+          <IconButton icon="add-circle-outline" size={22} onPress={addSection} />
+        </View>
+        {sections.map((section, i) => (
+          <View
+            key={section.id}
+            style={[
+              styles.sectionCard,
+              { backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md, borderColor: theme.colors.border },
+            ]}>
+            <View style={styles.sectionCardHeader}>
+              <Text style={[styles.sectionCardLabel, { color: theme.colors.textMuted }]}>Article {i + 2}</Text>
+              <IconButton icon="trash-outline" size={18} onPress={() => removeSection(section.id)} />
+            </View>
+            <View
+              style={[styles.sectionImageWrap, { borderColor: theme.colors.border, borderRadius: theme.radius.md }]}
+              onTouchEnd={() => pickSectionImage(section.id)}>
+              {section.image ? (
+                <Image source={{ uri: section.image }} style={styles.sectionImagePreview} contentFit="cover" />
+              ) : (
+                <View style={styles.bannerPlaceholder}>
+                  <Icon name="image-outline" size={22} color={theme.colors.textMuted} />
+                  <Text style={[styles.bannerText, { color: theme.colors.textMuted }]}>Tap to add photo (optional)</Text>
+                </View>
+              )}
+            </View>
+            <TextInput
+              value={section.title}
+              onChangeText={(text) => updateSection(section.id, { title: text })}
+              placeholder="Headline for this story"
+              placeholderTextColor={theme.colors.textMuted}
+              style={[
+                styles.titleInput,
+                { color: theme.colors.text, borderColor: theme.colors.border, borderRadius: theme.radius.md, fontSize: 15, marginTop: 12 },
+              ]}
+              multiline
+            />
+            <TextInput
+              value={section.content}
+              onChangeText={(text) => updateSection(section.id, { content: text })}
+              placeholder="Write this story..."
+              placeholderTextColor={theme.colors.textMuted}
+              style={[
+                styles.bodyInput,
+                { color: theme.colors.text, borderColor: theme.colors.border, borderRadius: theme.radius.md, minHeight: 100, marginTop: 10 },
+              ]}
+              multiline
+              textAlignVertical="top"
+            />
+          </View>
+        ))}
+
         {user ? (
           <View
             style={[
@@ -319,6 +407,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 8,
+  },
+  sectionCard: {
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 14,
+  },
+  sectionCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionCardLabel: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionImageWrap: {
+    height: 120,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  sectionImagePreview: {
+    width: '100%',
+    height: '100%',
   },
   bannerWrap: {
     height: 160,

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Card } from '@/components/ui/Card';
@@ -8,9 +8,22 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useAuth } from '@/context/AuthContext';
+import { useNotifications } from '@/context/NotificationsContext';
 import { useAppTheme } from '@/theme';
 
-function MenuRow({ icon, label, onPress, danger }: { icon: IconName; label: string; onPress: () => void; danger?: boolean }) {
+function MenuRow({
+  icon,
+  label,
+  onPress,
+  danger,
+  badge,
+}: {
+  icon: IconName;
+  label: string;
+  onPress: () => void;
+  danger?: boolean;
+  badge?: number;
+}) {
   const theme = useAppTheme();
   return (
     <Pressable onPress={onPress} style={styles.menuRow}>
@@ -18,6 +31,11 @@ function MenuRow({ icon, label, onPress, danger }: { icon: IconName; label: stri
         <Icon name={icon} size={18} color={danger ? theme.colors.danger : theme.colors.text} />
       </View>
       <Text style={[styles.menuLabel, { color: danger ? theme.colors.danger : theme.colors.text }]}>{label}</Text>
+      {badge ? (
+        <View style={[styles.menuBadge, { backgroundColor: theme.colors.danger }]}>
+          <Text style={styles.menuBadgeText}>{badge > 9 ? '9+' : badge}</Text>
+        </View>
+      ) : null}
       <Icon name="chevron-forward" size={18} color={theme.colors.textMuted} />
     </Pressable>
   );
@@ -26,6 +44,7 @@ function MenuRow({ icon, label, onPress, danger }: { icon: IconName; label: stri
 export default function AdminMoreScreen() {
   const theme = useAppTheme();
   const { user, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const [logoutVisible, setLogoutVisible] = useState(false);
 
   return (
@@ -40,7 +59,12 @@ export default function AdminMoreScreen() {
 
       <Card style={styles.menuCard} padded={false}>
         <MenuRow icon="bar-chart-outline" label="Analytics Dashboard" onPress={() => router.push('/(admin)/analytics')} />
-        <MenuRow icon="notifications-outline" label="Notifications" onPress={() => router.push('/(admin)/notifications')} />
+        <MenuRow
+          icon="notifications-outline"
+          label="Notifications"
+          onPress={() => router.push('/(admin)/notifications')}
+          badge={unreadCount('admin')}
+        />
         <MenuRow icon="settings-outline" label="Settings" onPress={() => router.push('/(admin)/settings')} />
       </Card>
 
@@ -112,5 +136,19 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14.5,
     fontWeight: '600',
+  },
+  menuBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  menuBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
 });

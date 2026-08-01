@@ -11,6 +11,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SectionHeader } from '@/components/ui/SearchBar';
 import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
+import { useNotifications } from '@/context/NotificationsContext';
 import { mockAnalytics } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 
@@ -31,6 +32,7 @@ export default function AdminDashboardScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
   const { articles } = useArticles();
+  const { unreadCount } = useNotifications();
   const pendingArticles = useMemo(() => articles.filter((a) => a.status === 'pending').slice(0, 4), [articles]);
 
   return (
@@ -47,7 +49,11 @@ export default function AdminDashboardScreen() {
                 <Text style={[styles.name, { color: theme.colors.text }]}>{user?.name ?? 'Admin'}</Text>
               </View>
               <View style={styles.headerActions}>
-                <IconButton icon="notifications-outline" onPress={() => router.push('/(admin)/notifications')} />
+                <IconButton
+                  icon="notifications-outline"
+                  onPress={() => router.push('/(admin)/notifications')}
+                  badge={unreadCount('admin')}
+                />
                 <Avatar uri={user?.avatar} name={user?.name ?? 'A'} size={44} />
               </View>
             </View>
@@ -56,7 +62,7 @@ export default function AdminDashboardScreen() {
               <StatCard icon="document-text" label="Total Articles" value={mockAnalytics.totalArticles.toString()} tone="primary" />
               <StatCard icon="people" label="Reporters" value={mockAnalytics.totalReporters.toString()} tone="success" />
               <StatCard icon="time" label="Pending Review" value={mockAnalytics.pendingReview.toString()} tone="warning" />
-              <StatCard icon="eye" label="Total Views" value={`${(mockAnalytics.totalViews / 1000).toFixed(1)}k`} tone="danger" />
+              {/* <StatCard icon="eye" label="Total Views" value={`${(mockAnalytics.totalViews / 1000).toFixed(1)}k`} tone="danger" /> */}
             </View>
 
             <Card style={[styles.analyticsCard, { backgroundColor: theme.colors.primary }]}>

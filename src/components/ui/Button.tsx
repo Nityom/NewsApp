@@ -1,11 +1,11 @@
 import { ReactNode } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  PressableProps,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Pressable,
+    PressableProps,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 
 import { useAppTheme } from '@/theme';
@@ -95,6 +95,7 @@ interface IconButtonProps extends Omit<PressableProps, 'style'> {
   size?: number;
   variant?: 'plain' | 'filled';
   color?: string;
+  badge?: number;
 }
 
 export function IconButton({
@@ -102,6 +103,7 @@ export function IconButton({
   size = 22,
   variant = 'plain',
   color,
+  badge,
   ...pressableProps
 }: IconButtonProps) {
   const theme = useAppTheme();
@@ -120,6 +122,11 @@ export function IconButton({
       hitSlop={8}
       {...pressableProps}>
       <Icon name={icon} size={size} color={iconColor} />
+      {badge ? (
+        <View style={[styles.iconButtonBadge, { backgroundColor: theme.colors.danger }]}>
+          <Text style={styles.iconButtonBadgeText}>{badge > 9 ? '9+' : badge}</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -147,6 +154,22 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconButtonBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconButtonBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   row: {
     flexDirection: 'row',

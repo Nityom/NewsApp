@@ -19,10 +19,11 @@ import { useAppTheme } from '@/theme';
 export default function AdminArticleDetailScreen() {
   const theme = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getArticle, updateArticle } = useArticles();
+  const { getArticle, updateArticle, deleteArticle } = useArticles();
   const article = getArticle(id);
   const reporterPhone = mockReporters.find((r) => r.id === article?.reporterId)?.phone;
   const [rejectVisible, setRejectVisible] = useState(false);
+  const [deleteVisible, setDeleteVisible] = useState(false);
   const [reason, setReason] = useState('');
   const [advertisements, setAdvertisements] = useState<string[]>(article?.advertisements ?? []);
 
@@ -43,7 +44,7 @@ export default function AdminArticleDetailScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
-      quality: 0.8,
+      quality: 1,
       allowsMultipleSelection: false,
     });
     if (result.canceled) return;
@@ -75,11 +76,35 @@ export default function AdminArticleDetailScreen() {
     ]);
   };
 
+  const moveToTrash = async () => {
+    setDeleteVisible(false);
+    await updateArticle(article.id, { status: 'trashed' });
+    Alert.alert('Article Deleted', 'The article has been moved to Trash.', [
+      { text: 'OK', onPress: () => router.back() },
+    ]);
+  };
+
+  const restoreFromTrash = async () => {
+    await updateArticle(article.id, { status: 'pending' });
+    Alert.alert('Article Restored', 'The article has been moved back to Pending.');
+  };
+
+  const deleteForever = async () => {
+    setDeleteVisible(false);
+    await deleteArticle(article.id);
+    Alert.alert('Article Removed', 'The article has been permanently deleted.', [
+      { text: 'OK', onPress: () => router.back() },
+    ]);
+  };
+
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.header}>
         <IconButton icon="arrow-back" onPress={() => router.back()} />
-        <StatusBadge status={article.status} />
+        <View style={styles.headerActions}>
+          <StatusBadge status={article.status} />
+          <IconButton icon="trash-outline" color={theme.colors.danger} onPress={() => setDeleteVisible(true)} />
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -135,6 +160,20 @@ export default function AdminArticleDetailScreen() {
             </ButtonRow>
           </>
         ) : null}
+
+        {article.status === 'trashed' ? (
+          <>
+            <View style={{ height: 24 }} />
+            <ButtonRow>
+              <View style={{ flex: 1 }}>
+                <Button label="Restore" variant="outline" icon="refresh" onPress={restoreFromTrash} fullWidth />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button label="Delete Forever" variant="danger" icon="trash" onPress={deleteForever} fullWidth />
+              </View>
+            </ButtonRow>
+          </>
+        ) : null}
       </ScrollView>
 
       <Dialog
@@ -156,6 +195,25 @@ export default function AdminArticleDetailScreen() {
           />
         </View>
       </Dialog>
+
+      <Dialog
+        visible={deleteVisible}
+        title={article.status === 'trashed' ? 'Delete Permanently?' : 'Delete Article?'}
+        message={
+          article.status === 'trashed'
+            ? 'This will permanently remove the article. This action cannot be undone.'
+            : 'This will move the article to Trash. The reporter will no longer see it as active.'
+        }
+        onRequestClose={() => setDeleteVisible(false)}
+        actions={[
+          { label: 'Cancel', variant: 'outline', onPress: () => setDeleteVisible(false) },
+          {
+            label: article.status === 'trashed' ? 'Delete Forever' : 'Delete',
+            variant: 'danger',
+            onPress: article.status === 'trashed' ? deleteForever : moveToTrash,
+          },
+        ]}
+      />
     </ScreenContainer>
   );
 }
@@ -166,6 +224,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   scroll: {
     paddingHorizontal: 20,

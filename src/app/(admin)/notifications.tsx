@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { IconButton } from '@/components/ui/Button';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { EmptyState } from '@/components/ui/StateViews';
-import { mockNotifications } from '@/mocks/data';
+import { useNotifications } from '@/context/NotificationsContext';
 import { useAppTheme } from '@/theme';
 import type { NotificationType } from '@/types/models';
 
@@ -36,6 +36,8 @@ function timeAgo(iso: string) {
 
 export default function AdminNotificationsScreen() {
   const theme = useAppTheme();
+  const { getForAudience, markRead } = useNotifications();
+  const notifications = getForAudience('admin');
 
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
@@ -46,13 +48,17 @@ export default function AdminNotificationsScreen() {
       </View>
 
       <FlatList
-        data={mockNotifications}
+        data={notifications}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => {
           const tone = toneMap[item.type];
           return (
-            <View
+            <Pressable
+              onPress={() => {
+                if (!item.isRead) markRead(item.id);
+                if (item.articleId) router.push(`/(admin)/article/${item.articleId}`);
+              }}
               style={[
                 styles.row,
                 {
@@ -71,7 +77,7 @@ export default function AdminNotificationsScreen() {
                 </Text>
                 <Text style={[styles.notifTime, { color: theme.colors.textMuted }]}>{timeAgo(item.createdAt)}</Text>
               </View>
-            </View>
+            </Pressable>
           );
         }}
         ListEmptyComponent={<EmptyState icon="notifications-off-outline" title="No notifications" />}

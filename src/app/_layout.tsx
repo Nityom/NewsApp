@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ArticlesProvider } from '@/context/ArticlesContext';
 import { AuthProvider } from '@/context/AuthContext';
 import { AppThemeProvider, useAppTheme } from '@/theme';
 
@@ -53,7 +54,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AppThemeProvider>
           <AuthProvider>
-            <RootNavigator />
+            <ArticlesProvider>
+              <RootNavigator />
+            </ArticlesProvider>
           </AuthProvider>
         </AppThemeProvider>
       </SafeAreaProvider>

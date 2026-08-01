@@ -22,10 +22,11 @@ interface ArticleNewspaperLayoutProps {
  */
 export function ArticleNewspaperLayout({ article, reporterPhone }: ArticleNewspaperLayoutProps) {
   const theme = useAppTheme();
+  const phone = article.reporterPhone ?? reporterPhone;
 
   return (
     <View>
-      <Image source={logoBanner} style={styles.logoBanner} contentFit="cover" />
+      <Image source={logoBanner} style={styles.logoBanner} contentFit="contain" />
 
       <Image
         source={{ uri: article.banner }}
@@ -56,8 +57,11 @@ export function ArticleNewspaperLayout({ article, reporterPhone }: ArticleNewspa
             <Image
               key={`${uri}-${i}`}
               source={{ uri }}
-              style={[styles.adImage, { borderRadius: theme.radius.md }]}
-              contentFit="cover"
+              style={[
+                styles.adImage,
+                { borderRadius: theme.radius.md, backgroundColor: theme.colors.backgroundSubtle },
+              ]}
+              contentFit="contain"
             />
           ))}
         </View>
@@ -71,7 +75,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone }: ArticleNewspa
         <Text style={[styles.reporterLabel, { color: theme.colors.textMuted }]}>News Reporter</Text>
         <Text style={[styles.reporterName, { color: theme.colors.text }]}>
           {article.reporterName}
-          {reporterPhone ? ` : ${reporterPhone}` : ''}
+          {phone ? ` : ${phone}` : ''}
         </Text>
       </View>
     </View>
@@ -81,11 +85,11 @@ export function ArticleNewspaperLayout({ article, reporterPhone }: ArticleNewspa
 const styles = StyleSheet.create({
   logoBanner: {
     width: '100%',
-    height: 90,
+    aspectRatio: 2564 / 451,
   },
   newsPhoto: {
     width: '100%',
-    height: 200,
+    height: 170,
     marginTop: 14,
   },
   title: {
@@ -104,7 +108,7 @@ const styles = StyleSheet.create({
   },
   galleryImage: {
     width: 220,
-    height: 140,
+    aspectRatio: 4 / 3,
     marginRight: 10,
   },
   adSection: {
@@ -119,7 +123,7 @@ const styles = StyleSheet.create({
   },
   adImage: {
     width: '100%',
-    height: 160,
+    height: 280,
     marginBottom: 10,
   },
   footer: {

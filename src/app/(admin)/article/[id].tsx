@@ -4,21 +4,23 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
 import { StatusBadge } from '@/components/ui/Badge';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
-import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ErrorState } from '@/components/ui/StateViews';
-import { mockArticles, mockReporters } from '@/mocks/data';
+import { useArticles } from '@/context/ArticlesContext';
+import { mockReporters } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 
 export default function AdminArticleDetailScreen() {
   const theme = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const article = mockArticles.find((a) => a.id === id);
+  const { getArticle, updateArticle } = useArticles();
+  const article = getArticle(id);
   const reporterPhone = mockReporters.find((r) => r.id === article?.reporterId)?.phone;
   const [rejectVisible, setRejectVisible] = useState(false);
   const [reason, setReason] = useState('');
@@ -40,27 +42,34 @@ export default function AdminArticleDetailScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
+      allowsEditing: false,
       quality: 0.8,
-      allowsMultipleSelection: true,
+      allowsMultipleSelection: false,
     });
     if (result.canceled) return;
     setAdvertisements((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
   };
 
-  const saveAdvertisements = () => {
-    article.advertisements = advertisements;
+  const saveAdvertisements = async () => {
+    await updateArticle(article.id, { advertisements });
     Alert.alert('Advertisements Saved', 'The ad photos for this article have been updated.');
   };
 
-  const approve = () => {
+  const approve = async () => {
+    await updateArticle(article.id, { status: 'approved', reviewedAt: new Date().toISOString() });
     Alert.alert('Article Approved', 'The article has been published successfully.', [
       { text: 'OK', onPress: () => router.back() },
     ]);
   };
 
-  const reject = () => {
+  const reject = async () => {
     if (!reason.trim()) return;
     setRejectVisible(false);
+    await updateArticle(article.id, {
+      status: 'rejected',
+      rejectionReason: reason.trim(),
+      reviewedAt: new Date().toISOString(),
+    });
     Alert.alert('Article Rejected', 'Feedback has been sent to the reporter.', [
       { text: 'OK', onPress: () => router.back() },
     ]);

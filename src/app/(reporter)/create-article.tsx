@@ -4,15 +4,15 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Button, ButtonRow } from '@/components/ui/Button';
-import { IconButton } from '@/components/ui/Button';
+import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
-import { allCategories, mockArticles } from '@/mocks/data';
+import { allCategories } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
-import type { Category } from '@/types/models';
+import type { Article, Category } from '@/types/models';
 
 const formatTools: { icon: IconName; token: string; label: string }[] = [
   { icon: 'text', token: '# ', label: 'Heading' },
@@ -24,10 +24,11 @@ const formatTools: { icon: IconName; token: string; label: string }[] = [
 export default function CreateArticleScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
+  const { articles, addArticle, updateArticle } = useArticles();
   const params = useLocalSearchParams<{ id?: string }>();
   const editingDraft = useMemo(
-    () => (params.id ? mockArticles.find((a) => a.id === params.id) : undefined),
-    [params.id],
+    () => (params.id ? articles.find((a) => a.id === params.id) : undefined),
+    [params.id, articles],
   );
 
   const [banner, setBanner] = useState<string | undefined>(editingDraft?.banner);
@@ -46,10 +47,10 @@ export default function CreateArticleScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: mode === 'banner',
-      aspect: mode === 'banner' ? [16, 9] : undefined,
+      allowsEditing: mode !== 'ad',
+      aspect: mode === 'banner' ? [16, 9] : mode === 'gallery' ? [4, 3] : undefined,
       quality: 0.8,
-      allowsMultipleSelection: mode !== 'banner',
+      allowsMultipleSelection: false,
     });
     if (result.canceled) return;
 
@@ -64,13 +65,59 @@ export default function CreateArticleScreen() {
 
   const insertToken = (token: string) => setContent((prev) => `${prev}${token}`);
 
-  const handleSave = (kind: 'draft' | 'submit') => {
+  const handleSave = async (kind: 'draft' | 'submit') => {
     if (!title.trim()) {
       Alert.alert('Title required', 'Please enter an article title before continuing.');
       return;
     }
+    if (!banner) {
+      Alert.alert('Banner required', 'Please upload a news photo before continuing.');
+      return;
+    }
     setSubmitting(kind);
-    setTimeout(() => {
+    const now = new Date().toISOString();
+    const status = kind === 'draft' ? 'draft' : 'pending';
+
+    try {
+      if (editingDraft) {
+        await updateArticle(editingDraft.id, {
+          title,
+          summary: content.slice(0, 140),
+          content,
+          banner,
+          images,
+          advertisements,
+          category,
+          status,
+          reporterPhone: user?.phone ?? editingDraft.reporterPhone,
+          updatedAt: now,
+          submittedAt: kind === 'submit' ? now : editingDraft.submittedAt,
+        });
+      } else {
+        const newArticle: Article = {
+          id: `art-${Date.now()}`,
+          title,
+          summary: content.slice(0, 140),
+          content,
+          banner,
+          images,
+          advertisements,
+          category,
+          status,
+          reporterId: user?.id ?? 'unknown',
+          reporterName: user?.name ?? 'Unknown Reporter',
+          reporterAvatar: user?.avatar ?? '',
+          reporterPhone: user?.phone,
+          createdAt: now,
+          updatedAt: now,
+          submittedAt: kind === 'submit' ? now : undefined,
+          views: 0,
+          likes: 0,
+          readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
+        };
+        await addArticle(newArticle);
+      }
+
       setSubmitting(null);
       Alert.alert(
         kind === 'draft' ? 'Saved to Drafts' : 'Submitted for Review',
@@ -79,7 +126,10 @@ export default function CreateArticleScreen() {
           : 'Your article has been submitted to the editorial team for review.',
         [{ text: 'OK', onPress: () => router.back() }],
       );
-    }, 900);
+    } catch {
+      setSubmitting(null);
+      Alert.alert('Something went wrong', 'Could not save the article. Please try again.');
+    }
   };
 
   return (

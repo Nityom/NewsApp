@@ -41,6 +41,7 @@ export interface Article {
   reporterId: string;
   reporterName: string;
   reporterAvatar: string;
+  reporterPhone?: string;
   createdAt: string;
   updatedAt: string;
   submittedAt?: string;

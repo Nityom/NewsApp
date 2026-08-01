@@ -3,11 +3,11 @@ import { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { ArticleCard } from '@/components/ui/ArticleCard';
-import { EmptyState } from '@/components/ui/StateViews';
 import { FAB } from '@/components/ui/FAB';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SearchBar } from '@/components/ui/SearchBar';
-import { mockArticles } from '@/mocks/data';
+import { EmptyState } from '@/components/ui/StateViews';
+import { useArticles } from '@/context/ArticlesContext';
 import { useAppTheme } from '@/theme';
 import type { ArticleStatus } from '@/types/models';
 
@@ -20,14 +20,15 @@ const tabs: { key: ArticleStatus; label: string }[] = [
 
 export default function ReporterArticlesScreen() {
   const theme = useAppTheme();
+  const { articles } = useArticles();
   const [activeTab, setActiveTab] = useState<ArticleStatus>('pending');
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
-    return mockArticles.filter(
+    return articles.filter(
       (a) => a.status === activeTab && a.title.toLowerCase().includes(query.toLowerCase()),
     );
-  }, [activeTab, query]);
+  }, [articles, activeTab, query]);
 
   return (
     <ScreenContainer>

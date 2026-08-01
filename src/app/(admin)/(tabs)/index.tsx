@@ -9,8 +9,9 @@ import { Card } from '@/components/ui/Card';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SectionHeader } from '@/components/ui/SearchBar';
+import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
-import { mockAnalytics, mockArticles } from '@/mocks/data';
+import { mockAnalytics } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 
 function StatCard({ icon, label, value, tone }: { icon: IconName; label: string; value: string; tone: 'primary' | 'success' | 'warning' | 'danger' }) {
@@ -29,7 +30,8 @@ function StatCard({ icon, label, value, tone }: { icon: IconName; label: string;
 export default function AdminDashboardScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
-  const pendingArticles = useMemo(() => mockArticles.filter((a) => a.status === 'pending').slice(0, 4), []);
+  const { articles } = useArticles();
+  const pendingArticles = useMemo(() => articles.filter((a) => a.status === 'pending').slice(0, 4), [articles]);
 
   return (
     <ScreenContainer>

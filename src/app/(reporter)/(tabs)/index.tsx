@@ -9,8 +9,8 @@ import { FAB } from '@/components/ui/FAB';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SectionHeader } from '@/components/ui/SearchBar';
+import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
-import { mockArticles } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 
 function StatTile({
@@ -42,16 +42,17 @@ function StatTile({
 export default function ReporterDashboardScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
+  const { articles } = useArticles();
 
-  const myArticles = useMemo(() => mockArticles.slice(0, 6), []);
+  const myArticles = useMemo(() => articles.slice(0, 6), [articles]);
   const counts = useMemo(
     () => ({
-      approved: mockArticles.filter((a) => a.status === 'approved').length,
-      pending: mockArticles.filter((a) => a.status === 'pending').length,
-      rejected: mockArticles.filter((a) => a.status === 'rejected').length,
-      drafts: mockArticles.filter((a) => a.status === 'draft').length,
+      approved: articles.filter((a) => a.status === 'approved').length,
+      pending: articles.filter((a) => a.status === 'pending').length,
+      rejected: articles.filter((a) => a.status === 'rejected').length,
+      drafts: articles.filter((a) => a.status === 'draft').length,
     }),
-    [],
+    [articles],
   );
 
   return (

@@ -1,21 +1,29 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Sharing from 'expo-sharing';
+import type { ElementRef } from 'react';
+import { useRef, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import ViewShot from 'react-native-view-shot';
 
+import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
+import { StatusBadge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Icon } from '@/components/ui/Icon';
-import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { StatusBadge } from '@/components/ui/Badge';
 import { ErrorState } from '@/components/ui/StateViews';
-import { mockArticles, mockReporters } from '@/mocks/data';
+import { useArticles } from '@/context/ArticlesContext';
+import { mockReporters } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 
 export default function ArticleDetailScreen() {
   const theme = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const article = mockArticles.find((a) => a.id === id);
+  const { getArticle } = useArticles();
+  const article = getArticle(id);
   const reporterPhone = mockReporters.find((r) => r.id === article?.reporterId)?.phone;
+  const viewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
+  const [sharing, setSharing] = useState(false);
 
   if (!article) {
     return (
@@ -25,29 +33,39 @@ export default function ArticleDetailScreen() {
     );
   }
 
+  const handleShare = async () => {
+    if (!viewShotRef.current?.capture) return;
+    setSharing(true);
+    try {
+      const uri = await viewShotRef.current.capture();
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Sharing unavailable', 'Sharing is not supported on this device.');
+        return;
+      }
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: article.title });
+    } catch {
+      Alert.alert('Share failed', 'Could not generate the article image. Please try again.');
+    } finally {
+      setSharing(false);
+    }
+  };
+
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.header}>
         <IconButton icon="arrow-back" onPress={() => router.back()} />
-        <StatusBadge status={article.status} />
+        <View style={styles.headerActions}>
+          {article.status === 'approved' ? (
+            <IconButton icon="share-social-outline" onPress={handleShare} disabled={sharing} />
+          ) : null}
+          <StatusBadge status={article.status} />
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={[styles.categoryPill, { backgroundColor: theme.colors.primaryMuted }]}>
           <Text style={{ color: theme.colors.primary, fontSize: 11.5, fontWeight: '700' }}>{article.category}</Text>
-        </View>
-
-        <View style={styles.metaRow}>
-          <Icon name="time-outline" size={14} color={theme.colors.textMuted} />
-          <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>
-            {article.readTimeMinutes} min read
-          </Text>
-          {article.status === 'approved' ? (
-            <>
-              <Icon name="eye-outline" size={14} color={theme.colors.textMuted} />
-              <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>{article.views} views</Text>
-            </>
-          ) : null}
         </View>
 
         {article.status === 'rejected' && article.rejectionReason ? (
@@ -60,7 +78,9 @@ export default function ArticleDetailScreen() {
           </Card>
         ) : null}
 
-        <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} />
+        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }}>
+          <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} />
+        </ViewShot>
       </ScrollView>
     </ScreenContainer>
   );
@@ -72,6 +92,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   scroll: {
     paddingHorizontal: 20,

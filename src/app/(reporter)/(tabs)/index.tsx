@@ -71,13 +71,13 @@ export default function ReporterDashboardScreen() {
               <Avatar uri={user?.avatar} name={user?.name ?? 'R'} size={48} online />
             </View>
 
-            <Card style={styles.subscriptionCard} elevated>
+            {/* <Card style={[styles.subscriptionCard, { backgroundColor: theme.colors.primary }]} elevated>
               <Icon name="ribbon" size={22} color={theme.colors.onPrimary} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.subscriptionTitle}>Verified Reporter</Text>
-                <Text style={styles.subscriptionSubtitle}>Your subscription is active until Dec 2026</Text>
+                <Text style={[styles.subscriptionTitle, { color: theme.colors.onPrimary }]}>Verified Reporter</Text>
+                <Text style={[styles.subscriptionSubtitle, { color: theme.colors.onPrimary }]}>Your subscription is active until Dec 2026</Text>
               </View>
-            </Card>
+            </Card> */}
 
             <View style={styles.statsGrid}>
               <StatTile icon="checkmark-done" label="Approved" value={counts.approved} tone="success" />
@@ -125,17 +125,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#6366F1',
     borderWidth: 0,
     marginBottom: 20,
   },
   subscriptionTitle: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '700',
   },
   subscriptionSubtitle: {
-    color: 'rgba(255,255,255,0.85)',
     fontSize: 11.5,
     marginTop: 2,
   },

@@ -1,13 +1,15 @@
+import { Image } from 'expo-image';
 import { Link, router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/Button';
-import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useAuth } from '@/context/AuthContext';
 import { useAppTheme } from '@/theme';
+
+const appLogo = require('../../../assets/images/app_logo.png');
 
 export default function LoginScreen() {
   const theme = useAppTheme();
@@ -66,8 +68,8 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <View style={[styles.logoCircle, { backgroundColor: theme.colors.primaryMuted }]}>
-            <Icon name="newspaper" size={32} color={theme.colors.primary} />
+          <View style={styles.logoCircle}>
+            <Image source={appLogo} style={styles.logoImage} contentFit="contain" />
           </View>
           <Text style={[styles.title, { color: theme.colors.text }]}>Welcome back</Text>
           <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
@@ -147,10 +149,15 @@ const styles = StyleSheet.create({
   logoCircle: {
     width: 64,
     height: 64,
-    borderRadius: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
+    overflow: 'hidden',
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontSize: 26,

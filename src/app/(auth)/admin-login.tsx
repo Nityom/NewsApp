@@ -12,8 +12,8 @@ import { palette, useAppTheme } from '@/theme';
 export default function AdminLoginScreen() {
   const theme = useAppTheme();
   const { login, isLoading } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@educationnews.com');
+  const [password, setPassword] = useState('Admin@1234');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [submitting, setSubmitting] = useState(false);
 
@@ -43,7 +43,7 @@ export default function AdminLoginScreen() {
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.content}>
-          <View style={[styles.iconCircle, { backgroundColor: 'rgba(99,102,241,0.2)' }]}>
+          <View style={[styles.iconCircle, { backgroundColor: 'rgba(244,180,0,0.2)' }]}>
             <Icon name="shield-checkmark" size={34} color={palette.primary400} />
           </View>
           <Text style={styles.title}>Admin Console</Text>

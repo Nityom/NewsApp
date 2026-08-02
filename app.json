@@ -4,7 +4,7 @@
     "slug": "NewsApp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app_logo.png",
     "scheme": "newsapp",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -13,10 +13,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#F4B400",
+        "foregroundImage": "./assets/images/app_logo.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -27,7 +25,7 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/app_logo.png"
     },
     "plugins": [
       "expo-router",
@@ -53,6 +51,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a06b07fd-c3dd-4be4-bee2-2d53953af712"
+      }
     }
   }
 }

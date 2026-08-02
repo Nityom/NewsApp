@@ -1,13 +1,14 @@
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, StyleSheet, Text } from 'react-native';
 
-import { Icon } from '@/components/ui/Icon';
-import { palette, useAppTheme } from '@/theme';
+import { palette } from '@/theme';
+
+const appLogo = require('../../assets/images/app_logo.png');
 
 export default function SplashRoute() {
-  const theme = useAppTheme();
   const scale = useRef(new Animated.Value(0.7)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -18,17 +19,15 @@ export default function SplashRoute() {
     ]).start();
 
     const timer = setTimeout(() => {
-      router.replace('/onboarding');
+      router.replace('/(auth)/login');
     }, 1800);
     return () => clearTimeout(timer);
   }, [opacity, scale]);
 
   return (
-    <LinearGradient colors={[palette.primary500, palette.primary800]} style={styles.container}>
+    <LinearGradient colors={[palette.primary600, palette.primary900]} style={styles.container}>
       <Animated.View style={[styles.logoWrap, { opacity, transform: [{ scale }] }]}>
-        <View style={styles.iconCircle}>
-          <Icon name="newspaper" size={44} color={theme.colors.primary} />
-        </View>
+        <Image source={appLogo} style={styles.logoImage} contentFit="contain" />
         <Text style={styles.title}>Educational News Reporter</Text>
         <Text style={styles.subtitle}>Trusted education journalism, on the go</Text>
       </Animated.View>
@@ -46,13 +45,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 14,
   },
-  iconCircle: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
+  logoImage: {
+    width: 128,
+    height: 128,
+    borderRadius: 28,
     marginBottom: 6,
   },
   title: {

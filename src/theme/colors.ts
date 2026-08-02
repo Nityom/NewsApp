@@ -1,19 +1,20 @@
 /** Brand palette and semantic color tokens for light/dark modes. */
 
 export const palette = {
-  primary50: '#EEF2FF',
-  primary100: '#E0E7FF',
-  primary200: '#C7D2FE',
-  primary300: '#A5B4FC',
-  primary400: '#818CF8',
-  primary500: '#6366F1',
-  primary600: '#4F46E5',
-  primary700: '#4338CA',
-  primary800: '#3730A3',
-  primary900: '#312E81',
+  // Amber + Charcoal: softened amber from app_logo.png, deep amber accent
+  primary50: '#FFFBEB',
+  primary100: '#FEF3C7',
+  primary200: '#FDE68A',
+  primary300: '#FCD34D',
+  primary400: '#F8C63D',
+  primary500: '#F4B400',
+  primary600: '#D99A00',
+  primary700: '#B37E00',
+  primary800: '#8A6200',
+  primary900: '#5C4100',
 
-  accent500: '#F59E0B',
-  accent600: '#D97706',
+  accent500: '#D97706',
+  accent600: '#B45F04',
 
   success50: '#ECFDF5',
   success500: '#10B981',
@@ -23,9 +24,9 @@ export const palette = {
   warning500: '#F59E0B',
   warning600: '#D97706',
 
-  danger50: '#FEF2F2',
-  danger500: '#EF4444',
-  danger600: '#DC2626',
+  danger50: '#FDECEC',
+  danger500: '#C1272D',
+  danger600: '#A31E23',
 
   info50: '#EFF6FF',
   info500: '#3B82F6',
@@ -48,21 +49,21 @@ export const palette = {
 
 export const Colors = {
   light: {
-    background: palette.gray50,
+    background: '#F8FAFC',
     backgroundElevated: palette.gray0,
     backgroundSubtle: palette.gray100,
     card: palette.gray0,
     border: palette.gray200,
     borderStrong: palette.gray300,
 
-    text: palette.gray900,
+    text: palette.gray800,
     textSecondary: palette.gray600,
     textMuted: palette.gray400,
     textInverse: palette.gray0,
 
-    primary: palette.primary600,
+    primary: palette.primary500,
     primaryMuted: palette.primary50,
-    onPrimary: palette.gray0,
+    onPrimary: palette.gray800,
 
     accent: palette.accent500,
 
@@ -96,7 +97,7 @@ export const Colors = {
     textInverse: palette.gray900,
 
     primary: palette.primary400,
-    primaryMuted: 'rgba(99, 102, 241, 0.16)',
+    primaryMuted: 'rgba(248, 198, 61, 0.16)',
     onPrimary: palette.gray950,
 
     accent: palette.accent500,

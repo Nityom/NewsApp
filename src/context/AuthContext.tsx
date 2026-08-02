@@ -24,6 +24,10 @@ const PROFILE_STORAGE_KEY = 'enr:auth:profileByEmail';
 const SESSION_STORAGE_KEY = 'enr:auth:sessionExpiryByEmail';
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // keep users signed in for one month
 
+// Temporary hardcoded admin login until a real admin account exists in Firebase.
+const HARDCODED_ADMIN_EMAIL = 'admin@educationnews.com';
+const HARDCODED_ADMIN_PASSWORD = 'Admin@1234';
+
 // Web client ID from google-services.json (client_type: 3) - required by GoogleSignin.configure().
 GoogleSignin.configure({
   webClientId: '522828191876-mg6jcrm23hda7tvbsesa14cjm11sco3e.apps.googleusercontent.com',
@@ -163,6 +167,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string, role: Role) => {
+    const trimmedEmail = email.trim();
+    if (
+      role === 'admin' &&
+      trimmedEmail.toLowerCase() === HARDCODED_ADMIN_EMAIL &&
+      password === HARDCODED_ADMIN_PASSWORD
+    ) {
+      await storeRole(trimmedEmail, 'admin');
+      await refreshSessionExpiry(trimmedEmail);
+      setUser(profileForRole('admin', trimmedEmail));
+      return;
+    }
+
     authActionInProgressRef.current = true;
     try {
       const auth = getAuth();

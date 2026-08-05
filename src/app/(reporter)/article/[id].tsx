@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import type { ElementRef } from 'react';
 import { useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, LayoutChangeEvent, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
 import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
@@ -16,14 +16,30 @@ import { useArticles } from '@/context/ArticlesContext';
 import { mockReporters } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 
+const SHARE_WIDTH = 1200;
+const SHARE_HEIGHT = 1800;
+const SHARE_ASPECT = SHARE_HEIGHT / SHARE_WIDTH;
+
 export default function ArticleDetailScreen() {
   const theme = useAppTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getArticle } = useArticles();
   const article = getArticle(id);
   const reporterPhone = mockReporters.find((r) => r.id === article?.reporterId)?.phone;
   const viewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
   const [sharing, setSharing] = useState(false);
+  const [articleHeight, setArticleHeight] = useState(0);
+
+  const captureHeight = windowWidth * SHARE_ASPECT;
+  const captureScaleY = articleHeight > 0 ? Math.min(1, captureHeight / articleHeight) : 1;
+
+  const handleArticleLayout = (event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+    if (nextHeight > 0 && Math.abs(nextHeight - articleHeight) > 0.5) {
+      setArticleHeight(nextHeight);
+    }
+  };
 
   if (!article) {
     return (
@@ -52,7 +68,7 @@ export default function ArticleDetailScreen() {
   };
 
   return (
-    <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
+    <ScreenContainer edges={['top', 'bottom']}>
       <View style={styles.header}>
         <IconButton icon="arrow-back" onPress={() => router.back()} />
         <View style={styles.headerActions}>
@@ -63,7 +79,9 @@ export default function ArticleDetailScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        style={[styles.articleScroll, { width: windowWidth }]}
+        contentContainerStyle={[styles.scroll, { width: windowWidth }]}>
         {article.status === 'rejected' && article.rejectionReason ? (
           <Card style={[styles.rejectionCard, { backgroundColor: theme.colors.dangerMuted, borderColor: theme.colors.danger }]}>
             <View style={styles.rejectionHeader}>
@@ -74,10 +92,28 @@ export default function ArticleDetailScreen() {
           </Card>
         ) : null}
 
-        <ViewShot ref={viewShotRef} options={{ format: 'png', quality: 1 }}>
+        <View onLayout={handleArticleLayout}>
           <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} />
-        </ViewShot>
+        </View>
       </ScrollView>
+
+      <View pointerEvents="none" style={styles.captureHost}>
+        <ViewShot
+          ref={viewShotRef}
+          style={[styles.articleCapture, { width: windowWidth, height: captureHeight }]}
+          options={{ format: 'png', quality: 1, width: SHARE_WIDTH, height: SHARE_HEIGHT }}>
+          <View
+            style={[
+              styles.captureContent,
+              {
+                width: windowWidth,
+                transform: [{ scaleY: captureScaleY }],
+              },
+            ]}>
+            <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} shareMode />
+          </View>
+        </ViewShot>
+      </View>
     </ScreenContainer>
   );
 }
@@ -95,9 +131,27 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   scroll: {
-    paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 48,
+  },
+  articleScroll: {
+    alignSelf: 'stretch',
+  },
+  articleCapture: {
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  captureHost: {
+    position: 'absolute',
+    left: -10000,
+    top: 0,
+  },
+  captureContent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    transformOrigin: 'top left',
+    backgroundColor: '#FFFFFF',
   },
   banner: {
     width: '100%',
@@ -122,6 +176,7 @@ const styles = StyleSheet.create({
   },
   rejectionCard: {
     marginTop: 16,
+    marginHorizontal: 20,
     gap: 6,
   },
   rejectionHeader: {

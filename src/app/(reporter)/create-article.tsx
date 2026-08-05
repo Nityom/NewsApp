@@ -2,17 +2,16 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
-import { Chip } from '@/components/ui/Chip';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
-import { allCategories } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
-import type { Article, ArticleSection, Category } from '@/types/models';
+import type { Article, ArticleSection } from '@/types/models';
 
 const formatTools: { icon: IconName; token: string; label: string }[] = [
   { icon: 'text', token: '# ', label: 'Heading' },
@@ -31,14 +30,16 @@ export default function CreateArticleScreen() {
     [params.id, articles],
   );
 
+  const isAdminEditing = user?.role === 'admin' && !!editingDraft;
+
   const [banner, setBanner] = useState<string | undefined>(editingDraft?.banner);
   const [title, setTitle] = useState(editingDraft?.title ?? '');
-  const [category, setCategory] = useState<Category>(editingDraft?.category ?? 'Education');
   const [content, setContent] = useState(editingDraft?.content ?? '');
   const [images, setImages] = useState<string[]>(editingDraft?.images ?? []);
   const [advertisements, setAdvertisements] = useState<string[]>(editingDraft?.advertisements ?? []);
   const [sections, setSections] = useState<ArticleSection[]>(editingDraft?.sections ?? []);
-  const [submitting, setSubmitting] = useState<'draft' | 'submit' | null>(null);
+  const [submitting, setSubmitting] = useState<'draft' | 'submit' | 'save' | null>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
 
   const pickImage = async (mode: 'banner' | 'gallery' | 'ad') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -48,19 +49,20 @@ export default function CreateArticleScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: mode !== 'ad',
-      aspect: mode === 'banner' ? [16, 9] : mode === 'gallery' ? [4, 3] : undefined,
-      quality: mode === 'ad' ? 1 : 0.8,
+      allowsEditing: false,
+      quality: mode === 'ad' ? 1 : 0.9,
       allowsMultipleSelection: false,
     });
     if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset) return;
 
     if (mode === 'banner') {
-      setBanner(result.assets[0]?.uri);
+      setBanner(asset.uri);
     } else if (mode === 'gallery') {
-      setImages((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
+      setImages((prev) => [...prev, asset.uri]);
     } else {
-      setAdvertisements((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
+      setAdvertisements((prev) => [...prev, asset.uri]);
     }
   };
 
@@ -86,16 +88,17 @@ export default function CreateArticleScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
+      allowsEditing: false,
+      quality: 0.9,
       allowsMultipleSelection: false,
     });
     if (result.canceled) return;
-    updateSection(id, { image: result.assets[0]?.uri });
+    const asset = result.assets[0];
+    if (!asset) return;
+    updateSection(id, { image: asset.uri });
   };
 
-  const handleSave = async (kind: 'draft' | 'submit') => {
+  const handleSave = async (kind: 'draft' | 'submit' | 'save') => {
     if (!title.trim()) {
       Alert.alert('Title required', 'Please enter an article title before continuing.');
       return;
@@ -106,7 +109,7 @@ export default function CreateArticleScreen() {
     }
     setSubmitting(kind);
     const now = new Date().toISOString();
-    const status = kind === 'draft' ? 'draft' : 'pending';
+    const status = kind === 'draft' ? 'draft' : kind === 'submit' ? 'pending' : editingDraft?.status ?? 'pending';
     const cleanSections = sections.filter((s) => s.title.trim() || s.content.trim() || s.image);
 
     try {
@@ -119,9 +122,8 @@ export default function CreateArticleScreen() {
           images,
           advertisements,
           sections: cleanSections,
-          category,
+          category: editingDraft.category,
           status,
-          reporterPhone: user?.phone ?? editingDraft.reporterPhone,
           updatedAt: now,
           submittedAt: kind === 'submit' ? now : editingDraft.submittedAt,
         });
@@ -135,7 +137,7 @@ export default function CreateArticleScreen() {
           images,
           advertisements,
           sections: cleanSections,
-          category,
+          category: 'Education',
           status,
           reporterId: user?.id ?? 'unknown',
           reporterName: user?.name ?? 'Unknown Reporter',
@@ -152,25 +154,63 @@ export default function CreateArticleScreen() {
       }
 
       setSubmitting(null);
-      Alert.alert(
-        kind === 'draft' ? 'Saved to Drafts' : 'Submitted for Review',
-        kind === 'draft'
-          ? 'Your article has been saved as a draft.'
-          : 'Your article has been submitted to the editorial team for review.',
-        [{ text: 'OK', onPress: () => router.back() }],
-      );
+      const messages: Record<typeof kind, [string, string]> = {
+        draft: ['Saved to Drafts', 'Your article has been saved as a draft.'],
+        submit: ['Submitted for Review', 'Your article has been submitted to the editorial team for review.'],
+        save: ['Changes Saved', 'The article has been updated.'],
+      };
+      const [title_, message] = messages[kind];
+      setPreviewVisible(false);
+      Alert.alert(title_, message, [{ text: 'OK', onPress: () => router.back() }]);
     } catch {
       setSubmitting(null);
       Alert.alert('Something went wrong', 'Could not save the article. Please try again.');
     }
   };
 
+  const requestSubmit = () => {
+    if (!title.trim()) {
+      Alert.alert('Title required', 'Please enter an article title before continuing.');
+      return;
+    }
+    if (!banner) {
+      Alert.alert('Banner required', 'Please upload a news photo before continuing.');
+      return;
+    }
+    setPreviewVisible(true);
+  };
+
+  const previewArticle: Article = useMemo(
+    () => ({
+      id: editingDraft?.id ?? 'preview',
+      title,
+      summary: content.slice(0, 140),
+      content,
+      banner: banner ?? '',
+      images,
+      advertisements,
+      sections: sections.filter((s) => s.title.trim() || s.content.trim() || s.image),
+      category: editingDraft?.category ?? 'Education',
+      status: editingDraft?.status ?? 'pending',
+      reporterId: editingDraft?.reporterId ?? user?.id ?? 'unknown',
+      reporterName: editingDraft?.reporterName ?? user?.name ?? 'Unknown Reporter',
+      reporterAvatar: editingDraft?.reporterAvatar ?? user?.avatar ?? '',
+      reporterPhone: editingDraft?.reporterPhone ?? user?.phone,
+      createdAt: editingDraft?.createdAt ?? new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      views: editingDraft?.views ?? 0,
+      likes: editingDraft?.likes ?? 0,
+      readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
+    }),
+    [editingDraft, title, content, banner, images, advertisements, sections, user],
+  );
+
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.header}>
         <IconButton icon="close" onPress={() => router.back()} />
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-          {editingDraft ? 'Edit Article' : 'New Article'}
+          {isAdminEditing ? 'Edit Article' : editingDraft ? 'Edit Article' : 'New Article'}
         </Text>
         <View style={{ width: 40 }} />
       </View>
@@ -180,7 +220,11 @@ export default function CreateArticleScreen() {
         <View
           style={[
             styles.bannerWrap,
-            { backgroundColor: theme.colors.backgroundSubtle, borderColor: theme.colors.border, borderRadius: theme.radius.lg },
+            {
+              backgroundColor: theme.colors.backgroundSubtle,
+              borderColor: theme.colors.border,
+              borderRadius: theme.radius.lg,
+            },
           ]}
           onTouchEnd={() => pickImage('banner')}>
           {banner ? (
@@ -207,15 +251,6 @@ export default function CreateArticleScreen() {
           ]}
           multiline
         />
-
-        <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 16 }]}>
-          Category
-        </Text>
-        <View style={styles.chipsRow}>
-          {allCategories.map((cat) => (
-            <Chip key={cat} label={cat} selected={cat === category} onPress={() => setCategory(cat)} />
-          ))}
-        </View>
 
         <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
           Article Body
@@ -363,26 +398,59 @@ export default function CreateArticleScreen() {
         ) : null}
 
         <View style={{ height: 24 }} />
-        <ButtonRow>
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Save as Draft"
-              variant="outline"
-              onPress={() => handleSave('draft')}
-              loading={submitting === 'draft'}
-              fullWidth
-            />
+        {isAdminEditing ? (
+          <Button
+            label="Save Changes"
+            onPress={() => handleSave('save')}
+            loading={submitting === 'save'}
+            fullWidth
+          />
+        ) : (
+          <ButtonRow>
+            <View style={{ flex: 1 }}>
+              <Button
+                label="Save as Draft"
+                variant="outline"
+                onPress={() => handleSave('draft')}
+                loading={submitting === 'draft'}
+                fullWidth
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                label="Submit for Review"
+                onPress={requestSubmit}
+                loading={submitting === 'submit'}
+                fullWidth
+              />
+            </View>
+          </ButtonRow>
+        )}
+      </ScrollView>
+
+      <Modal
+        visible={previewVisible}
+        animationType="slide"
+        onRequestClose={() => setPreviewVisible(false)}>
+        <ScreenContainer edges={['top', 'left', 'right', 'bottom']} backgroundColor="#FFFFFF">
+          <View style={styles.previewHeader}>
+            <IconButton icon="arrow-back" color="#171717" onPress={() => setPreviewVisible(false)} />
+            <Text style={styles.previewHeaderTitle}>Preview</Text>
+            <View style={{ width: 40 }} />
           </View>
-          <View style={{ flex: 1 }}>
+          <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent}>
+            <ArticleNewspaperLayout article={previewArticle} />
+          </ScrollView>
+          <View style={styles.previewFooter}>
             <Button
-              label="Submit for Review"
+              label="Confirm & Submit"
               onPress={() => handleSave('submit')}
               loading={submitting === 'submit'}
               fullWidth
             />
           </View>
-        </ButtonRow>
-      </ScrollView>
+        </ScreenContainer>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -397,6 +465,31 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  previewHeaderTitle: {
+    color: '#171717',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  previewScroll: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  previewScrollContent: {
+    width: '100%',
+    paddingBottom: 16,
+  },
+  previewFooter: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
   },
   scroll: {
     paddingHorizontal: 20,
@@ -425,7 +518,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   sectionImageWrap: {
-    height: 120,
+    aspectRatio: 4 / 3,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
     marginTop: 8,

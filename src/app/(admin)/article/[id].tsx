@@ -103,6 +103,10 @@ export default function AdminArticleDetailScreen() {
         <IconButton icon="arrow-back" onPress={() => router.back()} />
         <View style={styles.headerActions}>
           <StatusBadge status={article.status} />
+          <IconButton
+            icon="create-outline"
+            onPress={() => router.push({ pathname: '/(reporter)/create-article', params: { id: article.id } })}
+          />
           <IconButton icon="trash-outline" color={theme.colors.danger} onPress={() => setDeleteVisible(true)} />
         </View>
       </View>

@@ -4,9 +4,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
+import { ArticleNewspaperLayout, MAX_SECTION_BODY_CHARS } from '@/components/ui/ArticleNewspaperLayout';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
 import { Icon, IconName } from '@/components/ui/Icon';
+// import { ImageCropModal } from '@/components/ui/ImageCropModal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
@@ -40,6 +41,14 @@ export default function CreateArticleScreen() {
   const [sections, setSections] = useState<ArticleSection[]>(editingDraft?.sections ?? []);
   const [submitting, setSubmitting] = useState<'draft' | 'submit' | 'save' | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
+  // Cropper disabled for now — kept here so it can be re-enabled later.
+  // const [cropTarget, setCropTarget] = useState<{
+  //   uri: string;
+  //   width: number;
+  //   height: number;
+  //   kind: 'banner' | 'gallery' | 'section';
+  //   sectionId?: string;
+  // } | null>(null);
 
   const pickImage = async (mode: 'banner' | 'gallery' | 'ad') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -57,13 +66,16 @@ export default function CreateArticleScreen() {
     const asset = result.assets[0];
     if (!asset) return;
 
+    if (mode === 'ad') {
+      setAdvertisements((prev) => [...prev, asset.uri]);
+      return;
+    }
     if (mode === 'banner') {
       setBanner(asset.uri);
-    } else if (mode === 'gallery') {
-      setImages((prev) => [...prev, asset.uri]);
     } else {
-      setAdvertisements((prev) => [...prev, asset.uri]);
+      setImages((prev) => [...prev, asset.uri]);
     }
+    // setCropTarget({ uri: asset.uri, width: asset.width, height: asset.height, kind: mode });
   };
 
   const insertToken = (token: string) => setContent((prev) => `${prev}${token}`);
@@ -96,7 +108,20 @@ export default function CreateArticleScreen() {
     const asset = result.assets[0];
     if (!asset) return;
     updateSection(id, { image: asset.uri });
+    // setCropTarget({ uri: asset.uri, width: asset.width, height: asset.height, kind: 'section', sectionId: id });
   };
+
+  // const handleCropComplete = (uri: string) => {
+  //   if (!cropTarget) return;
+  //   if (cropTarget.kind === 'banner') {
+  //     setBanner(uri);
+  //   } else if (cropTarget.kind === 'gallery') {
+  //     setImages((prev) => [...prev, uri]);
+  //   } else if (cropTarget.sectionId) {
+  //     updateSection(cropTarget.sectionId, { image: uri });
+  //   }
+  //   setCropTarget(null);
+  // };
 
   const handleSave = async (kind: 'draft' | 'submit' | 'save') => {
     if (!title.trim()) {
@@ -379,6 +404,17 @@ export default function CreateArticleScreen() {
               multiline
               textAlignVertical="top"
             />
+            <Text
+              style={[
+                styles.sectionCharCount,
+                {
+                  color:
+                    section.content.length > MAX_SECTION_BODY_CHARS ? theme.colors.danger : theme.colors.textMuted,
+                },
+              ]}>
+              {Math.min(section.content.length, MAX_SECTION_BODY_CHARS)}/{MAX_SECTION_BODY_CHARS} characters shown on the page
+              {section.content.length > MAX_SECTION_BODY_CHARS ? ' — rest will be trimmed' : ''}
+            </Text>
           </View>
         ))}
 
@@ -451,6 +487,16 @@ export default function CreateArticleScreen() {
           </View>
         </ScreenContainer>
       </Modal>
+
+      {/* <ImageCropModal
+        visible={!!cropTarget}
+        imageUri={cropTarget?.uri ?? null}
+        imageWidth={cropTarget?.width ?? 4}
+        imageHeight={cropTarget?.height ?? 3}
+        aspect={[4, 3]}
+        onCancel={() => setCropTarget(null)}
+        onCropComplete={handleCropComplete}
+      /> */}
     </ScreenContainer>
   );
 }
@@ -516,6 +562,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  sectionCharCount: {
+    fontSize: 11,
+    marginTop: 6,
+    textAlign: 'right',
   },
   sectionImageWrap: {
     aspectRatio: 4 / 3,

@@ -2,19 +2,21 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import type { ElementRef } from 'react';
 import { useRef, useState } from 'react';
-import { Alert, LayoutChangeEvent, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
-import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
+import { ArticleNewspaperLayout, TwoArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
 import { StatusBadge } from '@/components/ui/Badge';
-import { IconButton } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ErrorState } from '@/components/ui/StateViews';
 import { useArticles } from '@/context/ArticlesContext';
 import { mockReporters } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
+import type { Article } from '@/types/models';
 
 const SHARE_WIDTH = 1200;
 const SHARE_HEIGHT = 1800;
@@ -24,15 +26,21 @@ export default function ArticleDetailScreen() {
   const theme = useAppTheme();
   const { width: windowWidth } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getArticle } = useArticles();
+  const { articles, getArticle } = useArticles();
   const article = getArticle(id);
   const reporterPhone = mockReporters.find((r) => r.id === article?.reporterId)?.phone;
   const viewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
+  const pairViewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
   const [sharing, setSharing] = useState(false);
   const [articleHeight, setArticleHeight] = useState(0);
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pairArticle, setPairArticle] = useState<Article | null>(null);
+  const [pairSharing, setPairSharing] = useState(false);
 
   const captureHeight = windowWidth * SHARE_ASPECT;
   const captureScaleY = articleHeight > 0 ? Math.min(1, captureHeight / articleHeight) : 1;
+
+  const pairCandidates = articles.filter((a) => a.status === 'approved' && a.id !== article?.id);
 
   const handleArticleLayout = (event: LayoutChangeEvent) => {
     const nextHeight = event.nativeEvent.layout.height;
@@ -67,11 +75,32 @@ export default function ArticleDetailScreen() {
     }
   };
 
+  const handleSharePair = async () => {
+    if (!pairViewShotRef.current?.capture) return;
+    setPairSharing(true);
+    try {
+      const uri = await pairViewShotRef.current.capture();
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Sharing unavailable', 'Sharing is not supported on this device.');
+        return;
+      }
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: article.title });
+    } catch {
+      Alert.alert('Share failed', 'Could not generate the combined image. Please try again.');
+    } finally {
+      setPairSharing(false);
+    }
+  };
+
   return (
     <ScreenContainer edges={['top', 'bottom']}>
       <View style={styles.header}>
         <IconButton icon="arrow-back" onPress={() => router.back()} />
         <View style={styles.headerActions}>
+          {article.status === 'approved' ? (
+            <IconButton icon="layers-outline" onPress={() => setPickerVisible(true)} />
+          ) : null}
           {article.status === 'approved' ? (
             <IconButton icon="share-social-outline" onPress={handleShare} disabled={sharing} />
           ) : null}
@@ -95,6 +124,23 @@ export default function ArticleDetailScreen() {
         <View onLayout={handleArticleLayout}>
           <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} />
         </View>
+
+        {pairArticle ? (
+          <View style={styles.pairSection}>
+            <View style={styles.pairHeader}>
+              <Text style={[styles.pairHeading, { color: theme.colors.text }]}>Combined page preview</Text>
+              <Button label="Remove" variant="ghost" size="sm" onPress={() => setPairArticle(null)} />
+            </View>
+            <TwoArticleNewspaperLayout articles={[article, pairArticle]} />
+            <Button
+              label={pairSharing ? 'Preparing…' : 'Share Combined Page'}
+              icon="share-social-outline"
+              onPress={handleSharePair}
+              disabled={pairSharing}
+              fullWidth
+            />
+          </View>
+        ) : null}
       </ScrollView>
 
       <View pointerEvents="none" style={styles.captureHost}>
@@ -114,6 +160,39 @@ export default function ArticleDetailScreen() {
           </View>
         </ViewShot>
       </View>
+
+      {pairArticle ? (
+        <View pointerEvents="none" style={styles.captureHost}>
+          <ViewShot ref={pairViewShotRef} options={{ format: 'png', quality: 1 }}>
+            <TwoArticleNewspaperLayout articles={[article, pairArticle]} />
+          </ViewShot>
+        </View>
+      ) : null}
+
+      <Dialog
+        visible={pickerVisible}
+        title="Combine with another article"
+        message={pairCandidates.length === 0 ? 'No other approved articles are available.' : undefined}
+        onRequestClose={() => setPickerVisible(false)}
+        actions={[{ label: 'Cancel', onPress: () => setPickerVisible(false) }]}>
+        {pairCandidates.length > 0 ? (
+          <ScrollView style={styles.pickerList}>
+            {pairCandidates.map((candidate) => (
+              <Pressable
+                key={candidate.id}
+                style={[styles.pickerItem, { borderColor: theme.colors.border }]}
+                onPress={() => {
+                  setPairArticle(candidate);
+                  setPickerVisible(false);
+                }}>
+                <Text style={[styles.pickerItemText, { color: theme.colors.text }]} numberOfLines={2}>
+                  {candidate.title}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
+      </Dialog>
     </ScreenContainer>
   );
 }
@@ -152,6 +231,34 @@ const styles = StyleSheet.create({
     top: 0,
     transformOrigin: 'top left',
     backgroundColor: '#FFFFFF',
+  },
+  pairSection: {
+    marginTop: 24,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  pairHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pairHeading: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  pickerList: {
+    maxHeight: 260,
+    width: '100%',
+  },
+  pickerItem: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+  },
+  pickerItemText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   banner: {
     width: '100%',

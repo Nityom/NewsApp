@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import { Image as RNImage, StyleSheet, Text, View } from 'react-native';
 
+import { formatRegistrationDate, getCurrentPeriodLabel, usePublicationInfo } from '@/context/PublicationInfoContext';
 import { useAppTheme } from '@/theme';
 import type { Article } from '@/types/models';
 
@@ -12,9 +13,16 @@ const MUTED_INK = '#606060';
 const RULE = '#D7D7D7';
 const MIN_DISPLAY_RATIO = 3 / 4;
 const MAX_DISPLAY_RATIO = 2;
+// Keeps an additional article (added via the "+" section button) from pushing content onto a second page.
+export const MAX_SECTION_BODY_CHARS = 500;
 
 const displayRatio = (width: number, height: number) =>
   Math.min(MAX_DISPLAY_RATIO, Math.max(MIN_DISPLAY_RATIO, width / height));
+
+function truncate(text: string, max: number) {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max).trimEnd()}…`;
+}
 
 interface ArticleNewspaperLayoutProps {
   article: Article;
@@ -63,15 +71,34 @@ function AutoImage({
   );
 }
 
-function AdImage({ uri, radius }: { uri: string; radius: number }) {
+function AdImage({ uri, radius, wide }: { uri: string; radius: number; wide: boolean }) {
   return (
-    <View style={[styles.adImageContainer, { borderRadius: radius, overflow: 'hidden' }]}>
+    <View
+      style={[
+        styles.adImageContainer,
+        wide ? styles.adImageContainerWide : styles.adImageContainerHalf,
+        { borderRadius: radius, overflow: 'hidden' },
+      ]}>
       <Image
         source={{ uri }}
         style={styles.adImage}
         contentFit="contain"
         transition={0}
       />
+    </View>
+  );
+}
+
+function PublicationInfoBar({ pageCount, registrationLabel }: { pageCount: number; registrationLabel?: string }) {
+  const { info } = usePublicationInfo();
+  const period = getCurrentPeriodLabel();
+  const registrationDate = registrationLabel ?? '—';
+
+  return (
+    <View style={styles.infoBar}>
+      <Text style={styles.infoBarText} numberOfLines={1} adjustsFontSizeToFit>
+        वर्ष : {info.year}  |  अंक : {info.issueNumber}  |  {period}  (पृष्ठ : {pageCount})  |  दिनांक {registrationDate}  |  मूल्य : {info.price}
+      </Text>
     </View>
   );
 }
@@ -95,44 +122,73 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
   const mid = Math.ceil(bodyParas.length / 2);
   const leftCol = bodyParas.slice(0, mid);
   const rightCol = bodyParas.slice(mid);
+  const [firstSection, ...restSections] = article.sections ?? [];
+  // Extra sections beyond the first stack as additional pages; the first shares the lead page.
+  const pageCount = 1 + restSections.length;
+  // registrationDate is a pre-formatted display string set/edited by admin; fall back to the approval date.
+  const registrationLabel = article.registrationDate ?? (article.reviewedAt ? formatRegistrationDate(article.reviewedAt) : undefined);
 
   return (
     <View style={styles.paper}>
       {/* Masthead */}
       <Image source={logoBanner} style={styles.logoBanner} contentFit="contain" />
+      <PublicationInfoBar pageCount={pageCount} registrationLabel={registrationLabel} />
       <View style={styles.mastRule} />
 
-      {/* Headline */}
-      <Text style={styles.title}>{article.title}</Text>
-      <View style={styles.headlineRule} />
-
-      {/* Lead: image left + first paragraph right */}
-      <View style={styles.leadRow}>
-        <AutoImage
-          uri={article.banner}
-          style={styles.leadImage}
-          radius={theme.radius.sm}
-          fixedRatio={shareMode ? 4 / 3 : undefined}
-        />
-        <Text style={styles.leadPara}>{leadPara}</Text>
-      </View>
-
-      {/* Two-column body */}
-      {bodyParas.length > 0 ? (
-        <View style={styles.columns}>
-          <View style={styles.column}>
-            {leftCol.map((para, i) => <Text key={i} style={styles.body}>{para}</Text>)}
-          </View>
+      {firstSection ? (
+        // Additional article added via "+" — same side-by-side layout as the combined preview.
+        // Reporter is the same for both, so the name is shown once in the page footer below.
+        <View style={styles.twoUpRow}>
+          <CompactStory
+            title={article.title}
+            image={article.banner}
+            content={article.content}
+            maxBodyChars={MAX_SECTION_BODY_CHARS}
+          />
           <View style={styles.colDivider} />
-          <View style={styles.column}>
-            {rightCol.map((para, i) => <Text key={i} style={styles.body}>{para}</Text>)}
-          </View>
+          <CompactStory
+            title={firstSection.title}
+            image={firstSection.image ?? article.banner}
+            content={firstSection.content}
+            maxBodyChars={MAX_SECTION_BODY_CHARS}
+          />
         </View>
-      ) : null}
+      ) : (
+        <>
+          {/* Headline */}
+          <Text style={styles.title}>{article.title}</Text>
+          <View style={styles.headlineRule} />
 
-      {/* Sections */}
-      {article.sections?.map((section) => {
-        const sParas = section.content.split(/\n+/).filter(Boolean);
+          {/* Lead: image left + first paragraph right */}
+          <View style={styles.leadRow}>
+            <AutoImage
+              uri={article.banner}
+              style={styles.leadImage}
+              radius={theme.radius.sm}
+              fixedRatio={shareMode ? 4 / 3 : undefined}
+            />
+            <Text style={styles.leadPara}>{leadPara}</Text>
+          </View>
+
+          {/* Two-column body */}
+          {bodyParas.length > 0 ? (
+            <View style={styles.columns}>
+              <View style={styles.column}>
+                {leftCol.map((para, i) => <Text key={i} style={styles.body}>{para}</Text>)}
+              </View>
+              <View style={styles.colDivider} />
+              <View style={styles.column}>
+                {rightCol.map((para, i) => <Text key={i} style={styles.body}>{para}</Text>)}
+              </View>
+            </View>
+          ) : null}
+        </>
+      )}
+
+      {/* Any further sections beyond the first stack below in full width */}
+      {restSections.map((section) => {
+        const sContent = truncate(section.content.replace(/\n+/g, ' ').trim(), MAX_SECTION_BODY_CHARS);
+        const sParas = sContent.split(/\n+/).filter(Boolean);
         const sMid = Math.ceil(sParas.length / 2);
         return (
           <View key={section.id} style={styles.sectionBlock}>
@@ -173,9 +229,16 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
             <Text style={styles.adLabel}>Advertisement</Text>
             <View style={styles.adLabelLine} />
           </View>
-          {article.advertisements.map((uri, i) => (
-            <AdImage key={`${uri}-${i}`} uri={uri} radius={theme.radius.sm} />
-          ))}
+          <View style={styles.adGrid}>
+            {article.advertisements.map((uri, i) => (
+              <AdImage
+                key={`${uri}-${i}`}
+                uri={uri}
+                radius={theme.radius.sm}
+                wide={article.advertisements.length === 1}
+              />
+            ))}
+          </View>
         </View>
       ) : null}
 
@@ -191,6 +254,95 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
   );
 }
 
+interface TwoArticleNewspaperLayoutProps {
+  articles: [Article, Article];
+  reporterPhone?: string;
+  /** Max characters kept per article body when squeezing two stories onto one page. */
+  maxBodyChars?: number;
+}
+
+function CompactStory({
+  title,
+  image,
+  content,
+  footer,
+  maxBodyChars,
+}: {
+  title: string;
+  image: string;
+  content: string;
+  footer?: string;
+  maxBodyChars: number;
+}) {
+  const theme = useAppTheme();
+  const body = truncate(content.replace(/\n+/g, ' ').trim(), maxBodyChars);
+
+  return (
+    <View style={styles.storyColumn}>
+      <Text style={styles.storyTitle}>{title}</Text>
+      <View style={styles.headlineRule} />
+      <AutoImage uri={image} style={styles.storyImage} radius={theme.radius.sm} fixedRatio={4 / 3} />
+      <Text style={styles.storyBody}>{body}</Text>
+      {footer ? (
+        <View style={styles.storyFooter}>
+          <Text style={styles.reporterName}>{footer}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Two stories sharing a single masthead, laid out side by side.
+ * Each story's text is truncated so both fit on one page.
+ */
+export function TwoArticleNewspaperLayout({
+  articles,
+  reporterPhone,
+  maxBodyChars = 420,
+}: TwoArticleNewspaperLayoutProps) {
+  const [first, second] = articles;
+  const byline = (a: Article) => `${a.reporterName}${(a.reporterPhone ?? reporterPhone) ? ` : ${a.reporterPhone ?? reporterPhone}` : ''}`;
+  // Collapse into one line when both stories share the same reporter.
+  const bylines = Array.from(new Set([byline(first), byline(second)]));
+  const registrationLabel =
+    first.registrationDate ??
+    second.registrationDate ??
+    (first.reviewedAt ? formatRegistrationDate(first.reviewedAt) : undefined) ??
+    (second.reviewedAt ? formatRegistrationDate(second.reviewedAt) : undefined);
+
+  return (
+    <View style={styles.paper}>
+      <Image source={logoBanner} style={styles.logoBanner} contentFit="contain" />
+      <PublicationInfoBar pageCount={1} registrationLabel={registrationLabel} />
+      <View style={styles.mastRule} />
+
+      <View style={styles.twoUpRow}>
+        <CompactStory
+          title={first.title}
+          image={first.banner}
+          content={first.content}
+          maxBodyChars={maxBodyChars}
+        />
+        <View style={styles.colDivider} />
+        <CompactStory
+          title={second.title}
+          image={second.banner}
+          content={second.content}
+          maxBodyChars={maxBodyChars}
+        />
+      </View>
+
+      <View style={styles.footer}>
+        <Text style={styles.reporterLabel}>News Reporter{bylines.length > 1 ? 's' : ''}</Text>
+        {bylines.map((line) => (
+          <Text key={line} style={styles.reporterName}>{line}</Text>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   paper: {
     width: '100%',
@@ -200,6 +352,22 @@ const styles = StyleSheet.create({
   logoBanner: {
     width: '100%',
     aspectRatio: 2564 / 451,
+  },
+  infoBar: {
+    backgroundColor: '#FFE600',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: INK,
+    marginHorizontal: 12,
+    marginTop: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  infoBarText: {
+    color: INK,
+    fontSize: 10,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   mastRule: {
     height: 3,
@@ -303,12 +471,24 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   adImageContainer: {
-    width: '100%',
-    height: 200,
     backgroundColor: PAPER,
-    marginBottom: 4,
     borderRadius: 4,
     overflow: 'hidden',
+  },
+  adImageContainerWide: {
+    width: '100%',
+    height: 200,
+    marginBottom: 4,
+  },
+  adImageContainerHalf: {
+    width: '48.5%',
+    height: 140,
+    marginBottom: 8,
+  },
+  adGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   adImage: {
     width: '100%',
@@ -359,5 +539,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: 0.3,
+  },
+  twoUpRow: {
+    flexDirection: 'row',
+    marginHorizontal: 12,
+    marginTop: 8,
+    gap: 0,
+  },
+  storyColumn: {
+    flex: 1,
+    paddingHorizontal: 6,
+  },
+  storyImage: {
+    width: '100%',
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  storyTitle: {
+    color: INK,
+    fontSize: 16,
+    fontWeight: '900',
+    lineHeight: 20,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  storyBody: {
+    color: INK,
+    fontSize: 10.5,
+    lineHeight: 15,
+  },
+  storyFooter: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: RULE,
+    paddingTop: 6,
+    marginTop: 8,
   },
 });

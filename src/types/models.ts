@@ -55,6 +55,8 @@ export interface Article {
   submittedAt?: string;
   reviewedAt?: string;
   rejectionReason?: string;
+  /** दिनांक date shown in the publication info bar; synced to approval date, editable by admin. */
+  registrationDate?: string;
   views: number;
   likes: number;
   readTimeMinutes: number;

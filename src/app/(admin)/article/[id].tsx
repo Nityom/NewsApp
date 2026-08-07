@@ -1,8 +1,11 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as Sharing from 'expo-sharing';
+import type { ElementRef } from 'react';
+import { useRef, useState } from 'react';
+import { Alert, LayoutChangeEvent, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import ViewShot from 'react-native-view-shot';
 
 import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
 import { StatusBadge } from '@/components/ui/Badge';
@@ -13,11 +16,17 @@ import { Input } from '@/components/ui/Input';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ErrorState } from '@/components/ui/StateViews';
 import { useArticles } from '@/context/ArticlesContext';
+import { formatRegistrationDate } from '@/context/PublicationInfoContext';
 import { mockReporters } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 
+const SHARE_WIDTH = 1200;
+const SHARE_HEIGHT = 1800;
+const SHARE_ASPECT = SHARE_HEIGHT / SHARE_WIDTH;
+
 export default function AdminArticleDetailScreen() {
   const theme = useAppTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getArticle, updateArticle, deleteArticle } = useArticles();
   const article = getArticle(id);
@@ -26,6 +35,15 @@ export default function AdminArticleDetailScreen() {
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [reason, setReason] = useState('');
   const [advertisements, setAdvertisements] = useState<string[]>(article?.advertisements ?? []);
+  const [registrationDate, setRegistrationDate] = useState(
+    article?.registrationDate ?? (article?.reviewedAt ? formatRegistrationDate(article.reviewedAt) : ''),
+  );
+  const viewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
+  const [sharing, setSharing] = useState(false);
+  const [articleHeight, setArticleHeight] = useState(0);
+
+  const captureHeight = windowWidth * SHARE_ASPECT;
+  const captureScaleY = articleHeight > 0 ? Math.min(1, captureHeight / articleHeight) : 1;
 
   if (!article) {
     return (
@@ -34,6 +52,31 @@ export default function AdminArticleDetailScreen() {
       </ScreenContainer>
     );
   }
+
+  const handleArticleLayout = (event: LayoutChangeEvent) => {
+    const nextHeight = event.nativeEvent.layout.height;
+    if (nextHeight > 0 && Math.abs(nextHeight - articleHeight) > 0.5) {
+      setArticleHeight(nextHeight);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!viewShotRef.current?.capture) return;
+    setSharing(true);
+    try {
+      const uri = await viewShotRef.current.capture();
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Sharing unavailable', 'Sharing is not supported on this device.');
+        return;
+      }
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: article.title });
+    } catch {
+      Alert.alert('Share failed', 'Could not generate the article image. Please try again.');
+    } finally {
+      setSharing(false);
+    }
+  };
 
   const pickAd = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -56,8 +99,16 @@ export default function AdminArticleDetailScreen() {
     Alert.alert('Advertisements Saved', 'The ad photos for this article have been updated.');
   };
 
+  const saveRegistrationDate = async () => {
+    await updateArticle(article.id, { registrationDate: registrationDate.trim() });
+    Alert.alert('Saved', 'The दिनांक for this article has been updated.');
+  };
+
   const approve = async () => {
-    await updateArticle(article.id, { status: 'approved', reviewedAt: new Date().toISOString() });
+    const now = new Date().toISOString();
+    const registrationLabel = formatRegistrationDate(now);
+    await updateArticle(article.id, { status: 'approved', reviewedAt: now, registrationDate: registrationLabel });
+    setRegistrationDate(registrationLabel);
     Alert.alert('Article Approved', 'The article has been published successfully.', [
       { text: 'OK', onPress: () => router.back() },
     ]);
@@ -103,6 +154,9 @@ export default function AdminArticleDetailScreen() {
         <IconButton icon="arrow-back" onPress={() => router.back()} />
         <View style={styles.headerActions}>
           <StatusBadge status={article.status} />
+          {article.status === 'approved' ? (
+            <IconButton icon="share-social-outline" onPress={handleShare} disabled={sharing} />
+          ) : null}
           <IconButton
             icon="create-outline"
             onPress={() => router.push({ pathname: '/(reporter)/create-article', params: { id: article.id } })}
@@ -122,7 +176,21 @@ export default function AdminArticleDetailScreen() {
           </View>
         </View>
 
-        <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} />
+        <View onLayout={handleArticleLayout}>
+          <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} />
+        </View>
+
+        <View style={{ marginTop: 24 }}>
+          <Text style={[styles.summary, { color: theme.colors.textSecondary, marginTop: 0, fontWeight: '700' }]}>
+            दिनांक (Registration Date)
+          </Text>
+          <View style={{ marginTop: 8, flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+            <View style={{ flex: 1 }}>
+              <Input value={registrationDate} onChangeText={setRegistrationDate} placeholder="e.g. 1/08/2020" />
+            </View>
+            <Button label="Save" variant="outline" onPress={saveRegistrationDate} />
+          </View>
+        </View>
 
         <View style={{ marginTop: 24 }}>
           <Text style={[styles.summary, { color: theme.colors.textSecondary, marginTop: 0, fontWeight: '700' }]}>
@@ -182,6 +250,24 @@ export default function AdminArticleDetailScreen() {
         ) : null}
       </ScrollView>
 
+      <View pointerEvents="none" style={styles.captureHost}>
+        <ViewShot
+          ref={viewShotRef}
+          style={[styles.articleCapture, { width: windowWidth, height: captureHeight }]}
+          options={{ format: 'png', quality: 1, width: SHARE_WIDTH, height: SHARE_HEIGHT }}>
+          <View
+            style={[
+              styles.captureContent,
+              {
+                width: windowWidth,
+                transform: [{ scaleY: captureScaleY }],
+              },
+            ]}>
+            <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} shareMode />
+          </View>
+        </ViewShot>
+      </View>
+
       <Dialog
         visible={rejectVisible}
         title="Reject Article"
@@ -240,6 +326,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 48,
+  },
+  captureHost: {
+    position: 'absolute',
+    left: -10000,
+    top: 0,
+  },
+  articleCapture: {
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+  },
+  captureContent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    transformOrigin: 'top left',
+    backgroundColor: '#FFFFFF',
   },
   banner: {
     width: '100%',

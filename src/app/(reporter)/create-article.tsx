@@ -7,7 +7,7 @@ import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, View } from 'rea
 import { ArticleNewspaperLayout, MAX_SECTION_BODY_CHARS } from '@/components/ui/ArticleNewspaperLayout';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
 import { Icon, IconName } from '@/components/ui/Icon';
-// import { ImageCropModal } from '@/components/ui/ImageCropModal';
+import { ImageCropModal } from '@/components/ui/ImageCropModal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
@@ -41,14 +41,15 @@ export default function CreateArticleScreen() {
   const [sections, setSections] = useState<ArticleSection[]>(editingDraft?.sections ?? []);
   const [submitting, setSubmitting] = useState<'draft' | 'submit' | 'save' | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
-  // Cropper disabled for now — kept here so it can be re-enabled later.
-  // const [cropTarget, setCropTarget] = useState<{
-  //   uri: string;
-  //   width: number;
-  //   height: number;
-  //   kind: 'banner' | 'gallery' | 'section';
-  //   sectionId?: string;
-  // } | null>(null);
+  const [cropTarget, setCropTarget] = useState<{
+    uri: string;
+    width: number;
+    height: number;
+    kind: 'banner' | 'gallery' | 'section';
+    sectionId?: string;
+    /** Must match the aspect ratio the image slot actually renders at, or the display will re-crop it. */
+    aspect: [number, number] | null;
+  } | null>(null);
 
   const pickImage = async (mode: 'banner' | 'gallery' | 'ad') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -70,12 +71,15 @@ export default function CreateArticleScreen() {
       setAdvertisements((prev) => [...prev, asset.uri]);
       return;
     }
-    if (mode === 'banner') {
-      setBanner(asset.uri);
-    } else {
-      setImages((prev) => [...prev, asset.uri]);
-    }
-    // setCropTarget({ uri: asset.uri, width: asset.width, height: asset.height, kind: mode });
+    // Banner displays at its own natural ratio (no additional article) - let the user pick freely.
+    // Gallery photos are shown in a fixed 4:3 grid.
+    setCropTarget({
+      uri: asset.uri,
+      width: asset.width,
+      height: asset.height,
+      kind: mode,
+      aspect: mode === 'gallery' ? [4, 3] : null,
+    });
   };
 
   const insertToken = (token: string) => setContent((prev) => `${prev}${token}`);
@@ -107,21 +111,31 @@ export default function CreateArticleScreen() {
     if (result.canceled) return;
     const asset = result.assets[0];
     if (!asset) return;
-    updateSection(id, { image: asset.uri });
-    // setCropTarget({ uri: asset.uri, width: asset.width, height: asset.height, kind: 'section', sectionId: id });
+    // The first section renders side-by-side at 4:3 (CompactStory); any section after that
+    // stacks full-width at 16:9 - match whichever this one will actually render as.
+    const sectionIndex = sections.findIndex((s) => s.id === id);
+    const sectionAspect: [number, number] = sectionIndex <= 0 ? [4, 3] : [16, 9];
+    setCropTarget({
+      uri: asset.uri,
+      width: asset.width,
+      height: asset.height,
+      kind: 'section',
+      sectionId: id,
+      aspect: sectionAspect,
+    });
   };
 
-  // const handleCropComplete = (uri: string) => {
-  //   if (!cropTarget) return;
-  //   if (cropTarget.kind === 'banner') {
-  //     setBanner(uri);
-  //   } else if (cropTarget.kind === 'gallery') {
-  //     setImages((prev) => [...prev, uri]);
-  //   } else if (cropTarget.sectionId) {
-  //     updateSection(cropTarget.sectionId, { image: uri });
-  //   }
-  //   setCropTarget(null);
-  // };
+  const handleCropComplete = (uri: string) => {
+    if (!cropTarget) return;
+    if (cropTarget.kind === 'banner') {
+      setBanner(uri);
+    } else if (cropTarget.kind === 'gallery') {
+      setImages((prev) => [...prev, uri]);
+    } else if (cropTarget.sectionId) {
+      updateSection(cropTarget.sectionId, { image: uri });
+    }
+    setCropTarget(null);
+  };
 
   const handleSave = async (kind: 'draft' | 'submit' | 'save') => {
     if (!title.trim()) {
@@ -187,9 +201,13 @@ export default function CreateArticleScreen() {
       const [title_, message] = messages[kind];
       setPreviewVisible(false);
       Alert.alert(title_, message, [{ text: 'OK', onPress: () => router.back() }]);
-    } catch {
+    } catch (error) {
       setSubmitting(null);
-      Alert.alert('Something went wrong', 'Could not save the article. Please try again.');
+      console.error('Failed to save article:', error);
+      Alert.alert(
+        'Something went wrong',
+        `Could not save the article. ${error instanceof Error ? error.message : 'Please try again.'}`,
+      );
     }
   };
 
@@ -488,15 +506,15 @@ export default function CreateArticleScreen() {
         </ScreenContainer>
       </Modal>
 
-      {/* <ImageCropModal
+      <ImageCropModal
         visible={!!cropTarget}
         imageUri={cropTarget?.uri ?? null}
         imageWidth={cropTarget?.width ?? 4}
         imageHeight={cropTarget?.height ?? 3}
-        aspect={[4, 3]}
+        aspect={cropTarget?.aspect ?? null}
         onCancel={() => setCropTarget(null)}
         onCropComplete={handleCropComplete}
-      /> */}
+      />
     </ScreenContainer>
   );
 }

@@ -46,7 +46,7 @@ export default function RegisterScreen() {
     setSubmitting(true);
     try {
       await register(name.trim(), email.trim(), phone.trim(), password);
-      router.replace('/(reporter)/(tabs)');
+      router.replace('/(auth)/reporter-details');
     } catch (error: any) {
       Alert.alert('Could not create account', error?.message ?? 'Please try again.');
     } finally {
@@ -58,7 +58,7 @@ export default function RegisterScreen() {
     setGoogleSubmitting(true);
     try {
       await loginWithGoogle('reporter');
-      router.replace('/(reporter)/(tabs)');
+      router.replace('/(auth)/reporter-details');
     } catch (error: any) {
       Alert.alert('Could not sign in with Google', error?.message ?? 'Please try again.');
     } finally {

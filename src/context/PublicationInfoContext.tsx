@@ -1,7 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { doc, getDoc, onSnapshot, setDoc } from '@react-native-firebase/firestore';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'enr:publicationInfo';
+import { db, stripUndefined } from '@/lib/firebase';
+
+const DOC_PATH = 'settings/publicationInfo';
 
 const MARATHI_MONTHS = [
   'जानेवारी', 'फेब्रुवारी', 'मार्च', 'एप्रिल', 'मे', 'जून',
@@ -47,14 +49,25 @@ export function PublicationInfoProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, DOC_PATH),
+      (snapshot) => {
+        if (snapshot.exists()) setInfo({ ...DEFAULT_INFO, ...(snapshot.data() as PublicationInfo) });
+        setIsLoading(false);
+      },
+      () => setIsLoading(false),
+    );
+    return unsubscribe;
+  }, []);
+
+  // One-time on app start: seed the document if it doesn't exist yet.
+  useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) setInfo({ ...DEFAULT_INFO, ...JSON.parse(raw) });
+        const snapshot = await getDoc(doc(db, DOC_PATH));
+        if (!snapshot.exists()) await setDoc(doc(db, DOC_PATH), DEFAULT_INFO);
       } catch {
-        setInfo(DEFAULT_INFO);
-      } finally {
-        setIsLoading(false);
+        // best-effort - the app still works from whatever the live listener has
       }
     })();
   }, []);
@@ -63,7 +76,7 @@ export function PublicationInfoProvider({ children }: { children: ReactNode }) {
     async (patch: Partial<PublicationInfo>) => {
       const next = { ...info, ...patch };
       setInfo(next);
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      await setDoc(doc(db, DOC_PATH), stripUndefined(next));
     },
     [info],
   );

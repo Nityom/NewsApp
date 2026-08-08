@@ -99,6 +99,7 @@ export const mockReporters: Reporter[] = reporterNames.map((name, i) => {
     rejectedCount: rejected,
     rating: Number((3.6 + (i % 5) * 0.28).toFixed(1)),
     totalEarnings: 4200 + i * 950,
+    requestStatus: 'approved',
   };
 });
 

@@ -1,10 +1,19 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+    collection,
+    doc,
+    getDocs,
+    onSnapshot,
+    setDoc,
+    updateDoc,
+    writeBatch,
+} from '@react-native-firebase/firestore';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+import { db, stripUndefined } from '@/lib/firebase';
 import { mockNotifications } from '@/mocks/data';
 import type { AppNotification } from '@/types/models';
 
-const STORAGE_KEY = 'enr:notifications';
+const COLLECTION = 'notifications';
 
 interface NotificationsContextValue {
   notifications: AppNotification[];
@@ -22,47 +31,50 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, COLLECTION),
+      (snapshot) => {
+        setNotifications(snapshot.docs.map((d) => d.data() as AppNotification));
+        setIsLoading(false);
+      },
+      () => setIsLoading(false),
+    );
+    return unsubscribe;
+  }, []);
+
+  // One-time on app start: seed the collection if it's empty.
+  useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          setNotifications(JSON.parse(raw));
-        } else {
-          setNotifications(mockNotifications);
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(mockNotifications));
+        const snapshot = await getDocs(collection(db, COLLECTION));
+        if (snapshot.empty) {
+          const batch = writeBatch(db);
+          mockNotifications.forEach((n) => batch.set(doc(db, COLLECTION, n.id), n));
+          await batch.commit();
         }
       } catch {
-        setNotifications(mockNotifications);
-      } finally {
-        setIsLoading(false);
+        // best-effort - the app still works from whatever the live listener has
       }
     })();
   }, []);
 
-  const persist = useCallback(async (next: AppNotification[]) => {
-    setNotifications(next);
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  }, []);
-
   const addNotification = useCallback(
     async (notification: Omit<AppNotification, 'id' | 'createdAt' | 'isRead'>) => {
+      const id = `ntf-${Date.now()}-${Math.round(Math.random() * 1000)}`;
       const next: AppNotification = {
         ...notification,
-        id: `ntf-${Date.now()}-${Math.round(Math.random() * 1000)}`,
+        id,
         createdAt: new Date().toISOString(),
         isRead: false,
       };
-      await persist([next, ...notifications]);
+      await setDoc(doc(db, COLLECTION, id), stripUndefined(next));
     },
-    [notifications, persist],
+    [],
   );
 
-  const markRead = useCallback(
-    async (id: string) => {
-      await persist(notifications.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
-    },
-    [notifications, persist],
-  );
+  const markRead = useCallback(async (id: string) => {
+    await updateDoc(doc(db, COLLECTION, id), { isRead: true });
+  }, []);
 
   const getForAudience = useCallback(
     (audience: 'reporter' | 'admin') => notifications.filter((n) => n.audience === audience),

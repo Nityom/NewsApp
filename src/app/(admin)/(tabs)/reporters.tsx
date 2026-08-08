@@ -17,10 +17,16 @@ export default function AdminReportersScreen() {
   const { reporters } = useReporters();
   const [query, setQuery] = useState('');
 
-  const filtered = useMemo(
-    () => reporters.filter((r) => r.name.toLowerCase().includes(query.toLowerCase())),
-    [reporters, query],
-  );
+  const filtered = useMemo(() => {
+    const matches = reporters.filter((r) => r.name.toLowerCase().includes(query.toLowerCase()));
+    // Join requests still in progress surface first so admins see them immediately.
+    const inProgress = new Set(['pending', 'awaiting_payment', 'payment_submitted']);
+    return [...matches].sort((a, b) => {
+      const aPending = inProgress.has(a.requestStatus) ? 0 : 1;
+      const bPending = inProgress.has(b.requestStatus) ? 0 : 1;
+      return aPending - bPending;
+    });
+  }, [reporters, query]);
 
   return (
     <ScreenContainer>
@@ -48,8 +54,20 @@ export default function AdminReportersScreen() {
                 </View>
                 <Text style={[styles.city, { color: theme.colors.textMuted }]}>{item.city}</Text>
                 <View style={styles.metaRow}>
-                  <Badge label={`${item.articlesCount} articles`} tone="neutral" size="sm" />
-                  <Badge label={`★ ${item.rating}`} tone="warning" size="sm" />
+                  {item.requestStatus === 'pending' ? (
+                    <Badge label="Pending Approval" tone="warning" size="sm" />
+                  ) : item.requestStatus === 'awaiting_payment' ? (
+                    <Badge label={`Awaiting Payment ₹${item.joinFeeAmount}`} tone="warning" size="sm" />
+                  ) : item.requestStatus === 'payment_submitted' ? (
+                    <Badge label="Payment Submitted" tone="info" size="sm" />
+                  ) : item.requestStatus === 'rejected' ? (
+                    <Badge label="Rejected" tone="danger" size="sm" />
+                  ) : (
+                    <>
+                      <Badge label={`${item.articlesCount} articles`} tone="neutral" size="sm" />
+                      <Badge label={`★ ${item.rating}`} tone="warning" size="sm" />
+                    </>
+                  )}
                 </View>
               </View>
               <Icon name="chevron-forward" size={18} color={theme.colors.textMuted} />

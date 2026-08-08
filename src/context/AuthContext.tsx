@@ -173,9 +173,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       trimmedEmail.toLowerCase() === HARDCODED_ADMIN_EMAIL &&
       password === HARDCODED_ADMIN_PASSWORD
     ) {
-      await storeRole(trimmedEmail, 'admin');
-      await refreshSessionExpiry(trimmedEmail);
-      setUser(profileForRole('admin', trimmedEmail));
+      // Back the hardcoded admin shortcut with a real Firebase account so Firestore's
+      // `request.auth != null` rules actually pass for admin sessions too.
+      authActionInProgressRef.current = true;
+      try {
+        const auth = getAuth();
+        try {
+          await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        } catch {
+          // First time the hardcoded admin logs in - there's no Firebase account for it yet.
+          await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+        }
+        await storeRole(trimmedEmail, 'admin');
+        await refreshSessionExpiry(trimmedEmail);
+        setUser(profileForRole('admin', trimmedEmail));
+      } finally {
+        authActionInProgressRef.current = false;
+      }
       return;
     }
 
@@ -272,7 +286,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await signOut(getAuth());
+    const auth = getAuth();
+    if (auth.currentUser) {
+      // Ignore "no current user" - can happen with a stale local session from before a Firebase
+      // account existed for it (e.g. the old hardcoded-admin session). The end state is the same.
+      await signOut(auth).catch((error: { code?: string }) => {
+        if (error?.code !== 'auth/no-current-user') throw error;
+      });
+    }
     setUser(null);
   }, []);
 

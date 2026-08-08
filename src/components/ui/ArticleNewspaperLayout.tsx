@@ -116,12 +116,6 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
   const theme = useAppTheme();
   const phone = article.reporterPhone ?? reporterPhone;
   const paragraphs = article.content.split(/\n+/).filter(Boolean);
-  // Split paragraphs: first shown beside image, rest in two columns
-  const leadPara = paragraphs[0] ?? '';
-  const bodyParas = paragraphs.slice(1);
-  const mid = Math.ceil(bodyParas.length / 2);
-  const leftCol = bodyParas.slice(0, mid);
-  const rightCol = bodyParas.slice(mid);
   const [firstSection, ...restSections] = article.sections ?? [];
   // Extra sections beyond the first stack as additional pages; the first shares the lead page.
   const pageCount = 1 + restSections.length;
@@ -159,29 +153,18 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
           <Text style={styles.title}>{article.title}</Text>
           <View style={styles.headlineRule} />
 
-          {/* Lead: image left + first paragraph right */}
-          <View style={styles.leadRow}>
-            <AutoImage
-              uri={article.banner}
-              style={styles.leadImage}
-              radius={theme.radius.sm}
-              fixedRatio={shareMode ? 4 / 3 : undefined}
-            />
-            <Text style={styles.leadPara}>{leadPara}</Text>
-          </View>
+          {/* Full-width photo */}
+          <AutoImage
+            uri={article.banner}
+            style={styles.fullImage}
+            radius={theme.radius.sm}
+            fixedRatio={shareMode ? 4 / 3 : undefined}
+          />
 
-          {/* Two-column body */}
-          {bodyParas.length > 0 ? (
-            <View style={styles.columns}>
-              <View style={styles.column}>
-                {leftCol.map((para, i) => <Text key={i} style={styles.body}>{para}</Text>)}
-              </View>
-              <View style={styles.colDivider} />
-              <View style={styles.column}>
-                {rightCol.map((para, i) => <Text key={i} style={styles.body}>{para}</Text>)}
-              </View>
-            </View>
-          ) : null}
+          {/* Single-column body */}
+          <View style={styles.simpleBody}>
+            {paragraphs.map((para, i) => <Text key={i} style={styles.body}>{para}</Text>)}
+          </View>
         </>
       )}
 
@@ -193,7 +176,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
         return (
           <View key={section.id} style={styles.sectionBlock}>
             {section.image ? (
-              <AutoImage uri={section.image} style={styles.sectionImage} radius={theme.radius.sm} />
+              <AutoImage uri={section.image} style={styles.sectionImage} radius={theme.radius.sm} fixedRatio={16 / 9} />
             ) : null}
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.headlineRule} />
@@ -215,7 +198,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
         <View style={styles.gallery}>
           {article.images.map((uri, i) => (
             <View key={`${uri}-${i}`} style={styles.galleryItem}>
-              <AutoImage uri={uri} style={styles.galleryImage} radius={theme.radius.sm} />
+              <AutoImage uri={uri} style={styles.galleryImage} radius={theme.radius.sm} fixedRatio={4 / 3} />
             </View>
           ))}
         </View>
@@ -407,6 +390,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 17,
     fontStyle: 'italic',
+  },
+  fullImage: {
+    width: '100%',
+    marginTop: 4,
+    marginBottom: 10,
+  },
+  simpleBody: {
+    marginHorizontal: 12,
   },
   columns: {
     flexDirection: 'row',

@@ -26,6 +26,23 @@ export interface Reporter {
   rejectedCount: number;
   rating: number;
   totalEarnings: number;
+  /** Gaon (village) provided at join request time. */
+  village?: string;
+  /** Full residential address. */
+  address?: string;
+  /** Optional Aadhar number. */
+  aadharNumber?: string;
+  /** Passport-style photo captured/uploaded at join request time. */
+  photo?: string;
+  /**
+   * Admin approval state for the join request:
+   * pending -> admin sets a joining fee -> awaiting_payment -> reporter pays and confirms -> payment_submitted
+   * -> admin confirms receipt -> approved. Existing/seeded reporters default to 'approved'.
+   */
+  requestStatus: 'pending' | 'awaiting_payment' | 'payment_submitted' | 'approved' | 'rejected';
+  requestRejectionReason?: string;
+  /** Joining fee amount (in ₹) set by admin, shown to the reporter to pay before approval. */
+  joinFeeAmount?: number;
 }
 
 export interface ArticleSection {
@@ -79,6 +96,8 @@ export interface AppNotification {
   createdAt: string;
   isRead: boolean;
   articleId?: string;
+  /** Reporter this notification is about (e.g. a join request), for deep-linking. */
+  reporterId?: string;
   audience: 'reporter' | 'admin';
 }
 

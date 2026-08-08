@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // MVP rules: any signed-in user (reporter or admin) can read/write.
+    // Role separation (reporter vs admin) is currently only enforced in the app UI, not here.
+    // Tighten this before going to production - e.g. restrict article status changes to admins only.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

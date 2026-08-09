@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { IconButton } from '@/components/ui/Button';
@@ -36,8 +37,13 @@ function timeAgo(iso: string) {
 
 export default function AdminNotificationsScreen() {
   const theme = useAppTheme();
-  const { getForAudience, markRead } = useNotifications();
+  const { getForAudience, markAllRead } = useNotifications();
   const notifications = getForAudience('admin');
+  const unreadIds = notifications.filter((notification) => !notification.isRead).map((notification) => notification.id);
+
+  useEffect(() => {
+    if (unreadIds.length > 0) markAllRead(unreadIds).catch(() => {});
+  }, [markAllRead, unreadIds.join(',')]);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
@@ -56,7 +62,6 @@ export default function AdminNotificationsScreen() {
           return (
             <Pressable
               onPress={() => {
-                if (!item.isRead) markRead(item.id);
                 if (item.articleId) {
                   router.push(`/(admin)/article/${item.articleId}`);
                 } else if (item.reporterId) {

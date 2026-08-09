@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon, IconName } from '@/components/ui/Icon';
@@ -39,9 +40,14 @@ export default function ReporterNotificationsScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
   const { getReporterByEmail } = useReporters();
-  const { getForReporter, markRead } = useNotifications();
+  const { getForReporter, markAllRead } = useNotifications();
   const reporterId = user?.email ? getReporterByEmail(user.email)?.id : undefined;
   const notifications = getForReporter(reporterId);
+  const unreadIds = notifications.filter((notification) => !notification.isRead).map((notification) => notification.id);
+
+  useEffect(() => {
+    if (unreadIds.length > 0) markAllRead(unreadIds).catch(() => {});
+  }, [markAllRead, unreadIds.join(',')]);
 
   return (
     <ScreenContainer>
@@ -57,7 +63,6 @@ export default function ReporterNotificationsScreen() {
           return (
             <Pressable
               onPress={() => {
-                if (!item.isRead) markRead(item.id);
                 if (item.articleId) router.push(`/(reporter)/article/${item.articleId}`);
               }}
               style={[

@@ -23,6 +23,7 @@ interface NotificationsContextValue {
   unreadCountForReporter: (reporterId?: string) => number;
   addNotification: (notification: Omit<AppNotification, 'id' | 'createdAt' | 'isRead'>) => Promise<void>;
   markRead: (id: string) => Promise<void>;
+  markAllRead: (ids: string[]) => Promise<void>;
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
@@ -67,7 +68,19 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   );
 
   const markRead = useCallback(async (id: string) => {
+    setNotifications((current) =>
+      current.map((notification) => (notification.id === id ? { ...notification, isRead: true } : notification)),
+    );
     await updateDoc(doc(db, COLLECTION, id), { isRead: true });
+  }, []);
+
+  const markAllRead = useCallback(async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    setNotifications((current) =>
+      current.map((notification) => (idSet.has(notification.id) ? { ...notification, isRead: true } : notification)),
+    );
+    await Promise.all(ids.map((id) => updateDoc(doc(db, COLLECTION, id), { isRead: true })));
   }, []);
 
   const getForAudience = useCallback(
@@ -102,6 +115,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       unreadCountForReporter,
       addNotification,
       markRead,
+      markAllRead,
     }),
     [
       notifications,
@@ -112,6 +126,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       unreadCountForReporter,
       addNotification,
       markRead,
+      markAllRead,
     ],
   );
 

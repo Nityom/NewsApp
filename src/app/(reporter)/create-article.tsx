@@ -1,12 +1,13 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ArticleNewspaperLayout, MAX_SECTION_BODY_CHARS } from '@/components/ui/ArticleNewspaperLayout';
+import { BlogTextEditor } from '@/components/ui/BlogTextEditor';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
-import { Icon, IconName } from '@/components/ui/Icon';
+import { Icon } from '@/components/ui/Icon';
 import { ImageCropModal } from '@/components/ui/ImageCropModal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useArticles } from '@/context/ArticlesContext';
@@ -14,12 +15,14 @@ import { useAuth } from '@/context/AuthContext';
 import { useAppTheme } from '@/theme';
 import type { Article, ArticleSection } from '@/types/models';
 
-const formatTools: { icon: IconName; token: string; label: string }[] = [
-  { icon: 'text', token: '# ', label: 'Heading' },
-  { icon: 'reorder-four', token: '\n- ', label: 'Bullet' },
-  { icon: 'chatbox-ellipses-outline', token: '"', label: 'Quote' },
-  { icon: 'link', token: '[link]', label: 'Link' },
-];
+const articleSummary = (value: string) =>
+  value
+    .replace(/^(?:# |\- |> )/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 140);
 
 export default function CreateArticleScreen() {
   const theme = useAppTheme();
@@ -36,6 +39,8 @@ export default function CreateArticleScreen() {
   const [banner, setBanner] = useState<string | undefined>(editingDraft?.banner);
   const [title, setTitle] = useState(editingDraft?.title ?? '');
   const [content, setContent] = useState(editingDraft?.content ?? '');
+  const pageScrollRef = useRef<ScrollView>(null);
+  const editorTopRef = useRef(0);
   const [images, setImages] = useState<string[]>(editingDraft?.images ?? []);
   const [advertisements, setAdvertisements] = useState<string[]>(editingDraft?.advertisements ?? []);
   const [sections, setSections] = useState<ArticleSection[]>(editingDraft?.sections ?? []);
@@ -47,8 +52,6 @@ export default function CreateArticleScreen() {
     height: number;
     kind: 'banner' | 'gallery' | 'section';
     sectionId?: string;
-    /** Must match the aspect ratio the image slot actually renders at, or the display will re-crop it. */
-    aspect: [number, number] | null;
   } | null>(null);
 
   const pickImage = async (mode: 'banner' | 'gallery' | 'ad') => {
@@ -60,7 +63,7 @@ export default function CreateArticleScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
-      quality: mode === 'ad' ? 1 : 0.9,
+      quality: 1,
       allowsMultipleSelection: false,
     });
     if (result.canceled) return;
@@ -69,20 +72,15 @@ export default function CreateArticleScreen() {
 
     if (mode === 'ad') {
       setAdvertisements((prev) => [...prev, asset.uri]);
-      return;
+    } else {
+      setCropTarget({
+        uri: asset.uri,
+        width: asset.width,
+        height: asset.height,
+        kind: mode,
+      });
     }
-    // Banner displays at its own natural ratio (no additional article) - let the user pick freely.
-    // Gallery photos are shown in a fixed 4:3 grid.
-    setCropTarget({
-      uri: asset.uri,
-      width: asset.width,
-      height: asset.height,
-      kind: mode,
-      aspect: mode === 'gallery' ? [4, 3] : null,
-    });
   };
-
-  const insertToken = (token: string) => setContent((prev) => `${prev}${token}`);
 
   const addSection = () => {
     setSections((prev) => [...prev, { id: `sec-${Date.now()}`, title: '', content: '' }]);
@@ -105,24 +103,20 @@ export default function CreateArticleScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
-      quality: 0.9,
+      quality: 1,
       allowsMultipleSelection: false,
     });
     if (result.canceled) return;
     const asset = result.assets[0];
-    if (!asset) return;
-    // The first section renders side-by-side at 4:3 (CompactStory); any section after that
-    // stacks full-width at 16:9 - match whichever this one will actually render as.
-    const sectionIndex = sections.findIndex((s) => s.id === id);
-    const sectionAspect: [number, number] = sectionIndex <= 0 ? [4, 3] : [16, 9];
-    setCropTarget({
-      uri: asset.uri,
-      width: asset.width,
-      height: asset.height,
-      kind: 'section',
-      sectionId: id,
-      aspect: sectionAspect,
-    });
+    if (asset) {
+      setCropTarget({
+        uri: asset.uri,
+        width: asset.width,
+        height: asset.height,
+        kind: 'section',
+        sectionId: id,
+      });
+    }
   };
 
   const handleCropComplete = (uri: string) => {
@@ -155,7 +149,7 @@ export default function CreateArticleScreen() {
       if (editingDraft) {
         await updateArticle(editingDraft.id, {
           title,
-          summary: content.slice(0, 140),
+          summary: articleSummary(content),
           content,
           banner,
           images,
@@ -169,7 +163,7 @@ export default function CreateArticleScreen() {
         const newArticle: Article = {
           id: `art-${Date.now()}`,
           title,
-          summary: content.slice(0, 140),
+          summary: articleSummary(content),
           content,
           banner,
           images,
@@ -225,7 +219,7 @@ export default function CreateArticleScreen() {
     () => ({
       id: editingDraft?.id ?? 'preview',
       title,
-      summary: content.slice(0, 140),
+      summary: articleSummary(content),
       content,
       banner: banner ?? '',
       images,
@@ -255,7 +249,7 @@ export default function CreateArticleScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={pageScrollRef} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>News Photo</Text>
         <View
           style={[
@@ -296,26 +290,20 @@ export default function CreateArticleScreen() {
           Article Body
         </Text>
         <View
-          style={[
-            styles.toolbar,
-            { backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md },
-          ]}>
-          {formatTools.map((tool) => (
-            <IconButton key={tool.label} icon={tool.icon} size={18} onPress={() => insertToken(tool.token)} />
-          ))}
+          onLayout={(event) => {
+            editorTopRef.current = event.nativeEvent.layout.y;
+          }}>
+          <BlogTextEditor
+            initialValue={content}
+            onChange={setContent}
+            onCursorPosition={(offsetY) => {
+              pageScrollRef.current?.scrollTo({
+                y: Math.max(0, editorTopRef.current + offsetY - 180),
+                animated: true,
+              });
+            }}
+          />
         </View>
-        <TextInput
-          value={content}
-          onChangeText={setContent}
-          placeholder="Start writing your story..."
-          placeholderTextColor={theme.colors.textMuted}
-          style={[
-            styles.bodyInput,
-            { color: theme.colors.text, borderColor: theme.colors.border, borderRadius: theme.radius.md },
-          ]}
-          multiline
-          textAlignVertical="top"
-        />
 
         <View style={styles.imagesHeader}>
           <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
@@ -506,12 +494,13 @@ export default function CreateArticleScreen() {
       <ImageCropModal
         visible={!!cropTarget}
         imageUri={cropTarget?.uri ?? null}
-        imageWidth={cropTarget?.width ?? 4}
-        imageHeight={cropTarget?.height ?? 3}
-        aspect={cropTarget?.aspect ?? null}
+        imageWidth={cropTarget?.width ?? 1}
+        imageHeight={cropTarget?.height ?? 1}
+        aspect={null}
         onCancel={() => setCropTarget(null)}
         onCropComplete={handleCropComplete}
       />
+
     </ScreenContainer>
   );
 }
@@ -628,25 +617,17 @@ const styles = StyleSheet.create({
     padding: 14,
     minHeight: 54,
   },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  toolbar: {
-    flexDirection: 'row',
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    marginBottom: 8,
-    alignSelf: 'flex-start',
-  },
   bodyInput: {
     fontSize: 14.5,
     lineHeight: 22,
     borderWidth: 1,
     padding: 14,
-    minHeight: 200,
+    minHeight: 120,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   imagesHeader: {
     marginTop: 20,

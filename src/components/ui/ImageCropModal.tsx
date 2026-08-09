@@ -1,6 +1,6 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, LayoutChangeEvent, Modal, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Dimensions, LayoutChangeEvent, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -11,12 +11,10 @@ const INITIAL_STAGE_WIDTH = Dimensions.get('window').width;
 const INITIAL_STAGE_HEIGHT = Dimensions.get('window').height * 0.55;
 const MAX_ZOOM_MULTIPLIER = 5;
 
-const ASPECT_PRESETS: Array<{ key: string; label: string; value: [number, number] }> = [
-  { key: '1:1', label: '1:1', value: [1, 1] },
-  { key: '4:3', label: '4:3', value: [4, 3] },
-  { key: '3:4', label: '3:4', value: [3, 4] },
-  { key: '16:9', label: '16:9', value: [16, 9] },
-  { key: '9:16', label: '9:16', value: [9, 16] },
+const ASPECT_PRESETS: Array<{ key: string; label: string; value: [number, number]; preview: { width: number; height: number } }> = [
+  { key: 'square', label: 'Square', value: [1, 1], preview: { width: 24, height: 24 } },
+  { key: 'wide', label: 'Wide', value: [4, 3], preview: { width: 32, height: 24 } },
+  { key: 'tall', label: 'Tall', value: [3, 4], preview: { width: 18, height: 24 } },
 ];
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -39,9 +37,14 @@ function fitFrame(aspect: [number, number], stageWidth: number, stageHeight: num
   return { width, height };
 }
 
-function aspectKeyFromValue(aspect: [number, number] | null) {
-  if (!aspect) return '4:3';
-  return ASPECT_PRESETS.find((p) => p.value[0] === aspect[0] && p.value[1] === aspect[1])?.key ?? '4:3';
+function aspectKeyFromValue(aspect: [number, number] | null, imageWidth: number, imageHeight: number) {
+  if (!aspect) {
+    const ratio = imageWidth / imageHeight;
+    if (ratio < 0.9) return 'tall';
+    if (ratio > 1.1) return 'wide';
+    return 'square';
+  }
+  return ASPECT_PRESETS.find((preset) => preset.value[0] === aspect[0] && preset.value[1] === aspect[1])?.key ?? 'wide';
 }
 
 interface ImageCropModalProps {
@@ -49,7 +52,7 @@ interface ImageCropModalProps {
   imageUri: string | null;
   imageWidth: number;
   imageHeight: number;
-  /** Aspect ratio as [width, height], e.g. [4, 3]. Defaults to 4:3 if not one of the presets. */
+  /** Initial aspect ratio. When null, the crop frame follows the selected photo's orientation. */
   aspect: [number, number] | null;
   onCancel: () => void;
   onCropComplete: (uri: string) => void;
@@ -70,8 +73,16 @@ export function ImageCropModal({
 }: ImageCropModalProps) {
   const theme = useAppTheme();
   const [processing, setProcessing] = useState(false);
-  const [selectedAspectKey, setSelectedAspectKey] = useState(() => aspectKeyFromValue(aspect));
-  const activeAspect = ASPECT_PRESETS.find((p) => p.key === selectedAspectKey)?.value ?? [4, 3];
+  const [selectedAspectKey, setSelectedAspectKey] = useState(() =>
+    aspectKeyFromValue(aspect, imageWidth, imageHeight),
+  );
+  const activeAspect = ASPECT_PRESETS.find((preset) => preset.key === selectedAspectKey)?.value ?? [4, 3];
+
+  useEffect(() => {
+    if (visible && imageWidth > 0 && imageHeight > 0) {
+      setSelectedAspectKey(aspectKeyFromValue(aspect, imageWidth, imageHeight));
+    }
+  }, [aspect, imageHeight, imageUri, imageWidth, visible]);
 
   const stageW = useSharedValue(INITIAL_STAGE_WIDTH);
   const stageH = useSharedValue(INITIAL_STAGE_HEIGHT);
@@ -192,6 +203,23 @@ export function ImageCropModal({
     top: (stageH.value - frameH.value) / 2,
   }));
 
+  const maskTopStyle = useAnimatedStyle(() => ({
+    height: Math.max(0, (stageH.value - frameH.value) / 2),
+  }));
+  const maskBottomStyle = useAnimatedStyle(() => ({
+    top: (stageH.value + frameH.value) / 2,
+  }));
+  const maskLeftStyle = useAnimatedStyle(() => ({
+    top: (stageH.value - frameH.value) / 2,
+    width: Math.max(0, (stageW.value - frameW.value) / 2),
+    height: frameH.value,
+  }));
+  const maskRightStyle = useAnimatedStyle(() => ({
+    top: (stageH.value - frameH.value) / 2,
+    left: (stageW.value + frameW.value) / 2,
+    height: frameH.value,
+  }));
+
   const handleConfirm = async () => {
     if (!imageUri) return;
     setProcessing(true);
@@ -209,7 +237,7 @@ export function ImageCropModal({
         height: Math.min(cropHeight, imageHeight - cropOriginY),
       });
       const rendered = await context.renderAsync();
-      const result = await rendered.saveAsync({ compress: 0.95, format: SaveFormat.JPEG });
+      const result = await rendered.saveAsync({ compress: 1, format: SaveFormat.JPEG });
       onCropComplete(result.uri);
     } finally {
       setProcessing(false);
@@ -236,6 +264,10 @@ export function ImageCropModal({
                 </GestureDetector>
 
                 <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                  <Animated.View style={[styles.cropShade, styles.cropShadeTop, maskTopStyle]} />
+                  <Animated.View style={[styles.cropShade, styles.cropShadeBottom, maskBottomStyle]} />
+                  <Animated.View style={[styles.cropShade, styles.cropShadeLeft, maskLeftStyle]} />
+                  <Animated.View style={[styles.cropShade, styles.cropShadeRight, maskRightStyle]} />
                   <Animated.View style={[styles.frameMask, frameStyle]}>
                     <View style={[styles.gridLineV, { left: '33.333%' }]} />
                     <View style={[styles.gridLineV, { left: '66.666%' }]} />
@@ -252,23 +284,30 @@ export function ImageCropModal({
             {ASPECT_PRESETS.map((preset) => {
               const active = preset.key === selectedAspectKey;
               return (
-                <Text
+                <Pressable
                   key={preset.key}
                   onPress={() => setSelectedAspectKey(preset.key)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`${preset.label} photo shape`}
                   style={[
-                    styles.aspectPill,
-                    {
-                      color: active ? '#000' : '#fff',
-                      backgroundColor: active ? '#fff' : 'rgba(255,255,255,0.15)',
-                    },
+                    styles.aspectOption,
+                    { backgroundColor: active ? '#fff' : 'rgba(255,255,255,0.12)' },
                   ]}>
-                  {preset.label}
-                </Text>
+                  <View
+                    style={[
+                      styles.aspectPreview,
+                      preset.preview,
+                      { borderColor: active ? '#000' : '#fff' },
+                    ]}
+                  />
+                  <Text style={[styles.aspectLabel, { color: active ? '#000' : '#fff' }]}>{preset.label}</Text>
+                </Pressable>
               );
             })}
           </View>
 
-          <Text style={styles.hint}>Pinch to zoom · drag to reposition · double-tap to toggle zoom</Text>
+          <Text style={styles.hint}>Drag the photo to move it. Use two fingers to zoom.</Text>
 
           {processing ? (
             <View style={styles.loadingOverlay}>
@@ -308,6 +347,26 @@ const styles = StyleSheet.create({
   frameMask: {
     position: 'absolute',
   },
+  cropShade: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0,0,0,0.58)',
+  },
+  cropShadeTop: {
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  cropShadeBottom: {
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  cropShadeLeft: {
+    left: 0,
+  },
+  cropShadeRight: {
+    right: 0,
+  },
   frameBorder: {
     position: 'absolute',
     top: 0,
@@ -332,20 +391,26 @@ const styles = StyleSheet.create({
   },
   aspectRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    flexWrap: 'wrap',
     gap: 8,
     paddingHorizontal: 16,
     paddingTop: 12,
   },
-  aspectPill: {
-    fontSize: 12,
+  aspectOption: {
+    flex: 1,
+    height: 62,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  aspectPreview: {
+    borderWidth: 2,
+  },
+  aspectLabel: {
+    fontSize: 13,
     fontWeight: '700',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 14,
-    overflow: 'hidden',
   },
   hint: {
     color: '#fff',

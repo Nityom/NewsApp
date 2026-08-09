@@ -1,4 +1,5 @@
 import { Image } from 'expo-image';
+import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { Image as RNImage, StyleSheet, Text, View } from 'react-native';
 
@@ -22,6 +23,49 @@ const displayRatio = (width: number, height: number) =>
 function truncate(text: string, max: number) {
   if (text.length <= max) return text;
   return `${text.slice(0, max).trimEnd()}…`;
+}
+
+function plainArticleText(content: string) {
+  return content
+    .replace(/^(?:# |\- |> )/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/\n+/g, ' ')
+    .trim();
+}
+
+function renderInlineText(text: string, keyPrefix = 'inline'): ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*|_[^_]+_)/g).filter(Boolean);
+  return parts.map((part, index) => {
+    const key = `${keyPrefix}-${index}`;
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <Text key={key} style={styles.bodyBold}>{renderInlineText(part.slice(2, -2), key)}</Text>;
+    }
+    if (part.startsWith('_') && part.endsWith('_')) {
+      return <Text key={key} style={styles.bodyItalic}>{renderInlineText(part.slice(1, -1), key)}</Text>;
+    }
+    return part;
+  });
+}
+
+function ArticleBody({ content }: { content: string }) {
+  return content.split(/\n+/).filter(Boolean).map((line, index) => {
+    if (line.startsWith('# ')) {
+      return <Text key={index} style={styles.bodyHeading}>{renderInlineText(line.slice(2), `heading-${index}`)}</Text>;
+    }
+    if (line.startsWith('- ')) {
+      return (
+        <View key={index} style={styles.bulletRow}>
+          <Text style={styles.bulletMark}>•</Text>
+          <Text style={[styles.body, styles.bulletText]}>{renderInlineText(line.slice(2), `bullet-${index}`)}</Text>
+        </View>
+      );
+    }
+    if (line.startsWith('> ')) {
+      return <Text key={index} style={styles.bodyQuote}>{renderInlineText(line.slice(2), `quote-${index}`)}</Text>;
+    }
+    return <Text key={index} style={styles.body}>{renderInlineText(line, `body-${index}`)}</Text>;
+  });
 }
 
 interface ArticleNewspaperLayoutProps {
@@ -65,7 +109,7 @@ function AutoImage({
         style,
         { aspectRatio: fixedRatio ?? ratio, borderRadius: radius },
       ]}
-      contentFit="cover"
+      contentFit="contain"
       transition={0}
     />
   );
@@ -115,7 +159,6 @@ function PublicationInfoBar({ pageCount, registrationLabel }: { pageCount: numbe
 export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = false }: ArticleNewspaperLayoutProps) {
   const theme = useAppTheme();
   const phone = article.reporterPhone ?? reporterPhone;
-  const paragraphs = article.content.split(/\n+/).filter(Boolean);
   const [firstSection, ...restSections] = article.sections ?? [];
   // Extra sections beyond the first stack as additional pages; the first shares the lead page.
   const pageCount = 1 + restSections.length;
@@ -159,26 +202,25 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
               uri={article.banner}
               style={styles.fullImage}
               radius={theme.radius.sm}
-              fixedRatio={shareMode ? 4 / 3 : undefined}
             />
           </View>
 
           {/* Single-column body */}
           <View style={styles.simpleBody}>
-            {paragraphs.map((para, i) => <Text key={i} style={styles.body}>{para}</Text>)}
+            <ArticleBody content={article.content} />
           </View>
         </>
       )}
 
       {/* Any further sections beyond the first stack below in full width */}
       {restSections.map((section) => {
-        const sContent = truncate(section.content.replace(/\n+/g, ' ').trim(), MAX_SECTION_BODY_CHARS);
+        const sContent = truncate(plainArticleText(section.content), MAX_SECTION_BODY_CHARS);
         const sParas = sContent.split(/\n+/).filter(Boolean);
         const sMid = Math.ceil(sParas.length / 2);
         return (
           <View key={section.id} style={styles.sectionBlock}>
             {section.image ? (
-              <AutoImage uri={section.image} style={styles.sectionImage} radius={theme.radius.sm} fixedRatio={16 / 9} />
+              <AutoImage uri={section.image} style={styles.sectionImage} radius={theme.radius.sm} />
             ) : null}
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.headlineRule} />
@@ -200,7 +242,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
         <View style={styles.gallery}>
           {article.images.map((uri, i) => (
             <View key={`${uri}-${i}`} style={styles.galleryItem}>
-              <AutoImage uri={uri} style={styles.galleryImage} radius={theme.radius.sm} fixedRatio={4 / 3} />
+              <AutoImage uri={uri} style={styles.galleryImage} radius={theme.radius.sm} />
             </View>
           ))}
         </View>
@@ -260,13 +302,13 @@ function CompactStory({
   maxBodyChars: number;
 }) {
   const theme = useAppTheme();
-  const body = truncate(content.replace(/\n+/g, ' ').trim(), maxBodyChars);
+  const body = truncate(plainArticleText(content), maxBodyChars);
 
   return (
     <View style={styles.storyColumn}>
       <Text style={styles.storyTitle}>{title}</Text>
       <View style={styles.headlineRule} />
-      <AutoImage uri={image} style={styles.storyImage} radius={theme.radius.sm} fixedRatio={4 / 3} />
+      <AutoImage uri={image} style={styles.storyImage} radius={theme.radius.sm} />
       <Text style={styles.storyBody}>{body}</Text>
       {footer ? (
         <View style={styles.storyFooter}>
@@ -423,6 +465,44 @@ const styles = StyleSheet.create({
     color: INK,
     fontSize: 11,
     lineHeight: 17,
+    marginBottom: 6,
+  },
+  bodyBold: {
+    fontWeight: '800',
+  },
+  bodyItalic: {
+    fontStyle: 'italic',
+  },
+  bodyHeading: {
+    color: INK,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: '800',
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingLeft: 4,
+  },
+  bulletMark: {
+    color: INK,
+    width: 14,
+    fontSize: 13,
+    lineHeight: 17,
+  },
+  bulletText: {
+    flex: 1,
+  },
+  bodyQuote: {
+    color: MUTED_INK,
+    fontSize: 11,
+    lineHeight: 17,
+    fontStyle: 'italic',
+    borderLeftWidth: 3,
+    borderLeftColor: RULE,
+    paddingLeft: 8,
     marginBottom: 6,
   },
   gallery: {

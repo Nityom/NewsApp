@@ -43,7 +43,7 @@ export default function SplashRoute() {
     <LinearGradient colors={[palette.primary600, palette.primary900]} style={styles.container}>
       <Animated.View style={[styles.logoWrap, { opacity, transform: [{ scale }] }]}>
         <Image source={appLogo} style={styles.logoImage} contentFit="contain" />
-        <Text style={styles.title}>Educational News Reporter</Text>
+        <Text style={styles.title}>Education News</Text>
         <Text style={styles.subtitle}>Trusted education journalism, on the go</Text>
       </Animated.View>
     </LinearGradient>

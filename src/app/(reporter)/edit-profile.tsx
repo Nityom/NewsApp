@@ -22,7 +22,6 @@ export default function EditProfileScreen() {
   const [name, setName] = useState(reporter?.name ?? user?.name ?? '');
   const [phone, setPhone] = useState(reporter?.phone ?? user?.phone ?? '');
   const [city, setCity] = useState(reporter?.city ?? user?.city ?? '');
-  const [bio, setBio] = useState(reporter?.bio ?? user?.bio ?? '');
   const [village, setVillage] = useState(reporter?.village ?? '');
   const [address, setAddress] = useState(reporter?.address ?? '');
   const [aadharNumber, setAadharNumber] = useState(reporter?.aadharNumber ?? '');
@@ -36,7 +35,6 @@ export default function EditProfileScreen() {
     setName(reporter.name);
     setPhone(reporter.phone);
     setCity(reporter.city);
-    setBio(reporter.bio);
     setVillage(reporter.village ?? '');
     setAddress(reporter.address ?? '');
     setAadharNumber(reporter.aadharNumber ?? '');
@@ -73,7 +71,6 @@ export default function EditProfileScreen() {
         name: name.trim(),
         phone: phone.trim(),
         city: city.trim(),
-        bio: bio.trim(),
         village: village.trim() || undefined,
         address: address.trim() || undefined,
         aadharNumber: aadharNumber.trim() || undefined,
@@ -84,7 +81,6 @@ export default function EditProfileScreen() {
         name: name.trim(),
         phone: phone.trim(),
         city: city.trim(),
-        bio: bio.trim(),
         avatar: resolvedProfile.avatar ?? avatar,
       });
       Alert.alert('Profile Updated', 'Your profile has been saved.', [
@@ -120,7 +116,6 @@ export default function EditProfileScreen() {
           <Input label="Village (Gaon)" leftIcon="location-outline" value={village} onChangeText={setVillage} />
           <Input label="Address" leftIcon="home-outline" value={address} onChangeText={setAddress} multiline />
           <Input label="Aadhar Number" leftIcon="card-outline" keyboardType="number-pad" value={aadharNumber} onChangeText={setAadharNumber} />
-          <Input label="Bio" leftIcon="document-text-outline" value={bio} onChangeText={setBio} multiline error={errors.bio} />
 
           {errors.form ? <Text style={[styles.formError, { color: theme.colors.danger }]}>{errors.form}</Text> : null}
           <Button label="Save Changes" onPress={handleSave} loading={submitting} fullWidth size="lg" />

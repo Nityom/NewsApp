@@ -114,6 +114,9 @@ export function ArticlesProvider({ children }: { children: ReactNode }) {
       const previous = articles.find((a) => a.id === id);
       const resolvedPatch = await resolveArticleImages(id, patch);
       await updateDoc(doc(db, COLLECTION, id), stripUndefined(resolvedPatch));
+      setArticles((current) =>
+        current.map((article) => (article.id === id ? { ...article, ...resolvedPatch } : article)),
+      );
 
       if (previous && patch.status && patch.status !== previous.status) {
         const title = patch.title ?? previous.title;

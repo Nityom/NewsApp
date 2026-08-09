@@ -1,13 +1,15 @@
+import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import type { ElementRef } from 'react';
 import { useRef, useState } from 'react';
-import { Alert, LayoutChangeEvent, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
 import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
+import { Avatar } from '@/components/ui/Avatar';
 import { StatusBadge } from '@/components/ui/Badge';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
@@ -24,6 +26,14 @@ const SHARE_WIDTH = 1200;
 const SHARE_HEIGHT = 1800;
 const SHARE_ASPECT = SHARE_HEIGHT / SHARE_WIDTH;
 
+function parseRegistrationDate(label?: string, fallbackIso?: string) {
+  const match = label?.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (match) {
+    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+  }
+  return fallbackIso ? new Date(fallbackIso) : new Date();
+}
+
 export default function AdminArticleDetailScreen() {
   const theme = useAppTheme();
   const { width: windowWidth } = useWindowDimensions();
@@ -31,7 +41,9 @@ export default function AdminArticleDetailScreen() {
   const { getArticle, updateArticle, deleteArticle } = useArticles();
   const article = getArticle(id);
   const { getReporter } = useReporters();
-  const reporterPhone = article?.reporterPhone ?? (article ? getReporter(article.reporterId)?.phone : undefined);
+  const reporter = article ? getReporter(article.reporterId) : undefined;
+  const reporterPhone = article?.reporterPhone ?? reporter?.phone;
+  const reporterPhoto = reporter?.photo || reporter?.avatar || article?.reporterAvatar;
   const [rejectVisible, setRejectVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [reason, setReason] = useState('');
@@ -39,6 +51,10 @@ export default function AdminArticleDetailScreen() {
   const [registrationDate, setRegistrationDate] = useState(
     article?.registrationDate ?? (article?.reviewedAt ? formatRegistrationDate(article.reviewedAt) : ''),
   );
+  const [selectedRegistrationDate, setSelectedRegistrationDate] = useState(() =>
+    parseRegistrationDate(article?.registrationDate, article?.reviewedAt),
+  );
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
   const viewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
   const [sharing, setSharing] = useState(false);
   const [articleHeight, setArticleHeight] = useState(0);
@@ -101,13 +117,19 @@ export default function AdminArticleDetailScreen() {
   };
 
   const saveRegistrationDate = async () => {
-    await updateArticle(article.id, { registrationDate: registrationDate.trim() });
+    await updateArticle(article.id, { registrationDate });
     Alert.alert('Saved', 'The दिनांक for this article has been updated.');
+  };
+
+  const selectRegistrationDate = (date: Date) => {
+    setDatePickerVisible(false);
+    setSelectedRegistrationDate(date);
+    setRegistrationDate(formatRegistrationDate(date.toISOString()));
   };
 
   const approve = async () => {
     const now = new Date().toISOString();
-    const registrationLabel = formatRegistrationDate(now);
+    const registrationLabel = registrationDate || formatRegistrationDate(now);
     await updateArticle(article.id, { status: 'approved', reviewedAt: now, registrationDate: registrationLabel });
     setRegistrationDate(registrationLabel);
     Alert.alert('Article Approved', 'The article has been published successfully.', [
@@ -168,13 +190,8 @@ export default function AdminArticleDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.authorRow}>
-          <Image source={{ uri: article.reporterAvatar }} style={styles.authorAvatar} />
-          <View>
-            <Text style={[styles.authorName, { color: theme.colors.text }]}>{article.reporterName}</Text>
-            {reporterPhone ? (
-              <Text style={[styles.authorMeta, { color: theme.colors.textMuted }]}>{reporterPhone}</Text>
-            ) : null}
-          </View>
+          <Avatar uri={reporterPhoto} name={reporter?.name ?? article.reporterName} size={34} />
+          <Text style={[styles.authorName, { color: theme.colors.text }]}>{article.reporterName}</Text>
         </View>
 
         <View onLayout={handleArticleLayout}>
@@ -185,12 +202,32 @@ export default function AdminArticleDetailScreen() {
           <Text style={[styles.summary, { color: theme.colors.textSecondary, marginTop: 0, fontWeight: '700' }]}>
             दिनांक (Registration Date)
           </Text>
-          <View style={{ marginTop: 8, flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-            <View style={{ flex: 1 }}>
-              <Input value={registrationDate} onChangeText={setRegistrationDate} placeholder="e.g. 1/08/2020" />
-            </View>
+          <View style={styles.dateRow}>
+            <Pressable
+              onPress={() => setDatePickerVisible(true)}
+              style={[
+                styles.dateButton,
+                { backgroundColor: theme.colors.backgroundSubtle, borderColor: theme.colors.border },
+              ]}>
+              <Icon name="calendar-outline" size={20} color={theme.colors.primary} />
+              <Text style={[styles.dateValue, { color: theme.colors.text }]}>
+                {registrationDate || 'Select date'}
+              </Text>
+              <Icon name="chevron-down" size={18} color={theme.colors.textMuted} />
+            </Pressable>
             <Button label="Save" variant="outline" onPress={saveRegistrationDate} />
           </View>
+          {datePickerVisible ? (
+            <DateTimePicker
+              value={selectedRegistrationDate}
+              mode="date"
+              display="calendar"
+              presentation="dialog"
+              accentColor={theme.colors.primary}
+              onValueChange={(_, date) => selectRegistrationDate(date)}
+              onDismiss={() => setDatePickerVisible(false)}
+            />
+          ) : null}
         </View>
 
         <View style={{ marginTop: 24 }}>
@@ -323,6 +360,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  dateButton: {
+    minHeight: 44,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+  },
+  dateValue: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
   scroll: {
     paddingHorizontal: 20,
     paddingTop: 8,
@@ -354,18 +412,9 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 16,
   },
-  authorAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-  },
   authorName: {
     fontSize: 13.5,
     fontWeight: '700',
-  },
-  authorMeta: {
-    fontSize: 11.5,
-    marginTop: 1,
   },
   title: {
     fontSize: 20,

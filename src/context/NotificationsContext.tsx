@@ -1,6 +1,6 @@
 import {
     collection,
-  deleteDoc,
+    deleteDoc,
     doc,
     onSnapshot,
     setDoc,

@@ -42,7 +42,7 @@ export default function AdminReportersScreen() {
         renderItem={({ item }) => (
           <Pressable onPress={() => router.push(`/(admin)/reporter/${item.id}`)}>
             <Card style={styles.row}>
-              <Avatar uri={item.avatar} name={item.name} size={52} online={item.isActive} />
+              <Avatar uri={item.photo || item.avatar} name={item.name} size={52} online={item.isActive} />
               <View style={{ flex: 1 }}>
                 <View style={styles.nameRow}>
                   <Text style={[styles.name, { color: theme.colors.text }]} numberOfLines={1}>

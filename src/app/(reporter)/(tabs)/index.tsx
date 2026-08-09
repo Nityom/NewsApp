@@ -11,6 +11,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SectionHeader } from '@/components/ui/SearchBar';
 import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 
 function StatTile({
@@ -43,6 +44,9 @@ export default function ReporterDashboardScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
   const { articles } = useArticles();
+  const { getReporterByEmail } = useReporters();
+  const reporter = user?.email ? getReporterByEmail(user.email) : undefined;
+  const reporterPhoto = reporter?.photo || reporter?.avatar || user?.avatar;
 
   const myArticles = useMemo(() => articles.slice(0, 6), [articles]);
   const counts = useMemo(
@@ -68,7 +72,7 @@ export default function ReporterDashboardScreen() {
                 <Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>Welcome back,</Text>
                 <Text style={[styles.name, { color: theme.colors.text }]}>{user?.name ?? 'Reporter'}</Text>
               </View>
-              <Avatar uri={user?.avatar} name={user?.name ?? 'R'} size={48} online />
+              <Avatar uri={reporterPhoto} name={reporter?.name ?? user?.name ?? 'R'} size={48} online />
             </View>
 
             {/* <Card style={[styles.subscriptionCard, { backgroundColor: theme.colors.primary }]} elevated>

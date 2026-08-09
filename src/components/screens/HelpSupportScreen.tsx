@@ -22,7 +22,7 @@ const faqs = [
   },
   {
     question: 'How do I update my profile details?',
-    answer: 'Open your Profile tab and tap Edit Profile to update your name, phone, city, bio, or photo.',
+    answer: 'Open your Profile tab and tap Edit Profile to update your name, phone, city, or photo.',
   },
 ];
 
@@ -51,8 +51,8 @@ export function HelpSupportScreen() {
             <Icon name="call-outline" size={18} color={theme.colors.primary} />
             <Text
               style={[styles.contactText, { color: theme.colors.text }]}
-              onPress={() => Linking.openURL('tel:+911234567890')}>
-              +91 12345 67890
+              onPress={() => Linking.openURL('tel:+919850545111')}>
+              +91 9850545111
             </Text>
           </View>
         </Card>

@@ -1,9 +1,9 @@
 import {
-  collection,
-  doc,
-  onSnapshot,
-  setDoc,
-  updateDoc,
+    collection,
+    doc,
+    onSnapshot,
+    setDoc,
+    updateDoc,
 } from '@react-native-firebase/firestore';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 

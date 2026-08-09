@@ -1,6 +1,9 @@
+import { Image } from 'expo-image';
+import { File, Paths } from 'expo-file-system';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
@@ -32,6 +35,8 @@ export default function ReporterDetailsScreen() {
   const [feeVisible, setFeeVisible] = useState(false);
   const [feeAmount, setFeeAmount] = useState('');
   const [sendingFee, setSendingFee] = useState(false);
+  const [photoVisible, setPhotoVisible] = useState(false);
+  const [downloadingPhoto, setDownloadingPhoto] = useState(false);
 
   if (!reporter) {
     return (
@@ -148,6 +153,34 @@ export default function ReporterDetailsScreen() {
     });
   };
 
+  const reporterPhoto = reporter.photo || reporter.avatar;
+
+  const downloadPhoto = async () => {
+    if (!reporterPhoto || downloadingPhoto) return;
+    setDownloadingPhoto(true);
+    try {
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert('Download Unavailable', 'Saving files is not supported on this device.');
+        return;
+      }
+      const localUri = reporterPhoto.startsWith('file://')
+        ? reporterPhoto
+        : (await File.downloadFileAsync(
+            reporterPhoto,
+            new File(Paths.cache, `reporter-${reporter.id}-${Date.now()}.jpg`),
+          )).uri;
+      await Sharing.shareAsync(localUri, {
+        mimeType: 'image/jpeg',
+        dialogTitle: `Save ${reporter.name}'s profile photo`,
+      });
+    } catch {
+      Alert.alert('Download Failed', 'The reporter photo could not be downloaded. Please try again.');
+    } finally {
+      setDownloadingPhoto(false);
+    }
+  };
+
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.header}>
@@ -158,7 +191,13 @@ export default function ReporterDetailsScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.profileHeader}>
-          <Avatar uri={reporter.avatar} name={reporter.name} size={84} online={reporter.isActive} />
+          <Pressable
+            onPress={() => reporterPhoto && setPhotoVisible(true)}
+            disabled={!reporterPhoto}
+            accessibilityRole="button"
+            accessibilityLabel={`View ${reporter.name}'s profile photo`}>
+            <Avatar uri={reporterPhoto} name={reporter.name} size={84} online={reporter.isActive} />
+          </Pressable>
           <View style={styles.nameRow}>
             <Text style={[styles.name, { color: theme.colors.text }]}>{reporter.name}</Text>
             {reporter.isVerified ? <Icon name="checkmark-circle" size={17} color={theme.colors.primary} /> : null}
@@ -202,8 +241,6 @@ export default function ReporterDetailsScreen() {
             <Text style={[styles.contactText, { color: theme.colors.text }]}>{reporter.phone}</Text>
           </View>
         </Card>
-
-        {reporter.bio ? <Text style={[styles.bio, { color: theme.colors.textSecondary }]}>{reporter.bio}</Text> : null}
 
         {reporter.village || reporter.address || reporter.aadharNumber ? (
           <Card style={styles.contactCard}>
@@ -302,6 +339,17 @@ export default function ReporterDetailsScreen() {
       </ScrollView>
 
       <Dialog
+        visible={photoVisible}
+        title={`${reporter.name}'s Profile Photo`}
+        onRequestClose={() => setPhotoVisible(false)}
+        actions={[
+          { label: 'Close', variant: 'outline', onPress: () => setPhotoVisible(false) },
+          { label: downloadingPhoto ? 'Downloading...' : 'Download Photo', onPress: downloadPhoto },
+        ]}>
+        {reporterPhoto ? <Image source={{ uri: reporterPhoto }} style={styles.profilePhoto} contentFit="contain" /> : null}
+      </Dialog>
+
+      <Dialog
         visible={deleteVisible}
         title="Delete Reporter Account?"
         message={`This will permanently remove ${reporter.name}'s account from the app. This action cannot be undone.`}
@@ -372,6 +420,12 @@ const styles = StyleSheet.create({
   profileHeader: {
     alignItems: 'center',
     paddingVertical: 20,
+  },
+  profilePhoto: {
+    width: '100%',
+    aspectRatio: 1,
+    marginVertical: 14,
+    borderRadius: 8,
   },
   nameRow: {
     flexDirection: 'row',

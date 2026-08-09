@@ -154,12 +154,14 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
           <View style={styles.headlineRule} />
 
           {/* Full-width photo */}
-          <AutoImage
-            uri={article.banner}
-            style={styles.fullImage}
-            radius={theme.radius.sm}
-            fixedRatio={shareMode ? 4 / 3 : undefined}
-          />
+          <View style={styles.fullImageWrap}>
+            <AutoImage
+              uri={article.banner}
+              style={styles.fullImage}
+              radius={theme.radius.sm}
+              fixedRatio={shareMode ? 4 / 3 : undefined}
+            />
+          </View>
 
           {/* Single-column body */}
           <View style={styles.simpleBody}>
@@ -395,6 +397,9 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: 4,
     marginBottom: 10,
+  },
+  fullImageWrap: {
+    paddingHorizontal: 12,
   },
   simpleBody: {
     marginHorizontal: 12,

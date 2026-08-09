@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "NewsApp",
+    "name": "Education News",
     "slug": "NewsApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -32,8 +32,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Educational News Reporter to access your photos to attach images and banners to articles.",
-          "cameraPermission": "Allow Educational News Reporter to access your camera to capture article photos."
+          "photosPermission": "Allow Education News to access your photos to attach images and banners to articles.",
+          "cameraPermission": "Allow Education News to access your camera to capture article photos."
         }
       ],
       [

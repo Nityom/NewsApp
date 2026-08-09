@@ -78,6 +78,7 @@ export default function ReporterDetailsScreen() {
     try {
       // Stable per-account ID (not a per-submission timestamp) so a resubmission or retry always
       // updates the same record instead of creating a duplicate the dashboard gate could confuse.
+      const reporterCode = `RPT-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
       const reporter: Reporter = {
         id: `rep-${user.email.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
         name: name.trim(),
@@ -99,6 +100,7 @@ export default function ReporterDetailsScreen() {
         aadharNumber: aadharNumber.trim() || undefined,
         photo,
         requestStatus: 'pending',
+        reporterCode,
       };
       await addReporter(reporter);
       await addNotification({

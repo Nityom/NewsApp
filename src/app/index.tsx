@@ -1,16 +1,19 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text } from 'react-native';
 
+import { useAuth } from '@/context/AuthContext';
 import { palette } from '@/theme';
 
 const appLogo = require('../../assets/images/app_logo.png');
 
 export default function SplashRoute() {
+  const { user, isLoading } = useAuth();
   const scale = useRef(new Animated.Value(0.7)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  const [minimumDisplayComplete, setMinimumDisplayComplete] = useState(false);
 
   useEffect(() => {
     Animated.parallel([
@@ -19,10 +22,22 @@ export default function SplashRoute() {
     ]).start();
 
     const timer = setTimeout(() => {
-      router.replace('/(auth)/login');
+      setMinimumDisplayComplete(true);
     }, 1800);
     return () => clearTimeout(timer);
   }, [opacity, scale]);
+
+  useEffect(() => {
+    if (isLoading || !minimumDisplayComplete) return;
+
+    if (user?.role === 'admin') {
+      router.replace('/(admin)/(tabs)');
+    } else if (user?.role === 'reporter') {
+      router.replace('/(reporter)/(tabs)');
+    } else {
+      router.replace('/(auth)/login');
+    }
+  }, [isLoading, minimumDisplayComplete, user]);
 
   return (
     <LinearGradient colors={[palette.primary600, palette.primary900]} style={styles.container}>

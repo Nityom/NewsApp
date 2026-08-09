@@ -1,25 +1,26 @@
 import {
     collection,
+  deleteDoc,
     doc,
-    getDocs,
     onSnapshot,
     setDoc,
     updateDoc,
-    writeBatch,
 } from '@react-native-firebase/firestore';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { db, stripUndefined } from '@/lib/firebase';
-import { mockNotifications } from '@/mocks/data';
 import type { AppNotification } from '@/types/models';
 
 const COLLECTION = 'notifications';
+const MOCK_NOTIFICATION_IDS = new Set(Array.from({ length: 6 }, (_, index) => `ntf-${index + 1}`));
 
 interface NotificationsContextValue {
   notifications: AppNotification[];
   isLoading: boolean;
   getForAudience: (audience: 'reporter' | 'admin') => AppNotification[];
   unreadCount: (audience: 'reporter' | 'admin') => number;
+  getForReporter: (reporterId?: string) => AppNotification[];
+  unreadCountForReporter: (reporterId?: string) => number;
   addNotification: (notification: Omit<AppNotification, 'id' | 'createdAt' | 'isRead'>) => Promise<void>;
   markRead: (id: string) => Promise<void>;
 }
@@ -34,28 +35,21 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onSnapshot(
       collection(db, COLLECTION),
       (snapshot) => {
-        setNotifications(snapshot.docs.map((d) => d.data() as AppNotification));
+        const mockDocuments = snapshot.docs.filter((notificationDoc) => MOCK_NOTIFICATION_IDS.has(notificationDoc.id));
+        setNotifications(
+          snapshot.docs
+            .filter((notificationDoc) => !MOCK_NOTIFICATION_IDS.has(notificationDoc.id))
+            .map((notificationDoc) => notificationDoc.data() as AppNotification)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        );
         setIsLoading(false);
+        if (mockDocuments.length > 0) {
+          Promise.all(mockDocuments.map((notificationDoc) => deleteDoc(notificationDoc.ref))).catch(() => {});
+        }
       },
       () => setIsLoading(false),
     );
     return unsubscribe;
-  }, []);
-
-  // One-time on app start: seed the collection if it's empty.
-  useEffect(() => {
-    (async () => {
-      try {
-        const snapshot = await getDocs(collection(db, COLLECTION));
-        if (snapshot.empty) {
-          const batch = writeBatch(db);
-          mockNotifications.forEach((n) => batch.set(doc(db, COLLECTION, n.id), n));
-          await batch.commit();
-        }
-      } catch {
-        // best-effort - the app still works from whatever the live listener has
-      }
-    })();
   }, []);
 
   const addNotification = useCallback(
@@ -86,9 +80,39 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     [notifications],
   );
 
+  const getForReporter = useCallback(
+    (reporterId?: string) => reporterId
+      ? notifications.filter((n) => n.audience === 'reporter' && n.reporterId === reporterId)
+      : [],
+    [notifications],
+  );
+
+  const unreadCountForReporter = useCallback(
+    (reporterId?: string) => getForReporter(reporterId).filter((n) => !n.isRead).length,
+    [getForReporter],
+  );
+
   const value = useMemo<NotificationsContextValue>(
-    () => ({ notifications, isLoading, getForAudience, unreadCount, addNotification, markRead }),
-    [notifications, isLoading, getForAudience, unreadCount, addNotification, markRead],
+    () => ({
+      notifications,
+      isLoading,
+      getForAudience,
+      unreadCount,
+      getForReporter,
+      unreadCountForReporter,
+      addNotification,
+      markRead,
+    }),
+    [
+      notifications,
+      isLoading,
+      getForAudience,
+      unreadCount,
+      getForReporter,
+      unreadCountForReporter,
+      addNotification,
+      markRead,
+    ],
   );
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;

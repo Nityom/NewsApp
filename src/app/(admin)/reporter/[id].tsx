@@ -13,8 +13,8 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ErrorState } from '@/components/ui/StateViews';
 import { useArticles } from '@/context/ArticlesContext';
 import { useNotifications } from '@/context/NotificationsContext';
+import { usePayments } from '@/context/PaymentsContext';
 import { useReporters } from '@/context/ReportersContext';
-import { mockArticles } from '@/mocks/data';
 import { useAppTheme } from '@/theme';
 
 export default function ReporterDetailsScreen() {
@@ -22,14 +22,16 @@ export default function ReporterDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getReporter, updateReporter, deleteReporter } = useReporters();
   const { addNotification } = useNotifications();
+  const { payments, addPayment, updatePaymentStatus } = usePayments();
   const { articles: allArticles } = useArticles();
   const reporter = getReporter(id);
-  const articles = (allArticles.length ? allArticles : mockArticles).filter((a) => a.reporterId === id).slice(0, 5);
+  const articles = allArticles.filter((a) => a.reporterId === id).slice(0, 5);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [rejectVisible, setRejectVisible] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [feeVisible, setFeeVisible] = useState(false);
   const [feeAmount, setFeeAmount] = useState('');
+  const [sendingFee, setSendingFee] = useState(false);
 
   if (!reporter) {
     return (
@@ -48,32 +50,71 @@ export default function ReporterDetailsScreen() {
   const toggleActive = async () => {
     const nextActive = !reporter.isActive;
     await updateReporter(reporter.id, { isActive: nextActive });
-    if (!nextActive) {
-      Alert.alert('Reporter Suspended', `${reporter.name} can no longer publish articles.`);
-    }
+    Alert.alert(
+      nextActive ? 'Reporter Activated' : 'Reporter Suspended',
+      nextActive
+        ? `${reporter.name} can publish articles again.`
+        : `${reporter.name} can no longer publish articles.`,
+    );
   };
 
   const sendPaymentRequest = async () => {
     const amount = Number(feeAmount);
-    if (!amount || amount <= 0) return;
-    setFeeVisible(false);
-    await updateReporter(reporter.id, { requestStatus: 'awaiting_payment', joinFeeAmount: amount });
-    await addNotification({
-      type: 'system',
-      audience: 'reporter',
-      title: 'Joining Fee Requested',
-      message: `${reporter.name}, please pay ₹${amount} to complete your reporter registration.`,
-    });
-    setFeeAmount('');
+    if (!amount || amount <= 0 || sendingFee) return;
+    setSendingFee(true);
+    try {
+      await updateReporter(reporter.id, { requestStatus: 'awaiting_payment', joinFeeAmount: amount });
+      setFeeVisible(false);
+      setFeeAmount('');
+      try {
+        await addNotification({
+          type: 'system',
+          audience: 'reporter',
+          title: 'Joining Fee Requested',
+          message: `${reporter.name}, please pay ₹${amount} to complete your reporter registration.`,
+          reporterId: reporter.id,
+        });
+        Alert.alert('Payment Request Sent', `${reporter.name}'s status is now Awaiting Payment.`);
+      } catch {
+        Alert.alert('Status Updated', 'The status is now Awaiting Payment, but the notification could not be sent.');
+      }
+    } catch {
+      Alert.alert('Could Not Send Request', 'The reporter status was not updated. Please try again.');
+    } finally {
+      setSendingFee(false);
+    }
   };
 
   const confirmPaymentReceived = async () => {
+    const existingPayment = payments.find(
+      (payment) => payment.reporterId === reporter.id && payment.purpose === 'joining_fee',
+    );
+    const paymentId = existingPayment?.id ?? `joining-fee-${reporter.id}`;
+    if (!existingPayment) {
+      const createdAt = new Date().toISOString();
+      await addPayment({
+        id: paymentId,
+        reporterId: reporter.id,
+        reporterName: reporter.name,
+        reporterAvatar: reporter.avatar,
+        amount: reporter.joinFeeAmount ?? 0,
+        status: 'pending',
+        method: 'UPI / QR',
+        articlesCount: 0,
+        period: 'Joining Fee',
+        createdAt,
+        updatedAt: createdAt,
+        purpose: 'joining_fee',
+      });
+    }
+    await updatePaymentStatus(paymentId, 'paid');
     await updateReporter(reporter.id, { requestStatus: 'approved', isActive: true, isVerified: true });
     await addNotification({
       type: 'system',
       audience: 'reporter',
       title: 'Reporter Request Approved',
       message: `${reporter.name}, your payment is confirmed and your reporter account is approved. You can now start publishing.`,
+      reporterId: reporter.id,
     });
     Alert.alert('Approved', `${reporter.name} can now publish articles.`);
   };
@@ -81,14 +122,30 @@ export default function ReporterDetailsScreen() {
   const rejectRequest = async () => {
     if (!rejectReason.trim()) return;
     setRejectVisible(false);
+    const joiningPayment = payments.find(
+      (payment) => payment.reporterId === reporter.id && payment.purpose === 'joining_fee' && payment.status === 'pending',
+    );
+    if (joiningPayment) await updatePaymentStatus(joiningPayment.id, 'failed');
     await updateReporter(reporter.id, { requestStatus: 'rejected', requestRejectionReason: rejectReason.trim() });
     await addNotification({
       type: 'system',
       audience: 'reporter',
       title: 'Reporter Request Rejected',
       message: `${reporter.name}, your reporter request was not approved. Reason: ${rejectReason.trim()}`,
+      reporterId: reporter.id,
     });
     setRejectReason('');
+  };
+
+  const reconsiderRequest = async () => {
+    await updateReporter(reporter.id, { requestStatus: 'pending', requestRejectionReason: undefined });
+    await addNotification({
+      type: 'system',
+      audience: 'reporter',
+      title: 'Reporter Request Reopened',
+      message: `${reporter.name}, your reporter request is being reconsidered by the admin.`,
+      reporterId: reporter.id,
+    });
   };
 
   return (
@@ -107,6 +164,9 @@ export default function ReporterDetailsScreen() {
             {reporter.isVerified ? <Icon name="checkmark-circle" size={17} color={theme.colors.primary} /> : null}
           </View>
           <Text style={[styles.city, { color: theme.colors.textSecondary }]}>{reporter.city}</Text>
+          {reporter.reporterCode ? (
+            <Text style={[styles.city, { color: theme.colors.textMuted }]}>ID: {reporter.reporterCode}</Text>
+          ) : null}
           <View style={styles.badgesRow}>
             <Badge label={reporter.isActive ? 'Active' : 'Inactive'} tone={reporter.isActive ? 'success' : 'neutral'} />
             <Badge label={`★ ${reporter.rating}`} tone="warning" />
@@ -143,7 +203,7 @@ export default function ReporterDetailsScreen() {
           </View>
         </Card>
 
-        <Text style={[styles.bio, { color: theme.colors.textSecondary }]}>{reporter.bio}</Text>
+        {reporter.bio ? <Text style={[styles.bio, { color: theme.colors.textSecondary }]}>{reporter.bio}</Text> : null}
 
         {reporter.village || reporter.address || reporter.aadharNumber ? (
           <Card style={styles.contactCard}>
@@ -212,7 +272,17 @@ export default function ReporterDetailsScreen() {
           </>
         ) : null}
 
+        {reporter.requestStatus === 'rejected' ? (
+          <>
+            <View style={{ height: 16 }} />
+            <Button label="Reconsider Request" icon="refresh" onPress={reconsiderRequest} fullWidth />
+          </>
+        ) : null}
+
         <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>Recent Submissions</Text>
+        {articles.length === 0 ? (
+          <Text style={[styles.bio, { color: theme.colors.textMuted }]}>No articles submitted yet.</Text>
+        ) : null}
         {articles.map((article) => (
           <Card key={article.id} style={styles.articleRow}>
             <Text style={[styles.articleTitle, { color: theme.colors.text }]} numberOfLines={2}>
@@ -269,7 +339,7 @@ export default function ReporterDetailsScreen() {
         onRequestClose={() => setFeeVisible(false)}
         actions={[
           { label: 'Cancel', variant: 'outline', onPress: () => setFeeVisible(false) },
-          { label: 'Send Payment Request', onPress: sendPaymentRequest },
+          { label: sendingFee ? 'Sending...' : 'Send Payment Request', onPress: sendPaymentRequest },
         ]}>
         <View style={{ marginBottom: 6 }}>
           <Input

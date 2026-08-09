@@ -4,7 +4,9 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { EmptyState } from '@/components/ui/StateViews';
+import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 import type { NotificationType } from '@/types/models';
 
@@ -35,8 +37,11 @@ function timeAgo(iso: string) {
 
 export default function ReporterNotificationsScreen() {
   const theme = useAppTheme();
-  const { getForAudience, markRead } = useNotifications();
-  const notifications = getForAudience('reporter');
+  const { user } = useAuth();
+  const { getReporterByEmail } = useReporters();
+  const { getForReporter, markRead } = useNotifications();
+  const reporterId = user?.email ? getReporterByEmail(user.email)?.id : undefined;
+  const notifications = getForReporter(reporterId);
 
   return (
     <ScreenContainer>

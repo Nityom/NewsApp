@@ -17,7 +17,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ErrorState } from '@/components/ui/StateViews';
 import { useArticles } from '@/context/ArticlesContext';
 import { formatRegistrationDate } from '@/context/PublicationInfoContext';
-import { mockReporters } from '@/mocks/data';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 
 const SHARE_WIDTH = 1200;
@@ -30,7 +30,8 @@ export default function AdminArticleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getArticle, updateArticle, deleteArticle } = useArticles();
   const article = getArticle(id);
-  const reporterPhone = mockReporters.find((r) => r.id === article?.reporterId)?.phone;
+  const { getReporter } = useReporters();
+  const reporterPhone = article?.reporterPhone ?? (article ? getReporter(article.reporterId)?.phone : undefined);
   const [rejectVisible, setRejectVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [reason, setReason] = useState('');

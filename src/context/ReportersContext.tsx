@@ -2,20 +2,18 @@ import {
     collection,
     deleteDoc,
     doc,
-    getDocs,
     onSnapshot,
     setDoc,
     updateDoc,
-    writeBatch,
 } from '@react-native-firebase/firestore';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { uploadLocalFile } from '@/lib/cloudinary';
 import { db, stripUndefined } from '@/lib/firebase';
-import { mockReporters } from '@/mocks/data';
 import type { Reporter } from '@/types/models';
 
 const COLLECTION = 'reporters';
+const MOCK_REPORTER_IDS = new Set(Array.from({ length: 10 }, (_, index) => `rep-${index + 1}`));
 
 /**
  * Keeps only the newest record per email. Guards against stale duplicate documents left over
@@ -40,7 +38,7 @@ interface ReportersContextValue {
   getReporter: (id: string) => Reporter | undefined;
   getReporterByEmail: (email: string) => Reporter | undefined;
   addReporter: (reporter: Reporter) => Promise<void>;
-  updateReporter: (id: string, patch: Partial<Reporter>) => Promise<void>;
+  updateReporter: (id: string, patch: Partial<Reporter>) => Promise<Partial<Reporter>>;
   deleteReporter: (id: string) => Promise<void>;
 }
 
@@ -58,37 +56,40 @@ async function resolveReporterPhoto(reporterId: string, data: Partial<Reporter>)
 
 export function ReportersProvider({ children }: { children: ReactNode }) {
   const [reporters, setReporters] = useState<Reporter[]>([]);
+  const [rawReporters, setRawReporters] = useState<Reporter[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
       collection(db, COLLECTION),
       (snapshot) => {
-        setReporters(dedupeByEmail(snapshot.docs.map((d) => d.data() as Reporter)));
+        const mockDocuments = snapshot.docs.filter((reporterDoc) => MOCK_REPORTER_IDS.has(reporterDoc.id));
+        const all = snapshot.docs
+          .filter((reporterDoc) => !MOCK_REPORTER_IDS.has(reporterDoc.id))
+          .map((reporterDoc) => reporterDoc.data() as Reporter);
+        setRawReporters(all);
+        setReporters(dedupeByEmail(all));
         setIsLoading(false);
+        if (mockDocuments.length > 0) {
+          Promise.all(mockDocuments.map((reporterDoc) => deleteDoc(reporterDoc.ref))).catch(() => {});
+        }
       },
       () => setIsLoading(false),
     );
     return unsubscribe;
   }, []);
 
-  // One-time on app start: seed the collection if it's empty.
-  useEffect(() => {
-    (async () => {
-      try {
-        const snapshot = await getDocs(collection(db, COLLECTION));
-        if (snapshot.empty) {
-          const batch = writeBatch(db);
-          mockReporters.forEach((reporter) => batch.set(doc(db, COLLECTION, reporter.id), reporter));
-          await batch.commit();
-        }
-      } catch {
-        // best-effort - the app still works from whatever the live listener has
-      }
-    })();
-  }, []);
-
-  const getReporter = useCallback((id: string) => reporters.find((r) => r.id === id), [reporters]);
+  const getReporter = useCallback(
+    (id: string) => {
+      const direct = reporters.find((r) => r.id === id);
+      if (direct) return direct;
+      // The id may belong to an older duplicate that dedupeByEmail filtered out (e.g. a stale
+      // notification deep-link) - resolve it to that person's current canonical record instead.
+      const stale = rawReporters.find((r) => r.id === id);
+      return stale ? reporters.find((r) => r.email.toLowerCase() === stale.email.toLowerCase()) : undefined;
+    },
+    [reporters, rawReporters],
+  );
   const getReporterByEmail = useCallback(
     (email: string) => reporters.find((r) => r.email.toLowerCase() === email.toLowerCase()),
     [reporters],
@@ -102,6 +103,13 @@ export function ReportersProvider({ children }: { children: ReactNode }) {
   const updateReporter = useCallback(async (id: string, patch: Partial<Reporter>) => {
     const resolvedPatch = await resolveReporterPhoto(id, patch);
     await updateDoc(doc(db, COLLECTION, id), stripUndefined(resolvedPatch));
+    setRawReporters((current) => current.map((reporter) =>
+      reporter.id === id ? { ...reporter, ...resolvedPatch } : reporter,
+    ));
+    setReporters((current) => dedupeByEmail(current.map((reporter) =>
+      reporter.id === id ? { ...reporter, ...resolvedPatch } : reporter,
+    )));
+    return resolvedPatch;
   }, []);
 
   const deleteReporter = useCallback(async (id: string) => {

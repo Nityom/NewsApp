@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/Input';
 import { ArticlesProvider } from '@/context/ArticlesContext';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { NotificationsProvider } from '@/context/NotificationsContext';
+import { PaymentsProvider } from '@/context/PaymentsContext';
 import { PublicationInfoProvider } from '@/context/PublicationInfoContext';
 import { ReportersProvider } from '@/context/ReportersContext';
 import { AppThemeProvider, useAppTheme } from '@/theme';
@@ -105,9 +106,11 @@ export default function RootLayout() {
             <NotificationsProvider>
               <ArticlesProvider>
                 <ReportersProvider>
-                  <PublicationInfoProvider>
-                    <RootNavigator />
-                  </PublicationInfoProvider>
+                  <PaymentsProvider>
+                    <PublicationInfoProvider>
+                      <RootNavigator />
+                    </PublicationInfoProvider>
+                  </PaymentsProvider>
                 </ReportersProvider>
               </ArticlesProvider>
             </NotificationsProvider>

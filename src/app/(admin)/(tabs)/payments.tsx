@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { PaymentStatusBadge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { EmptyState } from '@/components/ui/StateViews';
-import { mockPayments } from '@/mocks/data';
+import { useNotifications } from '@/context/NotificationsContext';
+import { usePayments } from '@/context/PaymentsContext';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
-import type { PaymentStatus } from '@/types/models';
+import type { Payment, PaymentStatus } from '@/types/models';
 
 const filters: { key: PaymentStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -20,21 +23,81 @@ const filters: { key: PaymentStatus | 'all'; label: string }[] = [
 
 export default function AdminPaymentsScreen() {
   const theme = useAppTheme();
+  const { payments, addPayment, updatePaymentStatus } = usePayments();
+  const { reporters, updateReporter } = useReporters();
+  const { addNotification } = useNotifications();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<PaymentStatus | 'all'>('all');
+  const [updatingId, setUpdatingId] = useState<string>();
+
+  const displayedPayments = useMemo(() => {
+    const legacyJoiningFees: Payment[] = reporters
+      .filter(
+        (reporter) =>
+          reporter.requestStatus === 'payment_submitted' &&
+          !payments.some((payment) => payment.reporterId === reporter.id && payment.purpose === 'joining_fee'),
+      )
+      .map((reporter) => ({
+        id: `joining-fee-${reporter.id}`,
+        reporterId: reporter.id,
+        reporterName: reporter.name,
+        reporterAvatar: reporter.avatar,
+        amount: reporter.joinFeeAmount ?? 0,
+        status: 'pending',
+        method: 'UPI / QR',
+        articlesCount: 0,
+        period: 'Joining Fee',
+        createdAt: reporter.joinedAt,
+        purpose: 'joining_fee',
+      }));
+    return [...legacyJoiningFees, ...payments];
+  }, [payments, reporters]);
 
   const filtered = useMemo(
     () =>
-      mockPayments.filter(
+      displayedPayments.filter(
         (p) =>
           (filter === 'all' || p.status === filter) &&
           p.reporterName.toLowerCase().includes(query.toLowerCase()),
       ),
-    [filter, query],
+    [displayedPayments, filter, query],
   );
 
-  const totalPaid = mockPayments.filter((p) => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
-  const totalPending = mockPayments.filter((p) => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0);
+  const totalPaid = displayedPayments.filter((p) => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
+  const totalPending = displayedPayments.filter((p) => p.status === 'pending').reduce((sum, p) => sum + p.amount, 0);
+
+  const setPaymentStatus = async (payment: Payment, status: 'paid' | 'failed') => {
+    if (updatingId) return;
+    setUpdatingId(payment.id);
+    try {
+      if (!payments.some((item) => item.id === payment.id)) await addPayment(payment);
+      await updatePaymentStatus(payment.id, status);
+
+      if (payment.purpose === 'joining_fee') {
+        await updateReporter(payment.reporterId, status === 'paid'
+          ? { requestStatus: 'approved', isActive: true, isVerified: true }
+          : { requestStatus: 'awaiting_payment' });
+      }
+
+      await addNotification({
+        type: 'payment',
+        audience: 'reporter',
+        title: status === 'paid' ? 'Payment Confirmed' : 'Payment Not Confirmed',
+        message: status === 'paid'
+          ? `Your payment of ₹${payment.amount.toLocaleString('en-IN')} has been confirmed by the admin.`
+          : `The admin could not confirm your payment of ₹${payment.amount.toLocaleString('en-IN')}. Please check and submit it again.`,
+        reporterId: payment.reporterId,
+      });
+      Alert.alert(
+        status === 'paid' ? 'Payment Confirmed' : 'Payment Rejected',
+        `${payment.reporterName}'s payment status is now ${status === 'paid' ? 'Paid' : 'Failed'}.`,
+      );
+    } catch {
+      Alert.alert('Could Not Update Payment', 'The payment status was not updated. Please try again.');
+    } finally {
+      setUpdatingId(undefined);
+    }
+  };
 
   return (
     <ScreenContainer>
@@ -43,7 +106,7 @@ export default function AdminPaymentsScreen() {
 
         <View style={styles.summaryRow}>
           <Card style={[styles.summaryCard, { backgroundColor: theme.colors.successMuted }]}>
-            <Text style={[styles.summaryLabel, { color: theme.colors.success }]}>Paid Out</Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.success }]}>Confirmed</Text>
             <Text style={[styles.summaryValue, { color: theme.colors.text }]}>₹{totalPaid.toLocaleString('en-IN')}</Text>
           </Card>
           <Card style={[styles.summaryCard, { backgroundColor: theme.colors.warningMuted }]}>
@@ -87,6 +150,23 @@ export default function AdminPaymentsScreen() {
               <Text style={[styles.amount, { color: theme.colors.text }]}>₹{item.amount.toLocaleString('en-IN')}</Text>
               <PaymentStatusBadge status={item.status} size="sm" />
             </View>
+            {item.status === 'pending' ? (
+              <View style={styles.actions}>
+                <Button
+                  label="Reject"
+                  variant="outline"
+                  size="sm"
+                  onPress={() => setPaymentStatus(item, 'failed')}
+                  disabled={updatingId === item.id}
+                />
+                <Button
+                  label="Confirm"
+                  size="sm"
+                  onPress={() => setPaymentStatus(item, 'paid')}
+                  loading={updatingId === item.id}
+                />
+              </View>
+            ) : null}
           </Card>
         )}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
@@ -143,7 +223,14 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 12,
+  },
+  actions: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
   },
   reporterName: {
     fontSize: 14,

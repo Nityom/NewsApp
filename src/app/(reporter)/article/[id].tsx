@@ -14,7 +14,7 @@ import { Icon } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ErrorState } from '@/components/ui/StateViews';
 import { useArticles } from '@/context/ArticlesContext';
-import { mockReporters } from '@/mocks/data';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 import type { Article } from '@/types/models';
 
@@ -28,7 +28,8 @@ export default function ArticleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { articles, getArticle } = useArticles();
   const article = getArticle(id);
-  const reporterPhone = mockReporters.find((r) => r.id === article?.reporterId)?.phone;
+  const { getReporter } = useReporters();
+  const reporterPhone = article?.reporterPhone ?? (article ? getReporter(article.reporterId)?.phone : undefined);
   const viewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
   const pairViewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
   const [sharing, setSharing] = useState(false);

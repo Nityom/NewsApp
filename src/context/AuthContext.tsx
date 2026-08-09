@@ -14,7 +14,7 @@ import {
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import { currentAdmin, currentReporter } from '@/mocks/data';
+import { clearJustSubmittedReporterId } from '@/lib/joinRequestFlag';
 import type { CurrentUser } from '@/types/models';
 
 type Role = 'reporter' | 'admin';
@@ -53,8 +53,22 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function profileForRole(role: Role, email: string, overrides?: Partial<CurrentUser>): CurrentUser {
-  const base = role === 'admin' ? currentAdmin : currentReporter;
-  return { ...base, email, role, ...overrides };
+  const defaultName = email.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const profile: CurrentUser = {
+    id: role === 'admin' ? 'admin' : `reporter-${email.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    name: defaultName,
+    email,
+    phone: '',
+    avatar: '',
+    bio: '',
+    city: '',
+    role,
+    isVerified: role === 'admin',
+    isSubscribed: false,
+    joinedAt: '',
+    ...overrides,
+  };
+  return role === 'admin' ? { ...profile, name: 'Admin', avatar: '' } : profile;
 }
 
 async function getStoredRole(email: string): Promise<Role | null> {
@@ -287,14 +301,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     const auth = getAuth();
-    if (auth.currentUser) {
-      // Ignore "no current user" - can happen with a stale local session from before a Firebase
-      // account existed for it (e.g. the old hardcoded-admin session). The end state is the same.
-      await signOut(auth).catch((error: { code?: string }) => {
-        if (error?.code !== 'auth/no-current-user') throw error;
-      });
+    try {
+      if (auth.currentUser) {
+        // Ignore "no current user" - can happen with a stale local session from before a Firebase
+        // account existed for it (e.g. the old hardcoded-admin session). The end state is the same.
+        await signOut(auth).catch((error: { code?: string }) => {
+          if (error?.code !== 'auth/no-current-user') throw error;
+        });
+      }
+    } finally {
+      clearJustSubmittedReporterId();
+      setRequiresPhone(false);
+      setUser(null);
     }
-    setUser(null);
   }, []);
 
   const updateUserProfile = useCallback(async (updates: ProfileOverrides) => {

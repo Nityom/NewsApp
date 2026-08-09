@@ -3,7 +3,9 @@ import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, IconName } from '@/components/ui/Icon';
+import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 
 export interface TabBarIconMap {
@@ -91,7 +93,12 @@ function CustomTabBarInner({
 }: CustomTabBarProps & { iconMap: TabBarIconMap; notificationsAudience?: 'reporter' | 'admin' }) {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { unreadCount } = useNotifications();
+  const { user } = useAuth();
+  const { getReporterByEmail } = useReporters();
+  const { unreadCount, unreadCountForReporter } = useNotifications();
+  const reporterId = user?.role === 'reporter' && user.email
+    ? getReporterByEmail(user.email)?.id
+    : undefined;
 
   return (
     <View
@@ -111,7 +118,9 @@ function CustomTabBarInner({
         const config = iconMap[route.name] ?? { active: 'ellipse', inactive: 'ellipse-outline' };
         const badge =
           route.name === 'notifications' && notificationsAudience
-            ? unreadCount(notificationsAudience)
+            ? notificationsAudience === 'reporter'
+              ? unreadCountForReporter(reporterId)
+              : unreadCount(notificationsAudience)
             : config.badge;
 
         const onPress = () => {

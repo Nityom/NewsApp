@@ -4,35 +4,42 @@ import { Alert } from 'react-native';
 
 import { useNotifications } from '@/context/NotificationsContext';
 
-function NewReporterRequestAlerts() {
-  const { notifications } = useNotifications();
-  // Seeded with whatever's already there on mount so we only alert for requests that arrive
-  // while the admin is actively using the app, not the whole unread backlog.
+function AdminActionAlerts() {
+  const { notifications, markRead } = useNotifications();
   const seenIdsRef = useRef<Set<string> | null>(null);
 
   useEffect(() => {
-    const joinRequests = notifications.filter((n) => n.audience === 'admin' && n.type === 'reporter_joined');
+    const actionableNotifications = notifications.filter(
+      (notification) =>
+        notification.audience === 'admin' &&
+        (notification.type === 'reporter_joined' ||
+          notification.type === 'payment' ||
+          (notification.type === 'system' && notification.title === 'Payment Marked as Done')),
+    );
 
     if (seenIdsRef.current === null) {
-      seenIdsRef.current = new Set(joinRequests.map((n) => n.id));
-      return;
+      seenIdsRef.current = new Set(
+        actionableNotifications.filter((notification) => notification.isRead).map((notification) => notification.id),
+      );
     }
 
-    for (const notification of joinRequests) {
-      if (seenIdsRef.current.has(notification.id)) continue;
+    for (const notification of actionableNotifications) {
+      if (notification.isRead || seenIdsRef.current.has(notification.id)) continue;
       seenIdsRef.current.add(notification.id);
       Alert.alert(notification.title, notification.message, [
-        { text: 'Dismiss', style: 'cancel' },
+        { text: 'Dismiss', style: 'cancel', onPress: () => markRead(notification.id) },
         {
           text: 'View',
-          onPress: () =>
-            notification.reporterId
+          onPress: () => {
+            markRead(notification.id);
+            return notification.reporterId
               ? router.push(`/(admin)/reporter/${notification.reporterId}`)
-              : router.push('/(admin)/(tabs)/reporters'),
+              : router.push('/(admin)/(tabs)/reporters');
+          },
         },
       ]);
     }
-  }, [notifications]);
+  }, [markRead, notifications]);
 
   return null;
 }
@@ -40,7 +47,7 @@ function NewReporterRequestAlerts() {
 export default function AdminLayout() {
   return (
     <>
-      <NewReporterRequestAlerts />
+      <AdminActionAlerts />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="reporter/[id]" />

@@ -92,7 +92,7 @@ export default function LoginScreen() {
               ref={passwordRef}
               leftIcon="lock-closed-outline"
               placeholder="••••••••"
-              secureTextEntry
+              isPassword
               value={password}
               onChangeText={setPassword}
               onFocus={scrollToInput(passwordRef)}

@@ -57,7 +57,11 @@ export default function AdminNotificationsScreen() {
             <Pressable
               onPress={() => {
                 if (!item.isRead) markRead(item.id);
-                if (item.articleId) router.push(`/(admin)/article/${item.articleId}`);
+                if (item.articleId) {
+                  router.push(`/(admin)/article/${item.articleId}`);
+                } else if (item.reporterId) {
+                  router.push(`/(admin)/reporter/${item.reporterId}`);
+                }
               }}
               style={[
                 styles.row,

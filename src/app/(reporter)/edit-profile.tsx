@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
@@ -9,18 +9,38 @@ import { Icon } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useAuth } from '@/context/AuthContext';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 
 export default function EditProfileScreen() {
   const theme = useAppTheme();
   const { user, updateUserProfile } = useAuth();
-  const [avatar, setAvatar] = useState(user?.avatar);
-  const [name, setName] = useState(user?.name ?? '');
-  const [phone, setPhone] = useState(user?.phone ?? '');
-  const [city, setCity] = useState(user?.city ?? '');
-  const [bio, setBio] = useState(user?.bio ?? '');
+  const { getReporterByEmail, updateReporter } = useReporters();
+  const reporter = user?.email ? getReporterByEmail(user.email) : undefined;
+  const initializedReporterIdRef = useRef<string | null>(null);
+  const [avatar, setAvatar] = useState(reporter?.avatar || reporter?.photo || user?.avatar);
+  const [name, setName] = useState(reporter?.name ?? user?.name ?? '');
+  const [phone, setPhone] = useState(reporter?.phone ?? user?.phone ?? '');
+  const [city, setCity] = useState(reporter?.city ?? user?.city ?? '');
+  const [bio, setBio] = useState(reporter?.bio ?? user?.bio ?? '');
+  const [village, setVillage] = useState(reporter?.village ?? '');
+  const [address, setAddress] = useState(reporter?.address ?? '');
+  const [aadharNumber, setAadharNumber] = useState(reporter?.aadharNumber ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!reporter || initializedReporterIdRef.current === reporter.id) return;
+    initializedReporterIdRef.current = reporter.id;
+    setAvatar(reporter.avatar || reporter.photo || user?.avatar);
+    setName(reporter.name);
+    setPhone(reporter.phone);
+    setCity(reporter.city);
+    setBio(reporter.bio);
+    setVillage(reporter.village ?? '');
+    setAddress(reporter.address ?? '');
+    setAadharNumber(reporter.aadharNumber ?? '');
+  }, [reporter, user?.avatar]);
 
   const pickAvatar = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -42,17 +62,30 @@ export default function EditProfileScreen() {
     const nextErrors: Record<string, string> = {};
     if (name.trim().length < 3) nextErrors.name = 'Enter your full name';
     if (phone.trim().length < 10) nextErrors.phone = 'Enter a valid phone number';
+    if (!reporter) nextErrors.form = 'Your reporter profile is still loading';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
+    if (!reporter) return;
 
     setSubmitting(true);
     try {
+      const resolvedProfile = await updateReporter(reporter.id, {
+        name: name.trim(),
+        phone: phone.trim(),
+        city: city.trim(),
+        bio: bio.trim(),
+        village: village.trim() || undefined,
+        address: address.trim() || undefined,
+        aadharNumber: aadharNumber.trim() || undefined,
+        avatar,
+        photo: avatar,
+      });
       await updateUserProfile({
         name: name.trim(),
         phone: phone.trim(),
         city: city.trim(),
         bio: bio.trim(),
-        avatar,
+        avatar: resolvedProfile.avatar ?? avatar,
       });
       Alert.alert('Profile Updated', 'Your profile has been saved.', [
         { text: 'OK', onPress: () => router.back() },
@@ -84,8 +117,12 @@ export default function EditProfileScreen() {
           <Input label="Full Name" leftIcon="person-outline" value={name} onChangeText={setName} error={errors.name} />
           <Input label="Phone Number" leftIcon="call-outline" keyboardType="phone-pad" value={phone} onChangeText={setPhone} error={errors.phone} />
           <Input label="City" leftIcon="location-outline" value={city} onChangeText={setCity} error={errors.city} />
+          <Input label="Village (Gaon)" leftIcon="location-outline" value={village} onChangeText={setVillage} />
+          <Input label="Address" leftIcon="home-outline" value={address} onChangeText={setAddress} multiline />
+          <Input label="Aadhar Number" leftIcon="card-outline" keyboardType="number-pad" value={aadharNumber} onChangeText={setAadharNumber} />
           <Input label="Bio" leftIcon="document-text-outline" value={bio} onChangeText={setBio} multiline error={errors.bio} />
 
+          {errors.form ? <Text style={[styles.formError, { color: theme.colors.danger }]}>{errors.form}</Text> : null}
           <Button label="Save Changes" onPress={handleSave} loading={submitting} fullWidth size="lg" />
         </View>
       </ScrollView>
@@ -127,5 +164,10 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: 16,
+  },
+  formError: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

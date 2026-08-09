@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Card } from '@/components/ui/Card';
@@ -7,8 +8,8 @@ import { Dialog } from '@/components/ui/Dialog';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useAuth } from '@/context/AuthContext';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
-import { useState } from 'react';
 
 function MenuRow({ icon, label, onPress, danger }: { icon: IconName; label: string; onPress: () => void; danger?: boolean }) {
   const theme = useAppTheme();
@@ -26,6 +27,8 @@ function MenuRow({ icon, label, onPress, danger }: { icon: IconName; label: stri
 export default function ReporterProfileScreen() {
   const theme = useAppTheme();
   const { user, logout, resendVerificationEmail } = useAuth();
+  const { getReporterByEmail } = useReporters();
+  const reporterRecord = user?.email ? getReporterByEmail(user.email) : undefined;
   const [logoutVisible, setLogoutVisible] = useState(false);
 
   const handleResendVerification = async () => {
@@ -38,40 +41,52 @@ export default function ReporterProfileScreen() {
   };
 
   const stats = [
-    { label: 'Articles', value: 42 },
-    { label: 'Approved', value: 36 },
-    { label: 'Rating', value: '4.8' },
+    { label: 'Articles', value: reporterRecord?.articlesCount ?? 0 },
+    { label: 'Approved', value: reporterRecord?.approvedCount ?? 0 },
+    { label: 'Rating', value: reporterRecord?.rating ?? 0 },
   ];
 
   return (
     <ScreenContainer>
-      <View style={styles.header}>
-        <Avatar uri={user?.avatar} name={user?.name ?? 'R'} size={82} />
-        <Text style={[styles.name, { color: theme.colors.text }]}>{user?.name}</Text>
-        <Text style={[styles.email, { color: theme.colors.textSecondary }]}>{user?.email}</Text>
-        <View style={styles.statsRow}>
-          {stats.map((s) => (
-            <View key={s.label} style={styles.statItem}>
-              <Text style={[styles.statValue, { color: theme.colors.text }]}>{s.value}</Text>
-              <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{s.label}</Text>
-            </View>
-          ))}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Avatar
+            uri={reporterRecord?.avatar || reporterRecord?.photo || user?.avatar}
+            name={reporterRecord?.name ?? user?.name ?? 'R'}
+            size={82}
+          />
+          <Text style={[styles.name, { color: theme.colors.text }]}>{reporterRecord?.name ?? user?.name}</Text>
+          <Text style={[styles.email, { color: theme.colors.textSecondary }]}>{reporterRecord?.email ?? user?.email}</Text>
+          {reporterRecord?.city ? (
+            <Text style={[styles.email, { color: theme.colors.textMuted }]}>{reporterRecord.city}</Text>
+          ) : null}
+          {reporterRecord?.reporterCode ? (
+            <Text style={[styles.email, { color: theme.colors.textMuted }]}>ID: {reporterRecord.reporterCode}</Text>
+          ) : null}
+          <View style={styles.statsRow}>
+            {stats.map((s) => (
+              <View key={s.label} style={styles.statItem}>
+                <Text style={[styles.statValue, { color: theme.colors.text }]}>{s.value}</Text>
+                <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{s.label}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-      </View>
 
-      <Card style={styles.menuCard} padded={false}>
-        <MenuRow icon="person-outline" label="Edit Profile" onPress={() => router.push('/(reporter)/edit-profile')} />
-        {/* <MenuRow icon="mail-unread-outline" label="Resend Verification Email" onPress={handleResendVerification} /> */}
-        <MenuRow icon="card-outline" label="Payments & Payouts" onPress={() => router.push('/(reporter)/payment')} />
-        <MenuRow icon="lock-closed-outline" label="Change Password" onPress={() => router.push('/(reporter)/change-password')} />
-        <MenuRow icon="settings-outline" label="Settings" onPress={() => router.push('/(reporter)/settings')} />
-      </Card>
+        <Card style={styles.menuCard} padded={false}>
+          <MenuRow icon="person-outline" label="Edit Profile" onPress={() => router.push('/(reporter)/edit-profile')} />
+          {/* <MenuRow icon="mail-unread-outline" label="Resend Verification Email" onPress={handleResendVerification} /> */}
+          <MenuRow icon="card-outline" label="Payments & Payouts" onPress={() => router.push('/(reporter)/payment')} />
+          <MenuRow icon="lock-closed-outline" label="Change Password" onPress={() => router.push('/(reporter)/change-password')} />
+          <MenuRow icon="settings-outline" label="Settings" onPress={() => router.push('/(reporter)/settings')} />
+        </Card>
 
-      <Card style={styles.menuCard} padded={false}>
-        <MenuRow icon="help-circle-outline" label="Help & Support" onPress={() => router.push('/(reporter)/help-support')} />
-        <MenuRow icon="document-lock-outline" label="Terms & Privacy" onPress={() => router.push('/(reporter)/terms-privacy')} />
-        <MenuRow icon="log-out-outline" label="Logout" onPress={() => setLogoutVisible(true)} danger />
-      </Card>
+        <Card style={styles.menuCard} padded={false}>
+          <MenuRow icon="help-circle-outline" label="Help & Support" onPress={() => router.push('/(reporter)/help-support')} />
+          <MenuRow icon="document-lock-outline" label="Terms & Privacy" onPress={() => router.push('/(reporter)/terms-privacy')} />
+          <MenuRow icon="log-out-outline" label="Logout" onPress={() => setLogoutVisible(true)} danger />
+        </Card>
+      </ScrollView>
 
       <Dialog
         visible={logoutVisible}
@@ -96,6 +111,9 @@ export default function ReporterProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    paddingBottom: 32,
+  },
   header: {
     alignItems: 'center',
     paddingTop: 24,

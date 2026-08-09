@@ -12,7 +12,8 @@ import { SectionHeader } from '@/components/ui/SearchBar';
 import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
-import { mockAnalytics } from '@/mocks/data';
+import { usePayments } from '@/context/PaymentsContext';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 
 function StatCard({ icon, label, value, tone }: { icon: IconName; label: string; value: string; tone: 'primary' | 'success' | 'warning' | 'danger' }) {
@@ -32,8 +33,26 @@ export default function AdminDashboardScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
   const { articles } = useArticles();
+  const { reporters } = useReporters();
+  const { payments } = usePayments();
   const { unreadCount } = useNotifications();
-  const pendingArticles = useMemo(() => articles.filter((a) => a.status === 'pending').slice(0, 4), [articles]);
+  const allPendingArticles = useMemo(() => articles.filter((article) => article.status === 'pending'), [articles]);
+  const pendingArticles = allPendingArticles.slice(0, 4);
+  const monthlyRevenue = useMemo(
+    () => {
+      const now = new Date();
+      return payments
+        .filter((payment) => {
+          const confirmedAt = new Date(payment.updatedAt ?? payment.createdAt);
+          return payment.status === 'paid' &&
+            payment.purpose !== 'payout' &&
+            confirmedAt.getFullYear() === now.getFullYear() &&
+            confirmedAt.getMonth() === now.getMonth();
+        })
+        .reduce((sum, payment) => sum + payment.amount, 0);
+    },
+    [payments],
+  );
 
   return (
     <ScreenContainer>
@@ -45,7 +64,7 @@ export default function AdminDashboardScreen() {
           <View>
             <View style={styles.header}>
               <View>
-                <Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>Good morning,</Text>
+                <Text style={[styles.greeting, { color: theme.colors.textSecondary }]}>Welcome back,</Text>
                 <Text style={[styles.name, { color: theme.colors.text }]}>{user?.name ?? 'Admin'}</Text>
               </View>
               <View style={styles.headerActions}>
@@ -59,16 +78,15 @@ export default function AdminDashboardScreen() {
             </View>
 
             <View style={styles.statsGrid}>
-              <StatCard icon="document-text" label="Total Articles" value={mockAnalytics.totalArticles.toString()} tone="primary" />
-              <StatCard icon="people" label="Reporters" value={mockAnalytics.totalReporters.toString()} tone="success" />
-              <StatCard icon="time" label="Pending Review" value={mockAnalytics.pendingReview.toString()} tone="warning" />
-              {/* <StatCard icon="eye" label="Total Views" value={`${(mockAnalytics.totalViews / 1000).toFixed(1)}k`} tone="danger" /> */}
+              <StatCard icon="document-text" label="Total Articles" value={articles.length.toString()} tone="primary" />
+              <StatCard icon="people" label="Reporters" value={reporters.length.toString()} tone="success" />
+              <StatCard icon="time" label="Pending Review" value={allPendingArticles.length.toString()} tone="warning" />
             </View>
 
             <Card style={[styles.analyticsCard, { backgroundColor: theme.colors.primary }]}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.analyticsTitle}>Revenue this month</Text>
-                <Text style={styles.analyticsValue}>₹{mockAnalytics.totalRevenue.toLocaleString('en-IN')}</Text>
+                <Text style={styles.analyticsValue}>₹{monthlyRevenue.toLocaleString('en-IN')}</Text>
               </View>
               <Text onPress={() => router.push('/(admin)/analytics')} style={styles.analyticsLink}>
                 View Analytics →

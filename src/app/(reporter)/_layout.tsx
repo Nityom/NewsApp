@@ -8,12 +8,13 @@ import { Icon } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
+import { usePayments } from '@/context/PaymentsContext';
 import { useReporters } from '@/context/ReportersContext';
 import { clearJustSubmittedReporterId, getJustSubmittedReporterId } from '@/lib/joinRequestFlag';
 import { useAppTheme } from '@/theme';
 import type { Reporter } from '@/types/models';
 
-const paymentQr = require('../../../assets/images/PaymentQr.jpg');
+const paymentQr = require('../../../assets/images/PaymentQr.jpeg');
 
 function PendingApprovalScreen({ reason }: { reason?: string }) {
   const theme = useAppTheme();
@@ -41,19 +42,42 @@ function PaymentScreen({ reporter }: { reporter: Reporter }) {
   const { logout } = useAuth();
   const { updateReporter } = useReporters();
   const { addNotification } = useNotifications();
+  const { addPayment } = usePayments();
   const [submitting, setSubmitting] = useState(false);
 
   const markPaymentDone = async () => {
     setSubmitting(true);
     try {
-      await updateReporter(reporter.id, { requestStatus: 'payment_submitted' });
-      await addNotification({
-        type: 'system',
-        audience: 'admin',
-        title: 'Payment Marked as Done',
-        message: `${reporter.name} says they have paid the ₹${reporter.joinFeeAmount} joining fee. Please confirm receipt.`,
+      const createdAt = new Date().toISOString();
+      await addPayment({
+        id: `joining-fee-${reporter.id}`,
+        reporterId: reporter.id,
+        reporterName: reporter.name,
+        reporterAvatar: reporter.avatar,
+        amount: reporter.joinFeeAmount ?? 0,
+        status: 'pending',
+        method: 'UPI / QR',
+        articlesCount: 0,
+        period: 'Joining Fee',
+        createdAt,
+        updatedAt: createdAt,
+        purpose: 'joining_fee',
       });
-      Alert.alert('Thanks!', 'The admin has been notified. You will get access once payment is confirmed.');
+      await updateReporter(reporter.id, { requestStatus: 'payment_submitted' });
+      try {
+        await addNotification({
+          type: 'payment',
+          audience: 'admin',
+          title: 'Payment Marked as Done',
+          message: `${reporter.name} says they have paid the ₹${reporter.joinFeeAmount} joining fee. Please confirm receipt.`,
+          reporterId: reporter.id,
+        });
+        Alert.alert('Thanks!', 'The admin has been notified. You will get access once payment is confirmed.');
+      } catch {
+        Alert.alert('Payment Recorded', 'Your payment is visible to the admin, but the alert could not be sent.');
+      }
+    } catch {
+      Alert.alert('Could Not Submit Payment', 'Your payment confirmation was not recorded. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -64,9 +88,16 @@ function PaymentScreen({ reporter }: { reporter: Reporter }) {
       <ScrollView contentContainerStyle={styles.paymentScroll}>
         <Icon name="cash-outline" size={44} color={theme.colors.primary} />
         <Text style={[styles.pendingTitle, { color: theme.colors.text }]}>Joining Fee Required</Text>
+        <View
+          style={[
+            styles.feeHighlight,
+            { backgroundColor: theme.colors.primaryMuted, borderColor: theme.colors.primary },
+          ]}>
+          <Text style={[styles.feeLabel, { color: theme.colors.textSecondary }]}>AMOUNT TO PAY</Text>
+          <Text style={[styles.feeAmount, { color: theme.colors.text }]}>₹{reporter.joinFeeAmount}</Text>
+        </View>
         <Text style={[styles.pendingText, { color: theme.colors.textSecondary }]}>
-          The admin has set a joining fee of ₹{reporter.joinFeeAmount}. Scan the QR code below to pay, then tap
-          "Payment Done".
+          Scan the QR code below to pay the joining fee, then tap "Payment Done".
         </Text>
         <Image source={paymentQr} style={styles.qrImage} contentFit="contain" />
         <Button label="Payment Done" onPress={markPaymentDone} loading={submitting} fullWidth size="lg" />
@@ -95,7 +126,7 @@ function AwaitingConfirmationScreen({ reporter }: { reporter: Reporter }) {
 }
 
 export default function ReporterLayout() {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { reporters, isLoading } = useReporters();
   const reporterRecord = user?.email
     ? reporters.find((r) => r.email.toLowerCase() === user.email.toLowerCase())
@@ -112,6 +143,18 @@ export default function ReporterLayout() {
   useEffect(() => {
     if (needsJoinForm) router.replace('/(auth)/reporter-details');
   }, [needsJoinForm]);
+
+  useEffect(() => {
+    if (!isAuthLoading && !user) router.replace('/(auth)/login');
+  }, [isAuthLoading, user]);
+
+  if (isAuthLoading || !user) {
+    return (
+      <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
+        <View style={styles.pendingWrap} />
+      </ScreenContainer>
+    );
+  }
 
   // No join-request record at all yet, and none was just submitted this session (e.g. the form
   // was skipped via the back button) - hold here and redirect to it instead of allowing dashboard access.
@@ -171,6 +214,24 @@ const styles = StyleSheet.create({
     width: 220,
     height: 220,
     marginVertical: 8,
+  },
+  feeHighlight: {
+    width: '100%',
+    maxWidth: 280,
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  feeLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  feeAmount: {
+    fontSize: 26,
+    fontWeight: '900',
   },
   pendingTitle: {
     fontSize: 18,

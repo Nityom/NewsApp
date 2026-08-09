@@ -6,13 +6,11 @@ import {
     onSnapshot,
     setDoc,
     updateDoc,
-    writeBatch,
 } from '@react-native-firebase/firestore';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { uploadLocalFile, uploadLocalFiles } from '@/lib/cloudinary';
 import { db, stripUndefined } from '@/lib/firebase';
-import { mockArticles } from '@/mocks/data';
 import type { Article } from '@/types/models';
 
 import { useNotifications } from './NotificationsContext';
@@ -75,18 +73,11 @@ export function ArticlesProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
-  // One-time on app start: seed the collection if it's empty, and clean up long-approved articles.
+  // One-time on app start: clean up long-approved articles (no more mock-data seeding).
   useEffect(() => {
     (async () => {
       try {
         const snapshot = await getDocs(collection(db, COLLECTION));
-        if (snapshot.empty) {
-          const batch = writeBatch(db);
-          mockArticles.forEach((article) => batch.set(doc(db, COLLECTION, article.id), article));
-          await batch.commit();
-          return;
-        }
-
         const cutoff = Date.now() - APPROVED_RETENTION_DAYS * 24 * 60 * 60 * 1000;
         const stale = snapshot.docs.filter((d) => {
           const data = d.data() as Article;
@@ -141,6 +132,7 @@ export function ArticlesProvider({ children }: { children: ReactNode }) {
             title: 'Article Approved',
             message: `Your article "${title}" was approved and published.`,
             articleId: id,
+            reporterId: previous.reporterId,
           });
         } else if (patch.status === 'rejected') {
           await addNotification({
@@ -149,6 +141,7 @@ export function ArticlesProvider({ children }: { children: ReactNode }) {
             title: 'Article Needs Changes',
             message: `Your article "${title}" was rejected.${patch.rejectionReason ? ` Reason: ${patch.rejectionReason}` : ' Tap to view feedback.'}`,
             articleId: id,
+            reporterId: previous.reporterId,
           });
         }
       }

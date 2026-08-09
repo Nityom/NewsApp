@@ -113,7 +113,7 @@ export default function RegisterScreen() {
               ref={passwordRef}
               leftIcon="lock-closed-outline"
               placeholder="••••••••"
-              secureTextEntry
+              isPassword
               value={password}
               onChangeText={setPassword}
               onFocus={scrollToInput(passwordRef)}
@@ -124,7 +124,7 @@ export default function RegisterScreen() {
               ref={confirmPasswordRef}
               leftIcon="lock-closed-outline"
               placeholder="••••••••"
-              secureTextEntry
+              isPassword
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               onFocus={scrollToInput(confirmPasswordRef)}

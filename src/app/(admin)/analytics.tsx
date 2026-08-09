@@ -1,17 +1,20 @@
 import { router } from 'expo-router';
+import { useMemo } from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { mockAnalytics } from '@/mocks/data';
+import { useArticles } from '@/context/ArticlesContext';
+import { usePayments } from '@/context/PaymentsContext';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 
 const { width } = Dimensions.get('window');
 const chartWidth = width - 72;
 
 function MiniBarChart({ data, color }: { data: number[]; color: string }) {
-  const max = Math.max(...data);
+  const max = Math.max(...data, 1);
   return (
     <View style={styles.chartRow}>
       {data.map((value, i) => (
@@ -28,8 +31,59 @@ function MiniBarChart({ data, color }: { data: number[]; color: string }) {
   );
 }
 
+function countsForLastSevenDays(dates: string[]) {
+  const dayStarts = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - (6 - index));
+    return date;
+  });
+  return dayStarts.map((start) => {
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return dates.filter((value) => {
+      const date = new Date(value);
+      return date >= start && date < end;
+    }).length;
+  });
+}
+
 export default function AdminAnalyticsScreen() {
   const theme = useAppTheme();
+  const { articles } = useArticles();
+  const { reporters } = useReporters();
+  const { payments } = usePayments();
+
+  const analytics = useMemo(() => {
+    const now = new Date();
+    const isCurrentMonth = (value?: string) => {
+      if (!value) return false;
+      const date = new Date(value);
+      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+    };
+    const confirmedPayments = payments.filter(
+      (payment) => payment.status === 'paid' && payment.purpose !== 'payout',
+    );
+    const monthlyRevenue = confirmedPayments
+      .filter((payment) => isCurrentMonth(payment.updatedAt ?? payment.createdAt))
+      .reduce((sum, payment) => sum + payment.amount, 0);
+
+    return {
+      monthlyRevenue,
+      publishedTrend: countsForLastSevenDays(
+        articles.filter((article) => article.status === 'approved' && article.reviewedAt).map((article) => article.reviewedAt!),
+      ),
+      paymentTrend: countsForLastSevenDays(
+        confirmedPayments.map((payment) => payment.updatedAt ?? payment.createdAt),
+      ),
+      approvedThisMonth: articles.filter(
+        (article) => article.status === 'approved' && isCurrentMonth(article.reviewedAt ?? article.updatedAt),
+      ).length,
+      rejectedThisMonth: articles.filter(
+        (article) => article.status === 'rejected' && isCurrentMonth(article.reviewedAt ?? article.updatedAt),
+      ).length,
+    };
+  }, [articles, payments]);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
@@ -42,57 +96,32 @@ export default function AdminAnalyticsScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.summaryGrid}>
           <Card style={styles.summaryCard}>
-            <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Total Views</Text>
-            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-              {(mockAnalytics.totalViews / 1000).toFixed(1)}k
-            </Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Revenue This Month</Text>
+            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>₹{analytics.monthlyRevenue.toLocaleString('en-IN')}</Text>
           </Card>
           <Card style={styles.summaryCard}>
-            <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Revenue</Text>
-            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
-              ₹{(mockAnalytics.totalRevenue / 1000).toFixed(0)}k
-            </Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.textMuted }]}>Active Reporters</Text>
+            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>{reporters.filter((reporter) => reporter.isActive).length}</Text>
           </Card>
         </View>
 
         <Card style={styles.chartCard}>
-          <Text style={[styles.chartTitle, { color: theme.colors.text }]}>Views this week</Text>
-          <MiniBarChart data={mockAnalytics.viewsTrend} color={theme.colors.primary} />
+          <Text style={[styles.chartTitle, { color: theme.colors.text }]}>Articles published in the last 7 days</Text>
+          <MiniBarChart data={analytics.publishedTrend} color={theme.colors.primary} />
         </Card>
 
         <Card style={styles.chartCard}>
-          <Text style={[styles.chartTitle, { color: theme.colors.text }]}>Articles published</Text>
-          <MiniBarChart data={mockAnalytics.articlesTrend} color={theme.colors.success} />
-        </Card>
-
-        <Card style={styles.chartCard}>
-          <Text style={[styles.chartTitle, { color: theme.colors.text }]}>Top Categories</Text>
-          {mockAnalytics.topCategories.map((c) => (
-            <View key={c.category} style={styles.categoryRow}>
-              <Text style={[styles.categoryLabel, { color: theme.colors.text }]}>{c.category}</Text>
-              <View style={[styles.categoryTrack, { backgroundColor: theme.colors.backgroundSubtle }]}>
-                <View
-                  style={[
-                    styles.categoryFill,
-                    {
-                      width: `${(c.count / mockAnalytics.topCategories[0].count) * 100}%` as `${number}%`,
-                      backgroundColor: theme.colors.primary,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={[styles.categoryCount, { color: theme.colors.textMuted }]}>{c.count}</Text>
-            </View>
-          ))}
+          <Text style={[styles.chartTitle, { color: theme.colors.text }]}>Payments confirmed in the last 7 days</Text>
+          <MiniBarChart data={analytics.paymentTrend} color={theme.colors.success} />
         </Card>
 
         <View style={styles.approvalRow}>
           <Card style={[styles.approvalCard, { backgroundColor: theme.colors.successMuted }]}>
-            <Text style={[styles.approvalValue, { color: theme.colors.success }]}>{mockAnalytics.approvedThisMonth}</Text>
+            <Text style={[styles.approvalValue, { color: theme.colors.success }]}>{analytics.approvedThisMonth}</Text>
             <Text style={[styles.approvalLabel, { color: theme.colors.text }]}>Approved this month</Text>
           </Card>
           <Card style={[styles.approvalCard, { backgroundColor: theme.colors.dangerMuted }]}>
-            <Text style={[styles.approvalValue, { color: theme.colors.danger }]}>{mockAnalytics.rejectedThisMonth}</Text>
+            <Text style={[styles.approvalValue, { color: theme.colors.danger }]}>{analytics.rejectedThisMonth}</Text>
             <Text style={[styles.approvalLabel, { color: theme.colors.text }]}>Rejected this month</Text>
           </Card>
         </View>
@@ -155,33 +184,6 @@ const styles = StyleSheet.create({
   },
   bar: {
     borderRadius: 6,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 4,
-  },
-  categoryLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    width: 90,
-  },
-  categoryTrack: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  categoryFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  categoryCount: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    width: 24,
-    textAlign: 'right',
   },
   approvalRow: {
     flexDirection: 'row',

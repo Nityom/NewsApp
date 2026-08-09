@@ -1,15 +1,5 @@
 export type ArticleStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'trashed';
 
-export type Category =
-  | 'Education'
-  | 'Exams'
-  | 'Admissions'
-  | 'Scholarships'
-  | 'Technology'
-  | 'Career'
-  | 'Policy'
-  | 'Campus Life';
-
 export interface Reporter {
   id: string;
   name: string;
@@ -43,6 +33,8 @@ export interface Reporter {
   requestRejectionReason?: string;
   /** Joining fee amount (in ₹) set by admin, shown to the reporter to pay before approval. */
   joinFeeAmount?: number;
+  /** Random, year-stamped ID card number assigned at join request time, e.g. "RPT-2026-483920". */
+  reporterCode?: string;
 }
 
 export interface ArticleSection {
@@ -61,7 +53,6 @@ export interface Article {
   images: string[];
   advertisements: string[];
   sections?: ArticleSection[];
-  category: Category;
   status: ArticleStatus;
   reporterId: string;
   reporterName: string;
@@ -96,7 +87,7 @@ export interface AppNotification {
   createdAt: string;
   isRead: boolean;
   articleId?: string;
-  /** Reporter this notification is about (e.g. a join request), for deep-linking. */
+  /** Recipient for reporter alerts, or the related reporter for admin alerts and deep-linking. */
   reporterId?: string;
   audience: 'reporter' | 'admin';
 }
@@ -114,7 +105,9 @@ export interface Payment {
   articlesCount: number;
   period: string;
   createdAt: string;
+  updatedAt?: string;
   transactionId?: string;
+  purpose?: 'joining_fee' | 'admin_payment' | 'payout';
 }
 
 export interface CurrentUser {
@@ -131,15 +124,3 @@ export interface CurrentUser {
   joinedAt: string;
 }
 
-export interface AnalyticsSummary {
-  totalArticles: number;
-  totalReporters: number;
-  totalViews: number;
-  totalRevenue: number;
-  pendingReview: number;
-  approvedThisMonth: number;
-  rejectedThisMonth: number;
-  viewsTrend: number[];
-  articlesTrend: number[];
-  topCategories: { category: Category; count: number }[];
-}

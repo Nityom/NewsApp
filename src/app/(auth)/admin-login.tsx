@@ -64,7 +64,7 @@ export default function AdminLoginScreen() {
               label="Password"
               leftIcon="lock-closed-outline"
               placeholder="••••••••"
-              secureTextEntry
+              isPassword
               value={password}
               onChangeText={setPassword}
               error={errors.password}

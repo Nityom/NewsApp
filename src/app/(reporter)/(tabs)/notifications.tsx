@@ -42,7 +42,7 @@ export default function ReporterNotificationsScreen() {
   const { getReporterByEmail } = useReporters();
   const { getForReporter, markAllRead } = useNotifications();
   const reporterId = user?.email ? getReporterByEmail(user.email)?.id : undefined;
-  const notifications = getForReporter(reporterId);
+  const notifications = getForReporter([reporterId, user?.id].filter((id): id is string => !!id));
   const unreadIds = notifications.filter((notification) => !notification.isRead).map((notification) => notification.id);
 
   useEffect(() => {

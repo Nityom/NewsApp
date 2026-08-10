@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Dialog } from '@/components/ui/Dialog';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
 import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
@@ -27,8 +28,11 @@ function MenuRow({ icon, label, onPress, danger }: { icon: IconName; label: stri
 export default function ReporterProfileScreen() {
   const theme = useAppTheme();
   const { user, logout, resendVerificationEmail } = useAuth();
+  const { articles } = useArticles();
   const { getReporterByEmail } = useReporters();
   const reporterRecord = user?.email ? getReporterByEmail(user.email) : undefined;
+  const reporterIds = new Set([reporterRecord?.id, user?.id].filter((id): id is string => !!id));
+  const reporterArticles = articles.filter((article) => reporterIds.has(article.reporterId));
   const [logoutVisible, setLogoutVisible] = useState(false);
 
   const handleResendVerification = async () => {
@@ -41,8 +45,8 @@ export default function ReporterProfileScreen() {
   };
 
   const stats = [
-    { label: 'Articles', value: reporterRecord?.articlesCount ?? 0 },
-    { label: 'Approved', value: reporterRecord?.approvedCount ?? 0 },
+    { label: 'Articles', value: reporterArticles.length },
+    { label: 'Approved', value: reporterArticles.filter((article) => article.status === 'approved').length },
     { label: 'Rating', value: reporterRecord?.rating ?? 0 },
   ];
 

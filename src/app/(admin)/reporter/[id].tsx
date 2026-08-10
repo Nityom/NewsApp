@@ -25,16 +25,18 @@ export default function ReporterDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getReporter, updateReporter, deleteReporter } = useReporters();
   const { addNotification } = useNotifications();
-  const { payments, addPayment, updatePaymentStatus } = usePayments();
+  const { payments, updatePaymentStatus, updateJoiningFeeStatus } = usePayments();
   const { articles: allArticles } = useArticles();
   const reporter = getReporter(id);
-  const articles = allArticles.filter((a) => a.reporterId === id).slice(0, 5);
+  const reporterArticles = allArticles.filter((article) => getReporter(article.reporterId)?.id === id);
+  const recentArticles = reporterArticles.slice(0, 5);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [rejectVisible, setRejectVisible] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [feeVisible, setFeeVisible] = useState(false);
   const [feeAmount, setFeeAmount] = useState('');
   const [sendingFee, setSendingFee] = useState(false);
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
   const [photoVisible, setPhotoVisible] = useState(false);
   const [downloadingPhoto, setDownloadingPhoto] = useState(false);
 
@@ -91,13 +93,19 @@ export default function ReporterDetailsScreen() {
   };
 
   const confirmPaymentReceived = async () => {
+    if (confirmingPayment) return;
+    if (!reporter.joinFeeAmount || reporter.joinFeeAmount <= 0) {
+      Alert.alert('Joining Fee Missing', 'Set a valid joining fee before confirming this payment.');
+      return;
+    }
+    setConfirmingPayment(true);
     const existingPayment = payments.find(
       (payment) => payment.reporterId === reporter.id && payment.purpose === 'joining_fee',
     );
     const paymentId = existingPayment?.id ?? `joining-fee-${reporter.id}`;
-    if (!existingPayment) {
-      const createdAt = new Date().toISOString();
-      await addPayment({
+    const createdAt = existingPayment?.createdAt ?? new Date().toISOString();
+    try {
+      await updateJoiningFeeStatus(existingPayment ?? {
         id: paymentId,
         reporterId: reporter.id,
         reporterName: reporter.name,
@@ -110,18 +118,24 @@ export default function ReporterDetailsScreen() {
         createdAt,
         updatedAt: createdAt,
         purpose: 'joining_fee',
-      });
+      }, 'paid');
+      try {
+        await addNotification({
+          type: 'system',
+          audience: 'reporter',
+          title: 'Reporter Request Approved',
+          message: `${reporter.name}, your payment is confirmed and your reporter account is approved. You can now start publishing.`,
+          reporterId: reporter.id,
+        });
+        Alert.alert('Approved', `${reporter.name} can now publish articles.`);
+      } catch {
+        Alert.alert('Approved', `${reporter.name} can now publish articles, but the alert could not be sent.`);
+      }
+    } catch {
+      Alert.alert('Could Not Confirm Payment', 'The payment and reporter status were not changed. Please try again.');
+    } finally {
+      setConfirmingPayment(false);
     }
-    await updatePaymentStatus(paymentId, 'paid');
-    await updateReporter(reporter.id, { requestStatus: 'approved', isActive: true, isVerified: true });
-    await addNotification({
-      type: 'system',
-      audience: 'reporter',
-      title: 'Reporter Request Approved',
-      message: `${reporter.name}, your payment is confirmed and your reporter account is approved. You can now start publishing.`,
-      reporterId: reporter.id,
-    });
-    Alert.alert('Approved', `${reporter.name} can now publish articles.`);
   };
 
   const rejectRequest = async () => {
@@ -131,7 +145,11 @@ export default function ReporterDetailsScreen() {
       (payment) => payment.reporterId === reporter.id && payment.purpose === 'joining_fee' && payment.status === 'pending',
     );
     if (joiningPayment) await updatePaymentStatus(joiningPayment.id, 'failed');
-    await updateReporter(reporter.id, { requestStatus: 'rejected', requestRejectionReason: rejectReason.trim() });
+    await updateReporter(reporter.id, {
+      requestStatus: 'rejected',
+      requestRejectionReason: rejectReason.trim(),
+      joinFeeAmount: 0,
+    });
     await addNotification({
       type: 'system',
       audience: 'reporter',
@@ -218,11 +236,15 @@ export default function ReporterDetailsScreen() {
 
         <View style={styles.statsRow}>
           <Card style={styles.statCard}>
-            <Text style={[styles.statValue, { color: theme.colors.text }]}>{reporter.approvedCount}</Text>
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>
+              {reporterArticles.filter((article) => article.status === 'approved').length}
+            </Text>
             <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Approved</Text>
           </Card>
           <Card style={styles.statCard}>
-            <Text style={[styles.statValue, { color: theme.colors.text }]}>{reporter.rejectedCount}</Text>
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>
+              {reporterArticles.filter((article) => article.status === 'rejected').length}
+            </Text>
             <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>Rejected</Text>
           </Card>
           <Card style={styles.statCard}>
@@ -303,7 +325,13 @@ export default function ReporterDetailsScreen() {
                 <Button label="Reject" variant="danger" icon="close" onPress={() => setRejectVisible(true)} fullWidth />
               </View>
               <View style={{ flex: 1 }}>
-                <Button label="Confirm Payment Received" icon="checkmark" onPress={confirmPaymentReceived} fullWidth />
+                <Button
+                  label="Confirm Payment Received"
+                  icon="checkmark"
+                  onPress={confirmPaymentReceived}
+                  loading={confirmingPayment}
+                  fullWidth
+                />
               </View>
             </ButtonRow>
           </>
@@ -317,10 +345,10 @@ export default function ReporterDetailsScreen() {
         ) : null}
 
         <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>Recent Submissions</Text>
-        {articles.length === 0 ? (
+        {recentArticles.length === 0 ? (
           <Text style={[styles.bio, { color: theme.colors.textMuted }]}>No articles submitted yet.</Text>
         ) : null}
-        {articles.map((article) => (
+        {recentArticles.map((article) => (
           <Card key={article.id} style={styles.articleRow}>
             <Text style={[styles.articleTitle, { color: theme.colors.text }]} numberOfLines={2}>
               {article.title}

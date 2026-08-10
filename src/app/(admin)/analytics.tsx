@@ -62,7 +62,7 @@ export default function AdminAnalyticsScreen() {
       return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
     };
     const confirmedPayments = payments.filter(
-      (payment) => payment.status === 'paid' && payment.purpose !== 'payout',
+      (payment) => payment.status === 'paid' && payment.purpose === 'joining_fee',
     );
     const monthlyRevenue = confirmedPayments
       .filter((payment) => isCurrentMonth(payment.updatedAt ?? payment.createdAt))

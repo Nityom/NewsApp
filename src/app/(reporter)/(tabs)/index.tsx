@@ -47,16 +47,24 @@ export default function ReporterDashboardScreen() {
   const { getReporterByEmail } = useReporters();
   const reporter = user?.email ? getReporterByEmail(user.email) : undefined;
   const reporterPhoto = reporter?.photo || reporter?.avatar || user?.avatar;
+  const myReporterIds = useMemo(
+    () => new Set([reporter?.id, user?.id].filter((id): id is string => !!id)),
+    [reporter?.id, user?.id],
+  );
+  const allMyArticles = useMemo(
+    () => articles.filter((article) => myReporterIds.has(article.reporterId)),
+    [articles, myReporterIds],
+  );
 
-  const myArticles = useMemo(() => articles.slice(0, 6), [articles]);
+  const myArticles = useMemo(() => allMyArticles.slice(0, 6), [allMyArticles]);
   const counts = useMemo(
     () => ({
-      approved: articles.filter((a) => a.status === 'approved').length,
-      pending: articles.filter((a) => a.status === 'pending').length,
-      rejected: articles.filter((a) => a.status === 'rejected').length,
-      drafts: articles.filter((a) => a.status === 'draft').length,
+      approved: allMyArticles.filter((article) => article.status === 'approved').length,
+      pending: allMyArticles.filter((article) => article.status === 'pending').length,
+      rejected: allMyArticles.filter((article) => article.status === 'rejected').length,
+      drafts: allMyArticles.filter((article) => article.status === 'draft').length,
     }),
-    [articles],
+    [allMyArticles],
   );
 
   return (
@@ -90,7 +98,11 @@ export default function ReporterDashboardScreen() {
               <StatTile icon="document" label="Drafts" value={counts.drafts} tone="primary" />
             </View>
 
-            <SectionHeader title="Recent Articles" action="See all" />
+            <SectionHeader
+              title="Recent Articles"
+              action="See all"
+              onActionPress={() => router.push('/(reporter)/(tabs)/articles')}
+            />
           </View>
         }
         renderItem={({ item }) => (

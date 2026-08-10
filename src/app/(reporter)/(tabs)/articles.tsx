@@ -8,6 +8,8 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { EmptyState } from '@/components/ui/StateViews';
 import { useArticles } from '@/context/ArticlesContext';
+import { useAuth } from '@/context/AuthContext';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 import type { ArticleStatus } from '@/types/models';
 
@@ -20,15 +22,22 @@ const tabs: { key: ArticleStatus; label: string }[] = [
 
 export default function ReporterArticlesScreen() {
   const theme = useAppTheme();
+  const { user } = useAuth();
   const { articles } = useArticles();
+  const { getReporterByEmail } = useReporters();
+  const reporter = user?.email ? getReporterByEmail(user.email) : undefined;
   const [activeTab, setActiveTab] = useState<ArticleStatus>('pending');
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
+    const reporterIds = new Set([reporter?.id, user?.id].filter((id): id is string => !!id));
     return articles.filter(
-      (a) => a.status === activeTab && a.title.toLowerCase().includes(query.toLowerCase()),
+      (article) =>
+        reporterIds.has(article.reporterId) &&
+        article.status === activeTab &&
+        article.title.toLowerCase().includes(query.toLowerCase()),
     );
-  }, [articles, activeTab, query]);
+  }, [activeTab, articles, query, reporter?.id, user?.id]);
 
   return (
     <ScreenContainer>

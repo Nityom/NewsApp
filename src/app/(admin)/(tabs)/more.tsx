@@ -84,10 +84,10 @@ export default function AdminMoreScreen() {
           {
             label: 'Logout',
             variant: 'danger',
-            onPress: () => {
+            onPress: async () => {
               setLogoutVisible(false);
-              logout();
-              router.replace('/(auth)/admin-login');
+              await logout();
+              router.replace('/(auth)/login');
             },
           },
         ]}

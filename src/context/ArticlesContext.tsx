@@ -2,7 +2,6 @@ import {
     collection,
     deleteDoc,
     doc,
-    getDocs,
     onSnapshot,
     setDoc,
     updateDoc,
@@ -13,12 +12,10 @@ import { uploadLocalFile, uploadLocalFiles } from '@/lib/cloudinary';
 import { db, stripUndefined } from '@/lib/firebase';
 import type { Article } from '@/types/models';
 
+import { useAuth } from './AuthContext';
 import { useNotifications } from './NotificationsContext';
 
 const COLLECTION = 'articles';
-// Approved articles are removed after this many days to save on Firestore reads/storage.
-// Their Cloudinary images are not deleted (unsigned uploads can't be deleted client-side securely).
-const APPROVED_RETENTION_DAYS = 10;
 
 interface ArticlesContextValue {
   articles: Article[];
@@ -59,9 +56,17 @@ async function resolveArticleImages(articleId: string, data: Partial<Article>): 
 export function ArticlesProvider({ children }: { children: ReactNode }) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
   const { addNotification } = useNotifications();
 
   useEffect(() => {
+    if (!user) {
+      setArticles([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
     const unsubscribe = onSnapshot(
       collection(db, COLLECTION),
       (snapshot) => {
@@ -71,24 +76,7 @@ export function ArticlesProvider({ children }: { children: ReactNode }) {
       () => setIsLoading(false),
     );
     return unsubscribe;
-  }, []);
-
-  // One-time on app start: clean up long-approved articles (no more mock-data seeding).
-  useEffect(() => {
-    (async () => {
-      try {
-        const snapshot = await getDocs(collection(db, COLLECTION));
-        const cutoff = Date.now() - APPROVED_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-        const stale = snapshot.docs.filter((d) => {
-          const data = d.data() as Article;
-          return data.status === 'approved' && data.reviewedAt && new Date(data.reviewedAt).getTime() < cutoff;
-        });
-        await Promise.all(stale.map((d) => deleteDoc(d.ref)));
-      } catch {
-        // best-effort - the app still works from whatever the live listener has
-      }
-    })();
-  }, []);
+  }, [user?.email]);
 
   const getArticle = useCallback((id: string) => articles.find((a) => a.id === id), [articles]);
 
@@ -96,6 +84,11 @@ export function ArticlesProvider({ children }: { children: ReactNode }) {
     async (article: Article) => {
       const resolved = { ...article, ...(await resolveArticleImages(article.id, article)) } as Article;
       await setDoc(doc(db, COLLECTION, article.id), stripUndefined(resolved));
+      setArticles((current) =>
+        current.some((currentArticle) => currentArticle.id === resolved.id)
+          ? current.map((currentArticle) => (currentArticle.id === resolved.id ? resolved : currentArticle))
+          : [resolved, ...current],
+      );
       if (article.status === 'pending') {
         await addNotification({
           type: 'article_pending',

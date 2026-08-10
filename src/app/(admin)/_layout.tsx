@@ -1,7 +1,8 @@
-import { router, Stack } from 'expo-router';
+import { Redirect, router, Stack } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 
+import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
 
 function AdminActionAlerts() {
@@ -45,6 +46,11 @@ function AdminActionAlerts() {
 }
 
 export default function AdminLayout() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) return null;
+  if (user?.role !== 'admin') return <Redirect href="/(auth)/login" />;
+
   return (
     <>
       <AdminActionAlerts />

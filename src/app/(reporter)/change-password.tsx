@@ -6,17 +6,19 @@ import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { useAuth } from '@/context/AuthContext';
 import { useAppTheme } from '@/theme';
 
 export default function ChangePasswordScreen() {
   const theme = useAppTheme();
+  const { changePassword } = useAuth();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const nextErrors: Record<string, string> = {};
     if (current.length < 4) nextErrors.current = 'Enter your current password';
     if (next.length < 6) nextErrors.next = 'Minimum 6 characters required';
@@ -25,12 +27,21 @@ export default function ChangePasswordScreen() {
     if (Object.keys(nextErrors).length > 0) return;
 
     setLoading(true);
-    setTimeout(() => {
+    try {
+      await changePassword(current, next);
       setLoading(false);
       Alert.alert('Password Updated', 'Your password has been changed successfully.', [
         { text: 'OK', onPress: () => router.back() },
       ]);
-    }, 900);
+    } catch (error: any) {
+      setLoading(false);
+      const message = error?.code === 'auth/wrong-password' || error?.code === 'auth/invalid-credential'
+        ? 'Your current password is incorrect.'
+        : error?.code === 'auth/weak-password'
+          ? 'Choose a stronger password with at least 6 characters.'
+          : 'Could not update your password. Please sign in again and retry.';
+      Alert.alert('Password Not Updated', message);
+    }
   };
 
   return (

@@ -45,7 +45,7 @@ export default function AdminDashboardScreen() {
         .filter((payment) => {
           const confirmedAt = new Date(payment.updatedAt ?? payment.createdAt);
           return payment.status === 'paid' &&
-            payment.purpose !== 'payout' &&
+            payment.purpose === 'joining_fee' &&
             confirmedAt.getFullYear() === now.getFullYear() &&
             confirmedAt.getMonth() === now.getMonth();
         })
@@ -93,7 +93,11 @@ export default function AdminDashboardScreen() {
               </Text>
             </Card>
 
-            <SectionHeader title="Pending Review" action="See all" />
+            <SectionHeader
+              title="Pending Review"
+              action="See all"
+              onActionPress={() => router.push('/(admin)/(tabs)/articles')}
+            />
           </View>
         }
         renderItem={({ item }) => (

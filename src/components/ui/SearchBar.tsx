@@ -66,13 +66,26 @@ export function SearchBar({
   );
 }
 
-export function SectionHeader({ title, action }: { title: string; action?: string; }) {
+export function SectionHeader({
+  title,
+  action,
+  onActionPress,
+}: {
+  title: string;
+  action?: string;
+  onActionPress?: () => void;
+}) {
   const theme = useAppTheme();
   return (
     <View style={styles.sectionHeader}>
       <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{title}</Text>
       {action ? (
-        <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '700' }}>{action}</Text>
+        <Text
+          accessibilityRole={onActionPress ? 'button' : undefined}
+          onPress={onActionPress}
+          style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '700' }}>
+          {action}
+        </Text>
       ) : null}
     </View>
   );

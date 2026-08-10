@@ -32,6 +32,11 @@ function dedupeByEmail(list: Reporter[]): Reporter[] {
   return Array.from(byEmail.values());
 }
 
+function reporterIdAliases(reporter: Reporter) {
+  const emailSlug = reporter.email.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return [`rep-${emailSlug}`, `reporter-${emailSlug}`];
+}
+
 interface ReportersContextValue {
   reporters: Reporter[];
   isLoading: boolean;
@@ -86,7 +91,8 @@ export function ReportersProvider({ children }: { children: ReactNode }) {
       // The id may belong to an older duplicate that dedupeByEmail filtered out (e.g. a stale
       // notification deep-link) - resolve it to that person's current canonical record instead.
       const stale = rawReporters.find((r) => r.id === id);
-      return stale ? reporters.find((r) => r.email.toLowerCase() === stale.email.toLowerCase()) : undefined;
+      if (stale) return reporters.find((r) => r.email.toLowerCase() === stale.email.toLowerCase());
+      return reporters.find((reporter) => reporterIdAliases(reporter).includes(id));
     },
     [reporters, rawReporters],
   );

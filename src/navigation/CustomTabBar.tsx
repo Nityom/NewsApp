@@ -119,7 +119,7 @@ function CustomTabBarInner({
         const badge =
           route.name === 'notifications' && notificationsAudience
             ? notificationsAudience === 'reporter'
-              ? unreadCountForReporter(reporterId)
+              ? unreadCountForReporter([reporterId, user?.id].filter((id): id is string => !!id))
               : unreadCount(notificationsAudience)
             : config.badge;
 

@@ -19,8 +19,8 @@ interface NotificationsContextValue {
   isLoading: boolean;
   getForAudience: (audience: 'reporter' | 'admin') => AppNotification[];
   unreadCount: (audience: 'reporter' | 'admin') => number;
-  getForReporter: (reporterId?: string) => AppNotification[];
-  unreadCountForReporter: (reporterId?: string) => number;
+  getForReporter: (reporterIds?: string | string[]) => AppNotification[];
+  unreadCountForReporter: (reporterIds?: string | string[]) => number;
   addNotification: (notification: Omit<AppNotification, 'id' | 'createdAt' | 'isRead'>) => Promise<void>;
   markRead: (id: string) => Promise<void>;
   markAllRead: (ids: string[]) => Promise<void>;
@@ -94,14 +94,18 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   );
 
   const getForReporter = useCallback(
-    (reporterId?: string) => reporterId
-      ? notifications.filter((n) => n.audience === 'reporter' && n.reporterId === reporterId)
-      : [],
+    (reporterIds?: string | string[]) => {
+      const ids = new Set(Array.isArray(reporterIds) ? reporterIds : reporterIds ? [reporterIds] : []);
+      return ids.size > 0
+        ? notifications.filter((notification) =>
+            notification.audience === 'reporter' && !!notification.reporterId && ids.has(notification.reporterId))
+        : [];
+    },
     [notifications],
   );
 
   const unreadCountForReporter = useCallback(
-    (reporterId?: string) => getForReporter(reporterId).filter((n) => !n.isRead).length,
+    (reporterIds?: string | string[]) => getForReporter(reporterIds).filter((notification) => !notification.isRead).length,
     [getForReporter],
   );
 

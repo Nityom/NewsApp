@@ -14,6 +14,7 @@ import { Icon } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { ErrorState } from '@/components/ui/StateViews';
 import { useArticles } from '@/context/ArticlesContext';
+import { useAuth } from '@/context/AuthContext';
 import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 import type { Article } from '@/types/models';
@@ -26,9 +27,15 @@ export default function ArticleDetailScreen() {
   const theme = useAppTheme();
   const { width: windowWidth } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuth();
   const { articles, getArticle } = useArticles();
   const article = getArticle(id);
-  const { getReporter } = useReporters();
+  const { getReporter, getReporterByEmail } = useReporters();
+  const currentReporter = user?.email ? getReporterByEmail(user.email) : undefined;
+  const ownsArticle = article
+    ? [currentReporter?.id, user?.id].some((reporterId) => reporterId === article.reporterId)
+    : false;
+  const canViewArticle = article?.status === 'approved' || ownsArticle;
   const reporterPhone = article?.reporterPhone ?? (article ? getReporter(article.reporterId)?.phone : undefined);
   const viewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
   const pairViewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
@@ -50,7 +57,7 @@ export default function ArticleDetailScreen() {
     }
   };
 
-  if (!article) {
+  if (!article || !canViewArticle) {
     return (
       <ScreenContainer>
         <ErrorState title="Article not found" message="This article may have been removed." />
@@ -119,6 +126,12 @@ export default function ArticleDetailScreen() {
               <Text style={[styles.rejectionTitle, { color: theme.colors.danger }]}>Editorial Feedback</Text>
             </View>
             <Text style={[styles.rejectionText, { color: theme.colors.text }]}>{article.rejectionReason}</Text>
+            <Button
+              label="Edit and Resubmit"
+              icon="create-outline"
+              onPress={() => router.push({ pathname: '/(reporter)/create-article', params: { id: article.id } })}
+              fullWidth
+            />
           </Card>
         ) : null}
 

@@ -36,17 +36,26 @@ function ToggleRow({
 export default function AdminSettingsScreen() {
   const theme = useAppTheme();
   const { mode, overrideMode, setOverrideMode } = useThemeMode();
-  const [autoApprove, setAutoApprove] = useState(false);
-  const [emailDigest, setEmailDigest] = useState(true);
-  const [newReporterAlert, setNewReporterAlert] = useState(true);
   const { info, updateInfo } = usePublicationInfo();
   const [year, setYear] = useState(info.year);
   const [issueNumber, setIssueNumber] = useState(info.issueNumber);
   const [price, setPrice] = useState(info.price);
+  const [saving, setSaving] = useState(false);
 
   const savePublicationInfo = async () => {
-    await updateInfo({ year, issueNumber, price });
-    Alert.alert('Saved', 'The publication info bar has been updated on all articles.');
+    if (!year.trim() || !issueNumber.trim() || !price.trim()) {
+      Alert.alert('Missing Information', 'Enter the year, issue number, and price before saving.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateInfo({ year: year.trim(), issueNumber: issueNumber.trim(), price: price.trim() });
+      Alert.alert('Saved', 'The publication info bar has been updated on all articles.');
+    } catch {
+      Alert.alert('Could Not Save', 'Publication information was not updated. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -69,15 +78,6 @@ export default function AdminSettingsScreen() {
         ) : null}
 
         <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary, marginTop: 20 }]}>
-          Editorial Workflow
-        </Text>
-        <Card style={styles.card} padded={false}>
-          <ToggleRow icon="flash-outline" label="Auto-approve trusted reporters" value={autoApprove} onValueChange={setAutoApprove} />
-          <ToggleRow icon="mail-outline" label="Daily Email Digest" value={emailDigest} onValueChange={setEmailDigest} />
-          <ToggleRow icon="person-add-outline" label="New Reporter Alerts" value={newReporterAlert} onValueChange={setNewReporterAlert} />
-        </Card>
-
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary, marginTop: 20 }]}>
           Publication Info (shown on every article page)
         </Text>
         <Card style={[styles.card, { padding: 14, gap: 10 }]}>
@@ -87,7 +87,7 @@ export default function AdminSettingsScreen() {
           <Text style={[styles.autoNote, { color: theme.colors.textMuted }]}>
             माह (period) and पृष्ठ (pages) update automatically. दिनांक (registration date) is set per-article from its approval date and can be changed on that article's page.
           </Text>
-          <Button label="Save Publication Info" onPress={savePublicationInfo} />
+          <Button label="Save Publication Info" onPress={savePublicationInfo} loading={saving} />
         </Card>
       </ScrollView>
     </ScreenContainer>

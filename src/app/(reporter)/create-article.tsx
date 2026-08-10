@@ -12,6 +12,7 @@ import { ImageCropModal } from '@/components/ui/ImageCropModal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
+import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 import type { Article, ArticleSection } from '@/types/models';
 
@@ -28,10 +29,17 @@ export default function CreateArticleScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
   const { articles, addArticle, updateArticle } = useArticles();
+  const { getReporterByEmail } = useReporters();
+  const reporter = user?.email ? getReporterByEmail(user.email) : undefined;
   const params = useLocalSearchParams<{ id?: string }>();
+  const reporterIds = useMemo(
+    () => new Set([reporter?.id, user?.id].filter((id): id is string => !!id)),
+    [reporter?.id, user?.id],
+  );
   const editingDraft = useMemo(
-    () => (params.id ? articles.find((a) => a.id === params.id) : undefined),
-    [params.id, articles],
+    () => (params.id ? articles.find((article) =>
+      article.id === params.id && (user?.role === 'admin' || reporterIds.has(article.reporterId))) : undefined),
+    [articles, params.id, reporterIds, user?.role],
   );
 
   const isAdminEditing = user?.role === 'admin' && !!editingDraft;
@@ -170,7 +178,7 @@ export default function CreateArticleScreen() {
           advertisements,
           sections: cleanSections,
           status,
-          reporterId: user?.id ?? 'unknown',
+          reporterId: reporter?.id ?? user?.id ?? 'unknown',
           reporterName: user?.name ?? 'Unknown Reporter',
           reporterAvatar: user?.avatar ?? '',
           reporterPhone: user?.phone,
@@ -226,7 +234,7 @@ export default function CreateArticleScreen() {
       advertisements,
       sections: sections.filter((s) => s.title.trim() || s.content.trim() || s.image),
       status: editingDraft?.status ?? 'pending',
-      reporterId: editingDraft?.reporterId ?? user?.id ?? 'unknown',
+      reporterId: editingDraft?.reporterId ?? reporter?.id ?? user?.id ?? 'unknown',
       reporterName: editingDraft?.reporterName ?? user?.name ?? 'Unknown Reporter',
       reporterAvatar: editingDraft?.reporterAvatar ?? user?.avatar ?? '',
       reporterPhone: editingDraft?.reporterPhone ?? user?.phone,
@@ -236,7 +244,7 @@ export default function CreateArticleScreen() {
       likes: editingDraft?.likes ?? 0,
       readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
     }),
-    [editingDraft, title, content, banner, images, advertisements, sections, user],
+    [editingDraft, title, content, banner, images, advertisements, sections, reporter?.id, user],
   );
 
   return (

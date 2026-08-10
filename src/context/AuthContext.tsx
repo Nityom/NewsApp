@@ -1,14 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     createUserWithEmailAndPassword,
+    EmailAuthProvider,
     getAuth,
     GoogleAuthProvider,
     onAuthStateChanged,
+    reauthenticateWithCredential,
     sendEmailVerification,
     sendPasswordResetEmail,
     signInWithCredential,
     signInWithEmailAndPassword,
     signOut,
+    updatePassword,
     updateProfile,
 } from '@react-native-firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
@@ -44,6 +47,7 @@ interface AuthContextValue {
   loginWithGoogle: (role: Role) => Promise<void>;
   register: (name: string, email: string, phone: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: ProfileOverrides) => Promise<void>;
@@ -182,11 +186,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string, role: Role) => {
     const trimmedEmail = email.trim();
-    if (
-      role === 'admin' &&
-      trimmedEmail.toLowerCase() === HARDCODED_ADMIN_EMAIL &&
-      password === HARDCODED_ADMIN_PASSWORD
-    ) {
+    if (role === 'admin' && trimmedEmail.toLowerCase() === HARDCODED_ADMIN_EMAIL) {
+      if (password !== HARDCODED_ADMIN_PASSWORD) {
+        throw new Error('Incorrect admin password. Use the configured admin password.');
+      }
       // Back the hardcoded admin shortcut with a real Firebase account so Firestore's
       // `request.auth != null` rules actually pass for admin sessions too.
       authActionInProgressRef.current = true;
@@ -194,9 +197,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const auth = getAuth();
         try {
           await signInWithEmailAndPassword(auth, trimmedEmail, password);
-        } catch {
+        } catch (signInError) {
           // First time the hardcoded admin logs in - there's no Firebase account for it yet.
-          await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+          try {
+            await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+          } catch (createError: any) {
+            if (createError?.code === 'auth/email-already-in-use') {
+              throw new Error(
+                'The Firebase admin account already exists with a different password. Reset its password to the configured admin password, then sign in again.',
+              );
+            }
+            throw signInError;
+          }
         }
         await storeRole(trimmedEmail, 'admin');
         await refreshSessionExpiry(trimmedEmail);
@@ -256,6 +268,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = useCallback(async (email: string) => {
     await sendPasswordResetEmail(getAuth(), email.trim());
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    const firebaseUser = getAuth().currentUser;
+    if (!firebaseUser?.email) throw new Error('No signed-in email account found.');
+    const credential = EmailAuthProvider.credential(firebaseUser.email, currentPassword);
+    await reauthenticateWithCredential(firebaseUser, credential);
+    await updatePassword(firebaseUser, newPassword);
   }, []);
 
   const loginWithGoogle = useCallback(async (role: Role) => {
@@ -349,6 +369,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginWithGoogle,
       register,
       resetPassword,
+      changePassword,
       resendVerificationEmail,
       logout,
       updateUserProfile,
@@ -362,6 +383,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginWithGoogle,
       register,
       resetPassword,
+      changePassword,
       resendVerificationEmail,
       logout,
       updateUserProfile,

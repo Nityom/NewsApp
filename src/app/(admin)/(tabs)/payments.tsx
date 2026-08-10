@@ -23,8 +23,8 @@ const filters: { key: PaymentStatus | 'all'; label: string }[] = [
 
 export default function AdminPaymentsScreen() {
   const theme = useAppTheme();
-  const { payments, addPayment, updatePaymentStatus } = usePayments();
-  const { reporters, updateReporter } = useReporters();
+  const { payments, updatePaymentStatus, updateJoiningFeeStatus } = usePayments();
+  const { reporters } = useReporters();
   const { addNotification } = useNotifications();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<PaymentStatus | 'all'>('all');
@@ -35,6 +35,8 @@ export default function AdminPaymentsScreen() {
       .filter(
         (reporter) =>
           reporter.requestStatus === 'payment_submitted' &&
+          !!reporter.joinFeeAmount &&
+          reporter.joinFeeAmount > 0 &&
           !payments.some((payment) => payment.reporterId === reporter.id && payment.purpose === 'joining_fee'),
       )
       .map((reporter) => ({
@@ -42,7 +44,7 @@ export default function AdminPaymentsScreen() {
         reporterId: reporter.id,
         reporterName: reporter.name,
         reporterAvatar: reporter.avatar,
-        amount: reporter.joinFeeAmount ?? 0,
+        amount: reporter.joinFeeAmount!,
         status: 'pending',
         method: 'UPI / QR',
         articlesCount: 0,
@@ -70,28 +72,32 @@ export default function AdminPaymentsScreen() {
     if (updatingId) return;
     setUpdatingId(payment.id);
     try {
-      if (!payments.some((item) => item.id === payment.id)) await addPayment(payment);
-      await updatePaymentStatus(payment.id, status);
-
       if (payment.purpose === 'joining_fee') {
-        await updateReporter(payment.reporterId, status === 'paid'
-          ? { requestStatus: 'approved', isActive: true, isVerified: true }
-          : { requestStatus: 'awaiting_payment' });
+        await updateJoiningFeeStatus(payment, status);
+      } else {
+        await updatePaymentStatus(payment.id, status);
       }
 
-      await addNotification({
-        type: 'payment',
-        audience: 'reporter',
-        title: status === 'paid' ? 'Payment Confirmed' : 'Payment Not Confirmed',
-        message: status === 'paid'
-          ? `Your payment of ₹${payment.amount.toLocaleString('en-IN')} has been confirmed by the admin.`
-          : `The admin could not confirm your payment of ₹${payment.amount.toLocaleString('en-IN')}. Please check and submit it again.`,
-        reporterId: payment.reporterId,
-      });
-      Alert.alert(
-        status === 'paid' ? 'Payment Confirmed' : 'Payment Rejected',
-        `${payment.reporterName}'s payment status is now ${status === 'paid' ? 'Paid' : 'Failed'}.`,
-      );
+      try {
+        await addNotification({
+          type: 'payment',
+          audience: 'reporter',
+          title: status === 'paid' ? 'Payment Confirmed' : 'Payment Not Confirmed',
+          message: status === 'paid'
+            ? `Your payment of ₹${payment.amount.toLocaleString('en-IN')} has been confirmed by the admin.`
+            : `The admin could not confirm your payment of ₹${payment.amount.toLocaleString('en-IN')}. Please check and submit it again.`,
+          reporterId: payment.reporterId,
+        });
+        Alert.alert(
+          status === 'paid' ? 'Payment Confirmed' : 'Payment Rejected',
+          `${payment.reporterName}'s payment status is now ${status === 'paid' ? 'Paid' : 'Failed'}.`,
+        );
+      } catch {
+        Alert.alert(
+          status === 'paid' ? 'Payment Confirmed' : 'Payment Rejected',
+          `The payment was updated, but ${payment.reporterName} could not be notified.`,
+        );
+      }
     } catch {
       Alert.alert('Could Not Update Payment', 'The payment status was not updated. Please try again.');
     } finally {

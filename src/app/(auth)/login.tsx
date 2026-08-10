@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAppTheme } from '@/theme';
 
 const appLogo = require('../../../assets/images/app_logo.png');
+const ADMIN_EMAIL = 'admin@educationnews.com';
 
 export default function LoginScreen() {
   const theme = useAppTheme();
@@ -41,8 +42,10 @@ export default function LoginScreen() {
 
     setSubmitting(true);
     try {
-      await login(email.trim(), password, 'reporter');
-      router.replace('/(reporter)/(tabs)');
+      const normalizedEmail = email.trim().toLowerCase();
+      const role = normalizedEmail === ADMIN_EMAIL ? 'admin' : 'reporter';
+      await login(normalizedEmail, password, role);
+      router.replace(role === 'admin' ? '/(admin)/(tabs)' : '/(reporter)/(tabs)');
     } catch (error: any) {
       Alert.alert('Could not sign in', error?.message ?? 'Please try again.');
     } finally {
@@ -131,9 +134,6 @@ export default function LoginScreen() {
             </Link>
           </View>
 
-          <Link href="/(auth)/admin-login" style={[styles.adminLink, { color: theme.colors.textMuted }]}>
-            Sign in as Admin
-          </Link>
         </ScrollView>
       </KeyboardAvoidingView>
     </ScreenContainer>
@@ -191,11 +191,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 24,
-  },
-  adminLink: {
-    textAlign: 'center',
-    marginTop: 18,
-    fontSize: 13,
-    fontWeight: '600',
   },
 });

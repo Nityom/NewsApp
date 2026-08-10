@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
@@ -39,9 +38,6 @@ function ToggleRow({
 export default function SettingsScreen() {
   const theme = useAppTheme();
   const { mode, overrideMode, setOverrideMode } = useThemeMode();
-  const [pushEnabled, setPushEnabled] = useState(true);
-  const [emailEnabled, setEmailEnabled] = useState(true);
-  const [articleUpdates, setArticleUpdates] = useState(true);
 
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
@@ -68,15 +64,6 @@ export default function SettingsScreen() {
             Use system appearance instead
           </Text>
         ) : null}
-
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary, marginTop: 20 }]}>
-          Notifications
-        </Text>
-        <Card style={styles.card} padded={false}>
-          <ToggleRow icon="notifications-outline" label="Push Notifications" value={pushEnabled} onValueChange={setPushEnabled} />
-          <ToggleRow icon="mail-outline" label="Email Notifications" value={emailEnabled} onValueChange={setEmailEnabled} />
-          <ToggleRow icon="document-text-outline" label="Article Status Updates" value={articleUpdates} onValueChange={setArticleUpdates} />
-        </Card>
 
         <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary, marginTop: 20 }]}>
           Account

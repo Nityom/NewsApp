@@ -4,6 +4,7 @@ import {
     onSnapshot,
     setDoc,
     updateDoc,
+    writeBatch,
 } from '@react-native-firebase/firestore';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
@@ -17,6 +18,7 @@ interface PaymentsContextValue {
   isLoading: boolean;
   addPayment: (payment: Payment) => Promise<void>;
   updatePaymentStatus: (id: string, status: PaymentStatus) => Promise<void>;
+  updateJoiningFeeStatus: (payment: Payment, status: Extract<PaymentStatus, 'paid' | 'failed'>) => Promise<void>;
 }
 
 const PaymentsContext = createContext<PaymentsContextValue | null>(null);
@@ -53,9 +55,27 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     ));
   }, []);
 
+  const updateJoiningFeeStatus = useCallback(async (
+    payment: Payment,
+    status: Extract<PaymentStatus, 'paid' | 'failed'>,
+  ) => {
+    const updatedAt = new Date().toISOString();
+    const updatedPayment = { ...payment, status, updatedAt };
+    const batch = writeBatch(db);
+    batch.set(doc(db, COLLECTION, payment.id), stripUndefined(updatedPayment), { merge: true });
+    batch.update(
+      doc(db, 'reporters', payment.reporterId),
+      status === 'paid'
+        ? { requestStatus: 'approved', isActive: true, isVerified: true }
+        : { requestStatus: 'awaiting_payment' },
+    );
+    await batch.commit();
+    setPayments((current) => [updatedPayment, ...current.filter((item) => item.id !== payment.id)]);
+  }, []);
+
   const value = useMemo(
-    () => ({ payments, isLoading, addPayment, updatePaymentStatus }),
-    [payments, isLoading, addPayment, updatePaymentStatus],
+    () => ({ payments, isLoading, addPayment, updatePaymentStatus, updateJoiningFeeStatus }),
+    [payments, isLoading, addPayment, updatePaymentStatus, updateJoiningFeeStatus],
   );
 
   return <PaymentsContext.Provider value={value}>{children}</PaymentsContext.Provider>;

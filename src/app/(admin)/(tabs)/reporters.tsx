@@ -9,12 +9,14 @@ import { Icon } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { EmptyState } from '@/components/ui/StateViews';
+import { useArticles } from '@/context/ArticlesContext';
 import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 
 export default function AdminReportersScreen() {
   const theme = useAppTheme();
-  const { reporters } = useReporters();
+  const { articles } = useArticles();
+  const { reporters, getReporter } = useReporters();
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
@@ -64,7 +66,11 @@ export default function AdminReportersScreen() {
                     <Badge label="Rejected" tone="danger" size="sm" />
                   ) : (
                     <>
-                      <Badge label={`${item.articlesCount} articles`} tone="neutral" size="sm" />
+                      <Badge
+                        label={`${articles.filter((article) => getReporter(article.reporterId)?.id === item.id).length} articles`}
+                        tone="neutral"
+                        size="sm"
+                      />
                       <Badge label={`★ ${item.rating}`} tone="warning" size="sm" />
                     </>
                   )}

@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { Image as RNImage, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Image as RNImage, StyleSheet, Text, View } from 'react-native';
 
 import { formatRegistrationDate, getCurrentPeriodLabel, usePublicationInfo } from '@/context/PublicationInfoContext';
 import { useAppTheme } from '@/theme';

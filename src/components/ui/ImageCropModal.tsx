@@ -10,6 +10,8 @@ import { IconButton } from './Button';
 const INITIAL_STAGE_WIDTH = Dimensions.get('window').width;
 const INITIAL_STAGE_HEIGHT = Dimensions.get('window').height * 0.55;
 const MAX_ZOOM_MULTIPLIER = 5;
+const MAX_OUTPUT_EDGE = 2048;
+const OUTPUT_QUALITY = 0.82;
 
 const ASPECT_PRESETS: Array<{ key: string; label: string; value: [number, number]; preview: { width: number; height: number } }> = [
   { key: 'square', label: 'Square', value: [1, 1], preview: { width: 24, height: 24 } },
@@ -236,8 +238,15 @@ export function ImageCropModal({
         width: Math.min(cropWidth, imageWidth - cropOriginX),
         height: Math.min(cropHeight, imageHeight - cropOriginY),
       });
+      if (cropWidth > MAX_OUTPUT_EDGE || cropHeight > MAX_OUTPUT_EDGE) {
+        context.resize(
+          cropWidth >= cropHeight
+            ? { width: MAX_OUTPUT_EDGE }
+            : { height: MAX_OUTPUT_EDGE },
+        );
+      }
       const rendered = await context.renderAsync();
-      const result = await rendered.saveAsync({ compress: 1, format: SaveFormat.JPEG });
+      const result = await rendered.saveAsync({ compress: OUTPUT_QUALITY, format: SaveFormat.JPEG });
       onCropComplete(result.uri);
     } finally {
       setProcessing(false);

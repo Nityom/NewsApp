@@ -1,24 +1,20 @@
 import { Image } from 'expo-image';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
-import { Image as RNImage, StyleSheet, Text, View } from 'react-native';
+import { Image as RNImage, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { formatRegistrationDate, getCurrentPeriodLabel, usePublicationInfo } from '@/context/PublicationInfoContext';
 import { useAppTheme } from '@/theme';
 import type { Article } from '@/types/models';
+import { Icon } from './Icon';
 
 const logoBanner = require('../../../assets/images/logoBanner.jpeg');
 const PAPER = '#FFFFFF';
 const INK = '#171717';
 const MUTED_INK = '#606060';
 const RULE = '#D7D7D7';
-const MIN_DISPLAY_RATIO = 3 / 4;
-const MAX_DISPLAY_RATIO = 2;
 // Keeps an additional article (added via the "+" section button) from pushing content onto a second page.
 export const MAX_SECTION_BODY_CHARS = 500;
-
-const displayRatio = (width: number, height: number) =>
-  Math.min(MAX_DISPLAY_RATIO, Math.max(MIN_DISPLAY_RATIO, width / height));
 
 function truncate(text: string, max: number) {
   if (text.length <= max) return text;
@@ -72,6 +68,12 @@ interface ArticleNewspaperLayoutProps {
   article: Article;
   reporterPhone?: string;
   shareMode?: boolean;
+  onImagePress?: (target: {
+    kind: 'banner' | 'gallery' | 'ad' | 'section';
+    index?: number;
+    sectionId?: string;
+    uri: string;
+  }) => void;
 }
 
 function AutoImage({
@@ -79,11 +81,13 @@ function AutoImage({
   style,
   radius,
   fixedRatio,
+  onPress,
 }: {
   uri: string;
   style?: object;
   radius: number;
   fixedRatio?: number;
+  onPress?: () => void;
 }) {
   const [ratio, setRatio] = useState(4 / 3);
 
@@ -92,7 +96,7 @@ function AutoImage({
     RNImage.getSize(
       uri,
       (w, h) => {
-        if (!cancelled && w > 0 && h > 0) setRatio(displayRatio(w, h));
+        if (!cancelled && w > 0 && h > 0) setRatio(w / h);
       },
       () => {},
     );
@@ -101,46 +105,85 @@ function AutoImage({
     };
   }, [uri]);
 
-  return (
+  const imageStyle = [styles.autoImage, style, { aspectRatio: fixedRatio ?? ratio, borderRadius: radius }];
+  if (!onPress) return (
     <Image
       source={{ uri }}
-      style={[
-        styles.autoImage,
-        style,
-        { aspectRatio: fixedRatio ?? ratio, borderRadius: radius },
-      ]}
-      contentFit="contain"
+      style={imageStyle}
+      contentFit={fixedRatio ? 'contain' : 'cover'}
       transition={0}
     />
   );
-}
 
-function AdImage({ uri, radius, wide }: { uri: string; radius: number; wide: boolean }) {
   return (
-    <View
-      style={[
-        styles.adImageContainer,
-        wide ? styles.adImageContainerWide : styles.adImageContainerHalf,
-        { borderRadius: radius, overflow: 'hidden' },
-      ]}>
-      <Image
-        source={{ uri }}
-        style={styles.adImage}
-        contentFit="contain"
-        transition={0}
-      />
-    </View>
+    <Pressable onPress={onPress} style={imageStyle} accessibilityRole="button" accessibilityLabel="Adjust photo">
+      <Image source={{ uri }} style={styles.editableImage} contentFit={fixedRatio ? 'contain' : 'cover'} transition={0} />
+      <View style={styles.editImageBadge}>
+        <Icon name="crop-outline" size={16} color="#FFFFFF" />
+      </View>
+    </Pressable>
   );
 }
 
-function PublicationInfoBar({ pageCount, registrationLabel }: { pageCount: number; registrationLabel?: string }) {
+function AdImage({ uri, radius, wide, shareMode = false, onPress }: {
+  uri: string;
+  radius: number;
+  wide: boolean;
+  shareMode?: boolean;
+  onPress?: () => void;
+}) {
+  const content = (
+    <>
+      <Image source={{ uri }} style={styles.adImage} contentFit="contain" transition={0} />
+      {onPress ? (
+        <View style={styles.editImageBadge}>
+          <Icon name="crop-outline" size={16} color="#FFFFFF" />
+        </View>
+      ) : null}
+    </>
+  );
+  const containerStyle = [
+    styles.adImageContainer,
+    wide ? styles.adImageContainerWide : styles.adImageContainerHalf,
+    shareMode && (wide ? styles.shareAdImageWide : styles.shareAdImageHalf),
+    { borderRadius: radius, overflow: 'hidden' as const },
+  ];
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        style={containerStyle}
+        accessibilityRole="button"
+        accessibilityLabel="Adjust advertisement photo">
+        {content}
+      </Pressable>
+    );
+  }
+  return (
+    <View style={containerStyle}>{content}</View>
+  );
+}
+
+function PublicationInfoBar({
+  pageCount,
+  registrationLabel,
+  shareMode = false,
+}: {
+  pageCount: number;
+  registrationLabel?: string;
+  shareMode?: boolean;
+}) {
   const { info } = usePublicationInfo();
   const period = getCurrentPeriodLabel();
   const registrationDate = registrationLabel ?? '—';
 
   return (
-    <View style={styles.infoBar}>
-      <Text style={styles.infoBarText} numberOfLines={1} adjustsFontSizeToFit>
+    <View style={[styles.infoBar, shareMode && styles.shareInfoBar]}>
+      <Text
+        style={[styles.infoBarText, shareMode && styles.shareInfoBarText]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={shareMode ? 0.85 : undefined}>
         वर्ष : {info.year}  |  अंक : {info.issueNumber}  |  {period}  (पृष्ठ : {pageCount})  |  दिनांक {registrationDate}  |  मूल्य : {info.price}
       </Text>
     </View>
@@ -156,7 +199,7 @@ function PublicationInfoBar({ pageCount, registrationLabel }: { pageCount: numbe
  * 5. Advertisement photo(s)
  * 6. Reporter name + contact footer
  */
-export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = false }: ArticleNewspaperLayoutProps) {
+export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = false, onImagePress }: ArticleNewspaperLayoutProps) {
   const theme = useAppTheme();
   const phone = article.reporterPhone ?? reporterPhone;
   const [firstSection, ...restSections] = article.sections ?? [];
@@ -166,21 +209,23 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
   const registrationLabel = article.registrationDate ?? (article.reviewedAt ? formatRegistrationDate(article.reviewedAt) : undefined);
 
   return (
-    <View style={styles.paper}>
+    <View style={[styles.paper, shareMode && styles.sharePaper]}>
       {/* Masthead */}
       <Image source={logoBanner} style={styles.logoBanner} contentFit="contain" />
-      <PublicationInfoBar pageCount={pageCount} registrationLabel={registrationLabel} />
+      <PublicationInfoBar pageCount={pageCount} registrationLabel={registrationLabel} shareMode={shareMode} />
       <View style={styles.mastRule} />
 
       {firstSection ? (
         // Additional article added via "+" — same side-by-side layout as the combined preview.
         // Reporter is the same for both, so the name is shown once in the page footer below.
-        <View style={styles.twoUpRow}>
+        <View style={[styles.twoUpRow, shareMode && styles.shareTwoUpRow]}>
           <CompactStory
             title={article.title}
             image={article.banner}
             content={article.content}
             maxBodyChars={MAX_SECTION_BODY_CHARS}
+            shareMode={shareMode}
+            onImagePress={onImagePress ? () => onImagePress({ kind: 'banner', uri: article.banner }) : undefined}
           />
           <View style={styles.colDivider} />
           <CompactStory
@@ -188,6 +233,10 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
             image={firstSection.image ?? article.banner}
             content={firstSection.content}
             maxBodyChars={MAX_SECTION_BODY_CHARS}
+            shareMode={shareMode}
+            onImagePress={onImagePress ? () => onImagePress(firstSection.image
+              ? { kind: 'section', sectionId: firstSection.id, uri: firstSection.image }
+              : { kind: 'banner', uri: article.banner }) : undefined}
           />
         </View>
       ) : (
@@ -202,6 +251,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
               uri={article.banner}
               style={styles.fullImage}
               radius={theme.radius.sm}
+              onPress={onImagePress ? () => onImagePress({ kind: 'banner', uri: article.banner }) : undefined}
             />
           </View>
 
@@ -220,7 +270,12 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
         return (
           <View key={section.id} style={styles.sectionBlock}>
             {section.image ? (
-              <AutoImage uri={section.image} style={styles.sectionImage} radius={theme.radius.sm} />
+              <AutoImage
+                uri={section.image}
+                style={styles.sectionImage}
+                radius={theme.radius.sm}
+                onPress={onImagePress ? () => onImagePress({ kind: 'section', sectionId: section.id, uri: section.image! }) : undefined}
+              />
             ) : null}
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.headlineRule} />
@@ -242,7 +297,12 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
         <View style={styles.gallery}>
           {article.images.map((uri, i) => (
             <View key={`${uri}-${i}`} style={styles.galleryItem}>
-              <AutoImage uri={uri} style={styles.galleryImage} radius={theme.radius.sm} />
+              <AutoImage
+                uri={uri}
+                style={styles.galleryImage}
+                radius={theme.radius.sm}
+                onPress={onImagePress ? () => onImagePress({ kind: 'gallery', index: i, uri }) : undefined}
+              />
             </View>
           ))}
         </View>
@@ -250,7 +310,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
 
       {/* Advertisement */}
       {article.advertisements.length > 0 ? (
-        <View style={styles.adSection}>
+        <View style={[styles.adSection, shareMode && styles.shareAdSection]}>
           <View style={styles.adLabelRow}>
             <View style={styles.adLabelLine} />
             <Text style={styles.adLabel}>Advertisement</Text>
@@ -263,6 +323,8 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
                 uri={uri}
                 radius={theme.radius.sm}
                 wide={article.advertisements.length === 1}
+                shareMode={shareMode}
+                onPress={onImagePress ? () => onImagePress({ kind: 'ad', index: i, uri }) : undefined}
               />
             ))}
           </View>
@@ -270,9 +332,9 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
       ) : null}
 
       {/* Footer */}
-      <View style={styles.footer}>
-        <Text style={styles.reporterLabel}>News Reporter</Text>
-        <Text style={styles.reporterName}>
+      <View style={[styles.footer, shareMode && styles.shareFooter]}>
+        <Text style={[styles.reporterLabel, shareMode && styles.shareReporterLabel]}>News Reporter</Text>
+        <Text style={[styles.reporterName, shareMode && styles.shareReporterName]}>
           {article.reporterName}
           {phone ? ` : ${phone}` : ''}
         </Text>
@@ -294,22 +356,32 @@ function CompactStory({
   content,
   footer,
   maxBodyChars,
+  shareMode = false,
+  onImagePress,
 }: {
   title: string;
   image: string;
   content: string;
   footer?: string;
   maxBodyChars: number;
+  shareMode?: boolean;
+  onImagePress?: () => void;
 }) {
   const theme = useAppTheme();
   const body = truncate(plainArticleText(content), maxBodyChars);
 
   return (
-    <View style={styles.storyColumn}>
-      <Text style={styles.storyTitle}>{title}</Text>
+    <View style={[styles.storyColumn, shareMode && styles.shareStoryColumn]}>
+      <Text style={[styles.storyTitle, shareMode && styles.shareStoryTitle]}>{title}</Text>
       <View style={styles.headlineRule} />
-      <AutoImage uri={image} style={styles.storyImage} radius={theme.radius.sm} />
-      <Text style={styles.storyBody}>{body}</Text>
+      <AutoImage
+        uri={image}
+        style={[styles.storyImage, shareMode && styles.shareStoryImage]}
+        radius={theme.radius.sm}
+        fixedRatio={4 / 3}
+        onPress={onImagePress}
+      />
+      <Text style={[styles.storyBody, shareMode && styles.shareStoryBody]}>{body}</Text>
       {footer ? (
         <View style={styles.storyFooter}>
           <Text style={styles.reporterName}>{footer}</Text>
@@ -376,6 +448,24 @@ const styles = StyleSheet.create({
     backgroundColor: PAPER,
     paddingBottom: 20,
   },
+  sharePaper: {
+    paddingBottom: 12,
+  },
+  editableImage: {
+    width: '100%',
+    height: '100%',
+  },
+  editImageBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(23,23,23,0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   logoBanner: {
     width: '100%',
     aspectRatio: 2564 / 451,
@@ -390,11 +480,18 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 6,
   },
+  shareInfoBar: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
   infoBarText: {
     color: INK,
     fontSize: 10,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  shareInfoBarText: {
+    fontSize: 13,
   },
   mastRule: {
     height: 3,
@@ -528,6 +625,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 10,
   },
+  shareAdSection: {
+    marginTop: 22,
+    marginHorizontal: 24,
+    padding: 14,
+  },
   adLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -556,10 +658,16 @@ const styles = StyleSheet.create({
     height: 200,
     marginBottom: 4,
   },
+  shareAdImageWide: {
+    height: 240,
+  },
   adImageContainerHalf: {
     width: '48.5%',
     height: 140,
     marginBottom: 8,
+  },
+  shareAdImageHalf: {
+    height: 170,
   },
   adGrid: {
     flexDirection: 'row',
@@ -603,11 +711,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
   },
+  shareFooter: {
+    paddingTop: 14,
+    marginTop: 40,
+    marginHorizontal: 24,
+    gap: 4,
+  },
   reporterLabel: {
     color: MUTED_INK,
     fontSize: 9,
     fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 1.4,
+  },
+  shareReporterLabel: {
+    fontSize: 12,
     letterSpacing: 1.4,
   },
   reporterName: {
@@ -616,20 +734,34 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.3,
   },
+  shareReporterName: {
+    fontSize: 17,
+  },
   twoUpRow: {
     flexDirection: 'row',
     marginHorizontal: 12,
     marginTop: 8,
     gap: 0,
   },
+  shareTwoUpRow: {
+    marginHorizontal: 18,
+    marginTop: 12,
+  },
   storyColumn: {
     flex: 1,
     paddingHorizontal: 6,
+  },
+  shareStoryColumn: {
+    paddingHorizontal: 10,
   },
   storyImage: {
     width: '100%',
     marginTop: 2,
     marginBottom: 6,
+  },
+  shareStoryImage: {
+    marginTop: 6,
+    marginBottom: 10,
   },
   storyTitle: {
     color: INK,
@@ -639,10 +771,19 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
+  shareStoryTitle: {
+    fontSize: 26,
+    lineHeight: 31,
+    letterSpacing: 0,
+  },
   storyBody: {
     color: INK,
     fontSize: 10.5,
     lineHeight: 15,
+  },
+  shareStoryBody: {
+    fontSize: 16,
+    lineHeight: 23,
   },
   storyFooter: {
     borderTopWidth: StyleSheet.hairlineWidth,

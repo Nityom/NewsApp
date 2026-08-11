@@ -93,13 +93,27 @@ export function htmlToArticleText(html: string) {
     .trim();
 }
 
+const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu;
+
+export function countArticleWords(value: string) {
+  return value.match(WORD_PATTERN)?.length ?? 0;
+}
+
+export function limitArticleWords(value: string, maxWords: number) {
+  const matches = Array.from(value.matchAll(WORD_PATTERN));
+  if (matches.length <= maxWords) return value;
+  const lastWord = matches[maxWords - 1];
+  return value.slice(0, (lastWord.index ?? 0) + lastWord[0].length).trimEnd();
+}
+
 interface BlogTextEditorProps {
   initialValue: string;
   onChange: (value: string) => void;
   onCursorPosition?: (offsetY: number) => void;
+  maxWords?: number;
 }
 
-export function BlogTextEditor({ initialValue, onChange, onCursorPosition }: BlogTextEditorProps) {
+export function BlogTextEditor({ initialValue, onChange, onCursorPosition, maxWords }: BlogTextEditorProps) {
   const theme = useAppTheme();
   const editorRef = useRef<RichEditor>(null);
   const initialHtml = useRef(articleTextToHtml(initialValue)).current;
@@ -124,7 +138,14 @@ export function BlogTextEditor({ initialValue, onChange, onCursorPosition }: Blo
         autoCorrect
         autoCapitalize="sentences"
         defaultParagraphSeparator="div"
-        onChange={(html) => onChange(htmlToArticleText(html))}
+        onChange={(html) => {
+          const nextValue = htmlToArticleText(html);
+          const acceptedValue = maxWords ? limitArticleWords(nextValue, maxWords) : nextValue;
+          if (acceptedValue !== nextValue) {
+            editorRef.current?.setContentHTML(articleTextToHtml(acceptedValue));
+          }
+          onChange(acceptedValue);
+        }}
         onCursorPosition={onCursorPosition}
         editorStyle={{
           backgroundColor: theme.colors.background,

@@ -23,6 +23,35 @@ In the output, you'll find options to open the app in a
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
+## System notifications
+
+The app registers signed-in devices for Expo push notifications. A Firebase Function sends an OS notification whenever a document is created in the `notifications` Firestore collection. Tapping an alert opens its article, reporter, or notification history screen.
+
+Remote notifications require a development or release build; they do not work in Expo Go on Android.
+
+1. Configure Android FCM V1 credentials for the EAS project:
+
+   ```bash
+   eas credentials --platform android
+   ```
+
+2. Configure iOS push credentials with `eas credentials --platform ios`. Apple push credentials require a paid Apple Developer account.
+
+3. Deploy the token rules and notification sender. Cloud Functions deployment requires the Firebase project to use the Blaze plan:
+
+   ```bash
+   npx firebase-tools deploy --only firestore:rules,functions
+   ```
+
+4. Rebuild and install the native app because the `expo-notifications` config plugin is a build-time change:
+
+   ```bash
+   eas build --profile development --platform android
+   # or: eas build --profile development --platform ios
+   ```
+
+5. Sign in and allow notifications when the system prompts. Create an article, payment, or reporter event from another signed-in account to test background and closed-app delivery.
+
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
 ## Get a fresh project

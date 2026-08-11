@@ -8,6 +8,7 @@ import { Alert } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { SystemNotifications } from '@/components/system/SystemNotifications';
 import { Dialog } from '@/components/ui/Dialog';
 import { Input } from '@/components/ui/Input';
 import { ArticlesProvider } from '@/context/ArticlesContext';
@@ -106,6 +107,7 @@ export default function RootLayout() {
             <NotificationsProvider>
               <ArticlesProvider>
                 <ReportersProvider>
+                  <SystemNotifications />
                   <PaymentsProvider>
                     <PublicationInfoProvider>
                       <RootNavigator />

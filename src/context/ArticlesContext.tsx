@@ -70,7 +70,11 @@ export function ArticlesProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onSnapshot(
       collection(db, COLLECTION),
       (snapshot) => {
-        setArticles(snapshot.docs.map((d) => d.data() as Article));
+        setArticles(
+          snapshot.docs
+            .map((d) => d.data() as Article)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        );
         setIsLoading(false);
       },
       () => setIsLoading(false),

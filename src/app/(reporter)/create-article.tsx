@@ -1,11 +1,12 @@
 import { Image } from 'expo-image';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Image as RNImage, Modal, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { ArticleNewspaperLayout, MAX_SECTION_BODY_CHARS } from '@/components/ui/ArticleNewspaperLayout';
-import { BlogTextEditor } from '@/components/ui/BlogTextEditor';
+import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
+import { BlogTextEditor, countArticleWords, limitArticleWords } from '@/components/ui/BlogTextEditor';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { ImageCropModal } from '@/components/ui/ImageCropModal';
@@ -15,6 +16,17 @@ import { useAuth } from '@/context/AuthContext';
 import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 import type { Article, ArticleSection } from '@/types/models';
+
+const MAX_ARTICLE_WORDS = 500;
+
+type CropTarget = {
+  uri: string;
+  width: number;
+  height: number;
+  kind: 'banner' | 'gallery' | 'ad' | 'section';
+  index?: number;
+  sectionId?: string;
+};
 
 const articleSummary = (value: string) =>
   value
@@ -54,13 +66,8 @@ export default function CreateArticleScreen() {
   const [sections, setSections] = useState<ArticleSection[]>(editingDraft?.sections ?? []);
   const [submitting, setSubmitting] = useState<'draft' | 'submit' | 'save' | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [cropTarget, setCropTarget] = useState<{
-    uri: string;
-    width: number;
-    height: number;
-    kind: 'banner' | 'gallery' | 'section';
-    sectionId?: string;
-  } | null>(null);
+  const [cropTarget, setCropTarget] = useState<CropTarget | null>(null);
+  const [pendingCropTargets, setPendingCropTargets] = useState<CropTarget[]>([]);
 
   const pickImage = async (mode: 'banner' | 'gallery' | 'ad') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -72,25 +79,32 @@ export default function CreateArticleScreen() {
       mediaTypes: ['images'],
       allowsEditing: false,
       quality: 1,
-      allowsMultipleSelection: false,
+      allowsMultipleSelection: mode === 'gallery',
+      selectionLimit: mode === 'gallery' ? 2 : 1,
+      orderedSelection: mode === 'gallery',
     });
     if (result.canceled) return;
-    const asset = result.assets[0];
-    if (!asset) return;
+    const selectedTargets = result.assets.map((asset) => ({
+      uri: asset.uri,
+      width: asset.width,
+      height: asset.height,
+      kind: mode,
+    } satisfies CropTarget));
+    const [firstTarget, ...remainingTargets] = selectedTargets;
+    if (!firstTarget) return;
 
-    if (mode === 'ad') {
-      setAdvertisements((prev) => [...prev, asset.uri]);
-    } else {
-      setCropTarget({
-        uri: asset.uri,
-        width: asset.width,
-        height: asset.height,
-        kind: mode,
-      });
-    }
+    setPendingCropTargets(remainingTargets);
+    setCropTarget(firstTarget);
   };
 
   const addSection = () => {
+    if (countArticleWords(content) > MAX_ARTICLE_WORDS) {
+      Alert.alert(
+        'Shorten the main article',
+        `Two-in-one articles are limited to ${MAX_ARTICLE_WORDS} words per story. Shorten the main article before adding another one.`,
+      );
+      return;
+    }
     setSections((prev) => [...prev, { id: `sec-${Date.now()}`, title: '', content: '' }]);
   };
 
@@ -132,11 +146,48 @@ export default function CreateArticleScreen() {
     if (cropTarget.kind === 'banner') {
       setBanner(uri);
     } else if (cropTarget.kind === 'gallery') {
-      setImages((prev) => [...prev, uri]);
+      setImages((prev) => cropTarget.index === undefined
+        ? [...prev, uri]
+        : prev.map((image, index) => index === cropTarget.index ? uri : image));
+    } else if (cropTarget.kind === 'ad') {
+      setAdvertisements((prev) => cropTarget.index === undefined
+        ? [...prev, uri]
+        : prev.map((image, index) => index === cropTarget.index ? uri : image));
     } else if (cropTarget.sectionId) {
       updateSection(cropTarget.sectionId, { image: uri });
     }
-    setCropTarget(null);
+    const [nextTarget, ...remainingTargets] = pendingCropTargets;
+    setPendingCropTargets(remainingTargets);
+    setCropTarget(nextTarget ?? null);
+  };
+
+  const handleCropCancel = () => {
+    const [nextTarget, ...remainingTargets] = pendingCropTargets;
+    setPendingCropTargets(remainingTargets);
+    setCropTarget(nextTarget ?? null);
+  };
+
+  const adjustPreviewImage = async (target: {
+    kind: 'banner' | 'gallery' | 'ad' | 'section';
+    index?: number;
+    sectionId?: string;
+    uri: string;
+  }) => {
+    try {
+      const uri = target.uri.startsWith('file://')
+        ? target.uri
+        : (await FileSystem.downloadAsync(
+            target.uri,
+            `${FileSystem.cacheDirectory}article-adjust-${Date.now()}.jpg`,
+          )).uri;
+      RNImage.getSize(
+        uri,
+        (width, height) => setCropTarget({ ...target, uri, width, height }),
+        () => Alert.alert('Could not edit photo', 'The selected image could not be loaded. Please choose it again.'),
+      );
+    } catch {
+      Alert.alert('Could not edit photo', 'The selected image could not be downloaded. Check your connection and try again.');
+    }
   };
 
   const handleSave = async (kind: 'draft' | 'submit' | 'save') => {
@@ -146,6 +197,23 @@ export default function CreateArticleScreen() {
     }
     if (!banner) {
       Alert.alert('Banner required', 'Please upload a news photo before continuing.');
+      return;
+    }
+    if (sections.length > 0 && countArticleWords(content) > MAX_ARTICLE_WORDS) {
+      Alert.alert(
+        'Main article is too long',
+        `Two-in-one articles are limited to ${MAX_ARTICLE_WORDS} words per story. Shorten the main article before continuing.`,
+      );
+      return;
+    }
+    const oversizedSectionIndex = sections.findIndex(
+      (section) => countArticleWords(section.content) > MAX_ARTICLE_WORDS,
+    );
+    if (oversizedSectionIndex >= 0) {
+      Alert.alert(
+        `Article ${oversizedSectionIndex + 2} is too long`,
+        `Each story in a combined article is limited to ${MAX_ARTICLE_WORDS} words.`,
+      );
       return;
     }
     setSubmitting(kind);
@@ -304,6 +372,7 @@ export default function CreateArticleScreen() {
           <BlogTextEditor
             initialValue={content}
             onChange={setContent}
+            maxWords={sections.length > 0 ? MAX_ARTICLE_WORDS : undefined}
             onCursorPosition={(offsetY) => {
               pageScrollRef.current?.scrollTo({
                 y: Math.max(0, editorTopRef.current + offsetY - 180),
@@ -311,6 +380,9 @@ export default function CreateArticleScreen() {
               });
             }}
           />
+          <Text style={[styles.sectionCharCount, { color: theme.colors.textMuted }]}>
+            {countArticleWords(content)}{sections.length > 0 ? `/${MAX_ARTICLE_WORDS}` : ''} words
+          </Text>
         </View>
 
         <View style={styles.imagesHeader}>
@@ -405,7 +477,9 @@ export default function CreateArticleScreen() {
             />
             <TextInput
               value={section.content}
-              onChangeText={(text) => updateSection(section.id, { content: text })}
+              onChangeText={(text) => updateSection(section.id, {
+                content: limitArticleWords(text, MAX_ARTICLE_WORDS),
+              })}
               placeholder="Write this story..."
               placeholderTextColor={theme.colors.textMuted}
               style={[
@@ -418,13 +492,9 @@ export default function CreateArticleScreen() {
             <Text
               style={[
                 styles.sectionCharCount,
-                {
-                  color:
-                    section.content.length > MAX_SECTION_BODY_CHARS ? theme.colors.danger : theme.colors.textMuted,
-                },
+                { color: theme.colors.textMuted },
               ]}>
-              {Math.min(section.content.length, MAX_SECTION_BODY_CHARS)}/{MAX_SECTION_BODY_CHARS} characters shown on the page
-              {section.content.length > MAX_SECTION_BODY_CHARS ? ' — rest will be trimmed' : ''}
+              {countArticleWords(section.content)}/{MAX_ARTICLE_WORDS} words
             </Text>
           </View>
         ))}
@@ -486,7 +556,7 @@ export default function CreateArticleScreen() {
             <View style={{ width: 40 }} />
           </View>
           <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent}>
-            <ArticleNewspaperLayout article={previewArticle} />
+            <ArticleNewspaperLayout article={previewArticle} onImagePress={adjustPreviewImage} />
           </ScrollView>
           <View style={styles.previewFooter}>
             <Button
@@ -505,7 +575,7 @@ export default function CreateArticleScreen() {
         imageWidth={cropTarget?.width ?? 1}
         imageHeight={cropTarget?.height ?? 1}
         aspect={null}
-        onCancel={() => setCropTarget(null)}
+        onCancel={handleCropCancel}
         onCropComplete={handleCropComplete}
       />
 

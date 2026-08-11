@@ -2,7 +2,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import type { ElementRef } from 'react';
 import { useRef, useState } from 'react';
-import { Alert, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
 import { ArticleNewspaperLayout, TwoArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
@@ -21,7 +21,8 @@ import type { Article } from '@/types/models';
 
 const SHARE_WIDTH = 1200;
 const SHARE_HEIGHT = 1800;
-const SHARE_ASPECT = SHARE_HEIGHT / SHARE_WIDTH;
+const CAPTURE_LAYOUT_WIDTH = 768;
+const CAPTURE_LAYOUT_HEIGHT = 1152;
 
 export default function ArticleDetailScreen() {
   const theme = useAppTheme();
@@ -40,22 +41,11 @@ export default function ArticleDetailScreen() {
   const viewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
   const pairViewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
   const [sharing, setSharing] = useState(false);
-  const [articleHeight, setArticleHeight] = useState(0);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pairArticle, setPairArticle] = useState<Article | null>(null);
   const [pairSharing, setPairSharing] = useState(false);
 
-  const captureHeight = windowWidth * SHARE_ASPECT;
-  const captureScaleY = articleHeight > 0 ? Math.min(1, captureHeight / articleHeight) : 1;
-
   const pairCandidates = articles.filter((a) => a.status === 'approved' && a.id !== article?.id);
-
-  const handleArticleLayout = (event: LayoutChangeEvent) => {
-    const nextHeight = event.nativeEvent.layout.height;
-    if (nextHeight > 0 && Math.abs(nextHeight - articleHeight) > 0.5) {
-      setArticleHeight(nextHeight);
-    }
-  };
 
   if (!article || !canViewArticle) {
     return (
@@ -135,7 +125,7 @@ export default function ArticleDetailScreen() {
           </Card>
         ) : null}
 
-        <View onLayout={handleArticleLayout}>
+        <View>
           <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} />
         </View>
 
@@ -160,16 +150,9 @@ export default function ArticleDetailScreen() {
       <View pointerEvents="none" style={styles.captureHost}>
         <ViewShot
           ref={viewShotRef}
-          style={[styles.articleCapture, { width: windowWidth, height: captureHeight }]}
+          style={[styles.articleCapture, { width: CAPTURE_LAYOUT_WIDTH, height: CAPTURE_LAYOUT_HEIGHT }]}
           options={{ format: 'png', quality: 1, width: SHARE_WIDTH, height: SHARE_HEIGHT }}>
-          <View
-            style={[
-              styles.captureContent,
-              {
-                width: windowWidth,
-                transform: [{ scaleY: captureScaleY }],
-              },
-            ]}>
+          <View style={[styles.captureContent, { width: CAPTURE_LAYOUT_WIDTH }]}>
             <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} shareMode />
           </View>
         </ViewShot>
@@ -243,7 +226,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
-    transformOrigin: 'top left',
     backgroundColor: '#FFFFFF',
   },
   pairSection: {

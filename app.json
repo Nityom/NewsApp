@@ -2,7 +2,7 @@
   "expo": {
     "name": "Education News",
     "slug": "NewsApp",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/app_logo.png",
     "scheme": "newsapp",
@@ -12,6 +12,7 @@
       "bundleIdentifier": "com.anonymous.NewsApp"
     },
     "android": {
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#F4B400",
         "foregroundImage": "./assets/images/app_logo.png"
@@ -45,6 +46,13 @@
         }
       ],
       "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "color": "#D99A00",
+          "defaultChannel": "news-v2"
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
       "@react-native-google-signin/google-signin"

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Education News",
     "slug": "NewsApp",
-    "version": "1.0.1",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/app_logo.png",
     "scheme": "newsapp",
@@ -12,7 +12,7 @@
       "bundleIdentifier": "com.anonymous.NewsApp"
     },
     "android": {
-      "versionCode": 2,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#F4B400",
         "foregroundImage": "./assets/images/app_logo.png"

@@ -11,6 +11,7 @@ import { useNotifications } from '@/context/NotificationsContext';
 import { usePayments } from '@/context/PaymentsContext';
 import { useReporters } from '@/context/ReportersContext';
 import { clearJustSubmittedReporterId, getJustSubmittedReporterId } from '@/lib/joinRequestFlag';
+import { isGooglePlayReviewEmail } from '@/lib/reviewAccount';
 import { useAppTheme } from '@/theme';
 import type { Reporter } from '@/types/models';
 
@@ -128,6 +129,7 @@ function AwaitingConfirmationScreen({ reporter }: { reporter: Reporter }) {
 export default function ReporterLayout() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { reporters, isLoading } = useReporters();
+  const isGooglePlayReviewer = isGooglePlayReviewEmail(user?.email);
   const reporterRecord = user?.email
     ? reporters.find((r) => r.email.toLowerCase() === user.email.toLowerCase())
     : undefined;
@@ -137,8 +139,9 @@ export default function ReporterLayout() {
     if (reporterRecord) clearJustSubmittedReporterId();
   }, [reporterRecord]);
 
-  const justSubmitted = !reporterRecord && getJustSubmittedReporterId() != null;
-  const needsJoinForm = !isLoading && !justSubmitted && user?.role === 'reporter' && !reporterRecord;
+  const justSubmitted = !isGooglePlayReviewer && !reporterRecord && getJustSubmittedReporterId() != null;
+  const needsJoinForm =
+    !isGooglePlayReviewer && !isLoading && !justSubmitted && user?.role === 'reporter' && !reporterRecord;
 
   useEffect(() => {
     if (needsJoinForm) router.replace('/(auth)/reporter-details');
@@ -170,7 +173,7 @@ export default function ReporterLayout() {
   // listener has delivered the record; otherwise use the request's real status.
   if (justSubmitted) return <PendingApprovalScreen />;
 
-  if (!isLoading && reporterRecord) {
+  if (!isGooglePlayReviewer && !isLoading && reporterRecord) {
     if (reporterRecord.requestStatus === 'pending') return <PendingApprovalScreen />;
     if (reporterRecord.requestStatus === 'awaiting_payment') return <PaymentScreen reporter={reporterRecord} />;
     if (reporterRecord.requestStatus === 'payment_submitted') return <AwaitingConfirmationScreen reporter={reporterRecord} />;

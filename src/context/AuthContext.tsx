@@ -18,6 +18,10 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { clearJustSubmittedReporterId } from '@/lib/joinRequestFlag';
+import {
+  GOOGLE_PLAY_REVIEW_PASSWORD,
+  isGooglePlayReviewEmail,
+} from '@/lib/reviewAccount';
 import type { CurrentUser } from '@/types/models';
 
 type Role = 'reporter' | 'admin';
@@ -72,7 +76,9 @@ function profileForRole(role: Role, email: string, overrides?: Partial<CurrentUs
     joinedAt: '',
     ...overrides,
   };
-  return role === 'admin' ? { ...profile, name: 'Admin', avatar: '' } : profile;
+  return role === 'admin'
+    ? { ...profile, name: overrides?.name?.trim() || 'Admin', avatar: '' }
+    : profile;
 }
 
 async function getStoredRole(email: string): Promise<Role | null> {
@@ -186,6 +192,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string, role: Role) => {
     const trimmedEmail = email.trim();
+    if (role === 'reporter' && isGooglePlayReviewEmail(trimmedEmail)) {
+      if (password !== GOOGLE_PLAY_REVIEW_PASSWORD) {
+        throw new Error('Incorrect password. Please use the Google Play review password.');
+      }
+      authActionInProgressRef.current = true;
+      try {
+        const auth = getAuth();
+        try {
+          await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        } catch (signInError) {
+          try {
+            await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+          } catch (createError: any) {
+            if (createError?.code === 'auth/email-already-in-use') {
+              throw new Error(
+                'The Google Play review account already exists with a different password. Reset it to the configured review password.',
+              );
+            }
+            throw signInError;
+          }
+        }
+        await storeRole(trimmedEmail, 'reporter');
+        await storeProfile(trimmedEmail, { name: 'Google Play Reviewer', phone: '0000000000' });
+        await refreshSessionExpiry(trimmedEmail);
+        setRequiresPhone(false);
+        setUser(
+          profileForRole('reporter', trimmedEmail, {
+            name: 'Google Play Reviewer',
+            phone: '0000000000',
+            isVerified: true,
+            isSubscribed: true,
+          }),
+        );
+      } finally {
+        authActionInProgressRef.current = false;
+      }
+      return;
+    }
+
     if (role === 'admin' && trimmedEmail.toLowerCase() === HARDCODED_ADMIN_EMAIL) {
       if (password !== HARDCODED_ADMIN_PASSWORD) {
         throw new Error('Incorrect admin password. Use the configured admin password.');
@@ -212,7 +257,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         await storeRole(trimmedEmail, 'admin');
         await refreshSessionExpiry(trimmedEmail);
-        setUser(profileForRole('admin', trimmedEmail));
+        const storedProfile = await getStoredProfile(trimmedEmail);
+        setUser(profileForRole('admin', trimmedEmail, {
+          name: auth.currentUser?.displayName || undefined,
+          ...storedProfile,
+        }));
       } finally {
         authActionInProgressRef.current = false;
       }

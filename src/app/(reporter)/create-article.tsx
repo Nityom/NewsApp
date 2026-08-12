@@ -1,9 +1,10 @@
+import DateTimePicker from '@expo/ui/community/datetime-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Modal, Image as RNImage, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Image as RNImage, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
 import { BlogTextEditor, countArticleWords, limitArticleWords } from '@/components/ui/BlogTextEditor';
@@ -13,6 +14,7 @@ import { ImageCropModal } from '@/components/ui/ImageCropModal';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
+import { formatRegistrationDate } from '@/context/PublicationInfoContext';
 import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 import type { Article, ArticleSection } from '@/types/models';
@@ -37,9 +39,17 @@ const articleSummary = (value: string) =>
     .trim()
     .slice(0, 140);
 
+function parseRegistrationDate(label?: string) {
+  const match = label?.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  return match
+    ? new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]))
+    : new Date();
+}
+
 export default function CreateArticleScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const { articles, addArticle, updateArticle } = useArticles();
   const { getReporterByEmail } = useReporters();
   const reporter = user?.email ? getReporterByEmail(user.email) : undefined;
@@ -54,7 +64,7 @@ export default function CreateArticleScreen() {
     [articles, params.id, reporterIds, user?.role],
   );
 
-  const isAdminEditing = user?.role === 'admin' && !!editingDraft;
+  const isAdminEditing = isAdmin && !!editingDraft;
 
   const [banner, setBanner] = useState<string | undefined>(editingDraft?.banner);
   const [title, setTitle] = useState(editingDraft?.title ?? '');
@@ -66,6 +76,13 @@ export default function CreateArticleScreen() {
   const [sections, setSections] = useState<ArticleSection[]>(editingDraft?.sections ?? []);
   const [submitting, setSubmitting] = useState<'draft' | 'submit' | 'save' | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [registrationDate, setRegistrationDate] = useState(
+    editingDraft?.registrationDate ?? formatRegistrationDate(new Date().toISOString()),
+  );
+  const [selectedRegistrationDate, setSelectedRegistrationDate] = useState(() =>
+    parseRegistrationDate(editingDraft?.registrationDate),
+  );
+  const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [cropTarget, setCropTarget] = useState<CropTarget | null>(null);
   const [pendingCropTargets, setPendingCropTargets] = useState<CropTarget[]>([]);
 
@@ -218,8 +235,11 @@ export default function CreateArticleScreen() {
     }
     setSubmitting(kind);
     const now = new Date().toISOString();
-    const status = kind === 'draft' ? 'draft' : kind === 'submit' ? 'pending' : editingDraft?.status ?? 'pending';
+    const status = kind === 'draft' ? 'draft' : kind === 'submit' ? (isAdmin ? 'approved' : 'pending') : editingDraft?.status ?? 'pending';
     const cleanSections = sections.filter((s) => s.title.trim() || s.content.trim() || s.image);
+    const adminPublicationFields = isAdmin
+      ? { registrationDate }
+      : {};
 
     try {
       if (editingDraft) {
@@ -234,6 +254,8 @@ export default function CreateArticleScreen() {
           status,
           updatedAt: now,
           submittedAt: kind === 'submit' ? now : editingDraft.submittedAt,
+          reviewedAt: kind === 'submit' && isAdmin ? now : editingDraft.reviewedAt,
+          ...adminPublicationFields,
         });
       } else {
         const newArticle: Article = {
@@ -253,6 +275,8 @@ export default function CreateArticleScreen() {
           createdAt: now,
           updatedAt: now,
           submittedAt: kind === 'submit' ? now : undefined,
+          reviewedAt: kind === 'submit' && isAdmin ? now : undefined,
+          ...adminPublicationFields,
           views: 0,
           likes: 0,
           readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
@@ -263,12 +287,26 @@ export default function CreateArticleScreen() {
       setSubmitting(null);
       const messages: Record<typeof kind, [string, string]> = {
         draft: ['Saved to Drafts', 'Your article has been saved as a draft.'],
-        submit: ['Submitted for Review', 'Your article has been submitted to the editorial team for review.'],
+        submit: isAdmin
+          ? ['Article Published', 'The article has been published successfully.']
+          : ['Submitted for Review', 'Your article has been submitted to the editorial team for review.'],
         save: ['Changes Saved', 'The article has been updated.'],
       };
       const [title_, message] = messages[kind];
       setPreviewVisible(false);
-      Alert.alert(title_, message, [{ text: 'OK', onPress: () => router.back() }]);
+      Alert.alert(title_, message, [{
+        text: 'OK',
+        onPress: () => {
+          if (isAdmin) {
+            router.replace({
+              pathname: '/(admin)/(tabs)/articles',
+              params: { status },
+            });
+          } else {
+            router.back();
+          }
+        },
+      }]);
     } catch (error) {
       setSubmitting(null);
       console.error('Failed to save article:', error);
@@ -308,11 +346,12 @@ export default function CreateArticleScreen() {
       reporterPhone: editingDraft?.reporterPhone ?? user?.phone,
       createdAt: editingDraft?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      registrationDate: isAdmin ? registrationDate : editingDraft?.registrationDate,
       views: editingDraft?.views ?? 0,
       likes: editingDraft?.likes ?? 0,
       readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
     }),
-    [editingDraft, title, content, banner, images, advertisements, sections, reporter?.id, user],
+    [editingDraft, title, content, banner, images, advertisements, sections, isAdmin, registrationDate, reporter?.id, user],
   );
 
   return (
@@ -499,6 +538,37 @@ export default function CreateArticleScreen() {
           </View>
         ))}
 
+        {isAdmin ? (
+          <View style={styles.dateSection}>
+            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Publication Date</Text>
+            <Pressable
+              onPress={() => setDatePickerVisible(true)}
+              style={[
+                styles.dateButton,
+                { backgroundColor: theme.colors.backgroundSubtle, borderColor: theme.colors.border },
+              ]}>
+              <Icon name="calendar-outline" size={20} color={theme.colors.primary} />
+              <Text style={[styles.dateValue, { color: theme.colors.text }]}>{registrationDate}</Text>
+              <Icon name="chevron-down" size={18} color={theme.colors.textMuted} />
+            </Pressable>
+            {datePickerVisible ? (
+              <DateTimePicker
+                value={selectedRegistrationDate}
+                mode="date"
+                display="calendar"
+                presentation="dialog"
+                accentColor={theme.colors.primary}
+                onValueChange={(_, date) => {
+                  setDatePickerVisible(false);
+                  setSelectedRegistrationDate(date);
+                  setRegistrationDate(formatRegistrationDate(date.toISOString()));
+                }}
+                onDismiss={() => setDatePickerVisible(false)}
+              />
+            ) : null}
+          </View>
+        ) : null}
+
         {user ? (
           <View
             style={[
@@ -515,13 +585,26 @@ export default function CreateArticleScreen() {
         ) : null}
 
         <View style={{ height: 24 }} />
-        {isAdminEditing ? (
-          <Button
-            label="Save Changes"
-            onPress={() => handleSave('save')}
-            loading={submitting === 'save'}
-            fullWidth
-          />
+        {isAdmin ? (
+          <ButtonRow>
+            <View style={{ flex: 1 }}>
+              <Button
+                label={isAdminEditing ? 'Save Changes' : 'Save as Draft'}
+                variant="outline"
+                onPress={() => handleSave(isAdminEditing ? 'save' : 'draft')}
+                loading={submitting === (isAdminEditing ? 'save' : 'draft')}
+                fullWidth
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                label="Publish Now"
+                onPress={requestSubmit}
+                loading={submitting === 'submit'}
+                fullWidth
+              />
+            </View>
+          </ButtonRow>
         ) : (
           <ButtonRow>
             <View style={{ flex: 1 }}>
@@ -560,7 +643,7 @@ export default function CreateArticleScreen() {
           </ScrollView>
           <View style={styles.previewFooter}>
             <Button
-              label="Confirm & Submit"
+              label={isAdmin ? 'Confirm & Publish' : 'Confirm & Submit'}
               onPress={() => handleSave('submit')}
               loading={submitting === 'submit'}
               fullWidth
@@ -682,6 +765,23 @@ const styles = StyleSheet.create({
   reporterFooter: {
     marginTop: 20,
     padding: 14,
+  },
+  dateSection: {
+    marginTop: 20,
+  },
+  dateButton: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+  },
+  dateValue: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
   },
   reporterFooterText: {
     fontSize: 14,

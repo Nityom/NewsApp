@@ -6,6 +6,7 @@ import { ArticleCard } from '@/components/ui/ArticleCard';
 import { Avatar } from '@/components/ui/Avatar';
 import { IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { FAB } from '@/components/ui/FAB';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SectionHeader } from '@/components/ui/SearchBar';
@@ -106,6 +107,7 @@ export default function AdminDashboardScreen() {
           </View>
         )}
       />
+      <FAB onPress={() => router.push('/(reporter)/create-article')} />
     </ScreenContainer>
   );
 }

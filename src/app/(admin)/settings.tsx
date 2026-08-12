@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { Input } from '@/components/ui/Input';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
+import { useAuth } from '@/context/AuthContext';
 import { usePublicationInfo } from '@/context/PublicationInfoContext';
 import { useAppTheme, useThemeMode } from '@/theme';
 
@@ -36,11 +37,31 @@ function ToggleRow({
 export default function AdminSettingsScreen() {
   const theme = useAppTheme();
   const { mode, overrideMode, setOverrideMode } = useThemeMode();
+  const { user, updateUserProfile } = useAuth();
   const { info, updateInfo } = usePublicationInfo();
+  const [name, setName] = useState(user?.name ?? '');
+  const [phone, setPhone] = useState(user?.phone ?? '');
+  const [savingAccount, setSavingAccount] = useState(false);
   const [year, setYear] = useState(info.year);
   const [issueNumber, setIssueNumber] = useState(info.issueNumber);
   const [price, setPrice] = useState(info.price);
   const [saving, setSaving] = useState(false);
+
+  const saveAccountInfo = async () => {
+    if (!name.trim() || !phone.trim()) {
+      Alert.alert('Missing Information', 'Enter the admin name and contact number before saving.');
+      return;
+    }
+    setSavingAccount(true);
+    try {
+      await updateUserProfile({ name: name.trim(), phone: phone.trim() });
+      Alert.alert('Saved', 'Admin name and contact number have been updated.');
+    } catch {
+      Alert.alert('Could Not Save', 'Admin account information was not updated. Please try again.');
+    } finally {
+      setSavingAccount(false);
+    }
+  };
 
   const savePublicationInfo = async () => {
     if (!year.trim() || !issueNumber.trim() || !price.trim()) {
@@ -67,7 +88,26 @@ export default function AdminSettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>Appearance</Text>
+        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary }]}>Account</Text>
+        <Card style={[styles.card, styles.formCard]}>
+          <Input
+            label="Admin Name"
+            value={name}
+            onChangeText={setName}
+            autoCapitalize="words"
+            leftIcon="person-outline"
+          />
+          <Input
+            label="Contact Number"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            leftIcon="call-outline"
+          />
+          <Button label="Save Account Info" onPress={saveAccountInfo} loading={savingAccount} />
+        </Card>
+
+        <Text style={[styles.sectionTitle, { color: theme.colors.textSecondary, marginTop: 20 }]}>Appearance</Text>
         <Card style={styles.card} padded={false}>
           <ToggleRow icon="moon-outline" label="Dark Mode" value={mode === 'dark'} onValueChange={(v) => setOverrideMode(v ? 'dark' : 'light')} />
         </Card>
@@ -118,6 +158,10 @@ const styles = StyleSheet.create({
   },
   card: {
     overflow: 'hidden',
+  },
+  formCard: {
+    padding: 14,
+    gap: 10,
   },
   row: {
     flexDirection: 'row',

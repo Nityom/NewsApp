@@ -134,7 +134,7 @@ function AdImage({ uri, radius, wide, shareMode = false, onPress }: {
 }) {
   const content = (
     <>
-      <Image source={{ uri }} style={styles.adImage} contentFit="contain" transition={0} />
+      <Image source={{ uri }} style={styles.adImage} contentFit="cover" transition={0} />
       {onPress ? (
         <View style={styles.editImageBadge}>
           <Icon name="crop-outline" size={16} color="#FFFFFF" />

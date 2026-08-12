@@ -1,8 +1,9 @@
-import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { ArticleCard } from '@/components/ui/ArticleCard';
+import { FAB } from '@/components/ui/FAB';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { SearchBar } from '@/components/ui/SearchBar';
 import { EmptyState } from '@/components/ui/StateViews';
@@ -11,6 +12,7 @@ import { useAppTheme } from '@/theme';
 import type { ArticleStatus } from '@/types/models';
 
 const tabs: { key: ArticleStatus; label: string }[] = [
+  { key: 'draft', label: 'Drafts' },
   { key: 'pending', label: 'Pending' },
   { key: 'approved', label: 'Approved' },
   { key: 'rejected', label: 'Rejected' },
@@ -20,8 +22,16 @@ const tabs: { key: ArticleStatus; label: string }[] = [
 export default function AdminArticlesScreen() {
   const theme = useAppTheme();
   const { articles } = useArticles();
-  const [activeTab, setActiveTab] = useState<ArticleStatus>('pending');
+  const params = useLocalSearchParams<{ status?: string }>();
+  const requestedStatus = tabs.some((tab) => tab.key === params.status)
+    ? params.status as ArticleStatus
+    : undefined;
+  const [activeTab, setActiveTab] = useState<ArticleStatus>(requestedStatus ?? 'pending');
   const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (requestedStatus) setActiveTab(requestedStatus);
+  }, [requestedStatus]);
 
   const filtered = useMemo(
     () =>
@@ -63,13 +73,23 @@ export default function AdminArticlesScreen() {
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
           <View style={{ marginBottom: 14 }}>
-            <ArticleCard article={item} showAuthor showStatus={false} onPress={() => router.push(`/(admin)/article/${item.id}`)} />
+            <ArticleCard
+              article={item}
+              showAuthor
+              showStatus={false}
+              onPress={() => router.push(
+                item.status === 'draft'
+                  ? { pathname: '/(reporter)/create-article', params: { id: item.id } }
+                  : `/(admin)/article/${item.id}`,
+              )}
+            />
           </View>
         )}
         ListEmptyComponent={
           <EmptyState icon="document-text-outline" title="No articles" message={`No ${activeTab} articles right now.`} />
         }
       />
+      <FAB onPress={() => router.push('/(reporter)/create-article')} />
     </ScreenContainer>
   );
 }
@@ -86,7 +106,7 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    gap: 16,
+    justifyContent: 'space-between',
   },
   tabItem: {
     fontSize: 13,

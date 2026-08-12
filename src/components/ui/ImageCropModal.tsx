@@ -40,12 +40,7 @@ function fitFrame(aspect: [number, number], stageWidth: number, stageHeight: num
 }
 
 function aspectKeyFromValue(aspect: [number, number] | null, imageWidth: number, imageHeight: number) {
-  if (!aspect) {
-    const ratio = imageWidth / imageHeight;
-    if (ratio < 0.9) return 'tall';
-    if (ratio > 1.1) return 'wide';
-    return 'square';
-  }
+  if (!aspect) return 'original';
   return ASPECT_PRESETS.find((preset) => preset.value[0] === aspect[0] && preset.value[1] === aspect[1])?.key ?? 'wide';
 }
 
@@ -56,6 +51,7 @@ interface ImageCropModalProps {
   imageHeight: number;
   /** Initial aspect ratio. When null, the crop frame follows the selected photo's orientation. */
   aspect: [number, number] | null;
+  preserveOriginal?: boolean;
   onCancel: () => void;
   onCropComplete: (uri: string) => void;
 }
@@ -70,6 +66,7 @@ export function ImageCropModal({
   imageWidth,
   imageHeight,
   aspect,
+  preserveOriginal = false,
   onCancel,
   onCropComplete,
 }: ImageCropModalProps) {
@@ -78,7 +75,9 @@ export function ImageCropModal({
   const [selectedAspectKey, setSelectedAspectKey] = useState(() =>
     aspectKeyFromValue(aspect, imageWidth, imageHeight),
   );
-  const activeAspect = ASPECT_PRESETS.find((preset) => preset.key === selectedAspectKey)?.value ?? [4, 3];
+  const activeAspect: [number, number] = selectedAspectKey === 'original'
+    ? [Math.max(imageWidth, 1), Math.max(imageHeight, 1)]
+    : ASPECT_PRESETS.find((preset) => preset.key === selectedAspectKey)?.value ?? [4, 3];
 
   useEffect(() => {
     if (visible && imageWidth > 0 && imageHeight > 0) {
@@ -224,6 +223,10 @@ export function ImageCropModal({
 
   const handleConfirm = async () => {
     if (!imageUri) return;
+    if (preserveOriginal && selectedAspectKey === 'original') {
+      onCropComplete(imageUri);
+      return;
+    }
     setProcessing(true);
     try {
       const cropWidth = frameW.value / scale.value;
@@ -290,6 +293,24 @@ export function ImageCropModal({
           </View>
 
           <View style={styles.aspectRow}>
+            <Pressable
+              onPress={() => setSelectedAspectKey('original')}
+              accessibilityRole="button"
+              accessibilityState={{ selected: selectedAspectKey === 'original' }}
+              accessibilityLabel="Original photo shape"
+              style={[
+                styles.aspectOption,
+                { backgroundColor: selectedAspectKey === 'original' ? '#fff' : 'rgba(255,255,255,0.12)' },
+              ]}>
+              <View
+                style={[
+                  styles.aspectPreview,
+                  { width: 32, height: 24, aspectRatio: Math.max(imageWidth, 1) / Math.max(imageHeight, 1) },
+                  { borderColor: selectedAspectKey === 'original' ? '#000' : '#fff' },
+                ]}
+              />
+              <Text style={[styles.aspectLabel, { color: selectedAspectKey === 'original' ? '#000' : '#fff' }]}>Original</Text>
+            </Pressable>
             {ASPECT_PRESETS.map((preset) => {
               const active = preset.key === selectedAspectKey;
               return (

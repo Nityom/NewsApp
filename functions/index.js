@@ -8,6 +8,8 @@ initializeApp();
 const db = getFirestore();
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const MAX_BATCH_SIZE = 100;
+const NOTIFICATION_CHANNEL = 'news-alerts-v4';
+const NOTIFICATION_SOUND = 'news_alert.wav';
 
 function chunks(items, size) {
   const batches = [];
@@ -39,11 +41,11 @@ exports.sendSystemNotification = onDocumentCreated('notifications/{notificationI
   for (const batch of chunks(uniqueRecipients, MAX_BATCH_SIZE)) {
     const messages = batch.map((tokenDocument) => ({
       to: tokenDocument.get('token'),
-      sound: 'default',
+      sound: NOTIFICATION_SOUND,
       title: notification.title,
       body: notification.message,
       priority: 'high',
-      channelId: 'news-v2',
+      channelId: NOTIFICATION_CHANNEL,
       data: {
         notificationId: event.params.notificationId,
         audience: notification.audience,

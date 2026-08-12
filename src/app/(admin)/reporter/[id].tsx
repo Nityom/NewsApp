@@ -2,8 +2,9 @@ import { File, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { doc, getDoc } from '@react-native-firebase/firestore';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
@@ -18,16 +19,36 @@ import { useArticles } from '@/context/ArticlesContext';
 import { useNotifications } from '@/context/NotificationsContext';
 import { usePayments } from '@/context/PaymentsContext';
 import { useReporters } from '@/context/ReportersContext';
+import { db } from '@/lib/firebase';
 import { useAppTheme } from '@/theme';
+import type { Reporter } from '@/types/models';
+
+const REPORTER_LOOKUP_DELAYS_MS = [0, 400, 1000];
+
+async function loadReporter(id: string) {
+  for (const delay of REPORTER_LOOKUP_DELAYS_MS) {
+    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
+    const snapshot = await getDoc(doc(db, 'reporters', id));
+    if (snapshot.exists()) return snapshot.data() as Reporter;
+  }
+  return undefined;
+}
 
 export default function ReporterDetailsScreen() {
   const theme = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getReporter, updateReporter, deleteReporter } = useReporters();
+  const { isLoading: reportersLoading, getReporter, updateReporter, deleteReporter } = useReporters();
   const { addNotification } = useNotifications();
   const { payments, updatePaymentStatus, updateJoiningFeeStatus } = usePayments();
   const { articles: allArticles } = useArticles();
-  const reporter = getReporter(id);
+  const contextReporter = getReporter(id);
+  const [reporterLookup, setReporterLookup] = useState<{
+    id: string;
+    reporter?: Reporter;
+    finished: boolean;
+  }>({ id, finished: false });
+  const reporter = contextReporter ?? (reporterLookup.id === id ? reporterLookup.reporter : undefined);
+  const lookupFinished = !!contextReporter || (reporterLookup.id === id && reporterLookup.finished);
   const reporterArticles = allArticles.filter((article) => getReporter(article.reporterId)?.id === id);
   const recentArticles = reporterArticles.slice(0, 5);
   const [deleteVisible, setDeleteVisible] = useState(false);
@@ -39,6 +60,36 @@ export default function ReporterDetailsScreen() {
   const [confirmingPayment, setConfirmingPayment] = useState(false);
   const [photoVisible, setPhotoVisible] = useState(false);
   const [downloadingPhoto, setDownloadingPhoto] = useState(false);
+
+  useEffect(() => {
+    if (contextReporter) return;
+    let active = true;
+    loadReporter(id)
+      .then((loadedReporter) => {
+        if (!active) return;
+        setReporterLookup({
+          id,
+          reporter: loadedReporter,
+          finished: true,
+        });
+      }, () => {
+        if (active) setReporterLookup({ id, finished: true });
+      });
+    return () => {
+      active = false;
+    };
+  }, [contextReporter, id]);
+
+  if (reportersLoading || (!reporter && !lookupFinished)) {
+    return (
+      <ScreenContainer>
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={{ color: theme.colors.textSecondary }}>Loading reporter...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   if (!reporter) {
     return (
@@ -431,6 +482,12 @@ export default function ReporterDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

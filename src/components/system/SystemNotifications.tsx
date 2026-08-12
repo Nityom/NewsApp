@@ -1,17 +1,18 @@
 import { getAuth } from '@react-native-firebase/auth';
-import { deleteDoc, doc, setDoc } from '@react-native-firebase/firestore';
+import { doc, setDoc } from '@react-native-firebase/firestore';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { AppState, Platform } from 'react-native';
 
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
 import { useReporters } from '@/context/ReportersContext';
 import { db, stripUndefined } from '@/lib/firebase';
 
-const CHANNEL_ID = 'news-v2';
+const CHANNEL_ID = 'news-alerts-v4';
+const NOTIFICATION_SOUND = 'news_alert.wav';
 const TOKENS_COLLECTION = 'pushTokens';
 
 Notifications.setNotificationHandler({
@@ -31,7 +32,7 @@ function notificationsAllowed(settings: Notifications.NotificationPermissionsSta
   );
 }
 
-async function getPushToken() {
+async function prepareNotifications() {
   if (Platform.OS === 'web') return null;
 
   if (Platform.OS === 'android') {
@@ -39,6 +40,7 @@ async function getPushToken() {
       name: 'Education news alerts',
       description: 'Article, payment, and account updates',
       importance: Notifications.AndroidImportance.MAX,
+      sound: NOTIFICATION_SOUND,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#D99A00',
       showBadge: true,
@@ -52,6 +54,12 @@ async function getPushToken() {
     });
   }
   if (!notificationsAllowed(permissions)) return null;
+
+  return true;
+}
+
+async function getPushToken() {
+  if (!(await prepareNotifications())) return null;
 
   const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
   if (!projectId) throw new Error('EAS project ID is missing from the app configuration.');
@@ -75,10 +83,22 @@ function openNotification(notification: Notifications.Notification) {
 export function SystemNotifications() {
   const { user } = useAuth();
   const { getReporterByEmail } = useReporters();
-  const { markRead } = useNotifications();
+  const { notifications, isLoading, markRead } = useNotifications();
   const reporter = user?.email ? getReporterByEmail(user.email) : undefined;
+  const notificationSessionRef = useRef<string | null>(null);
+  const knownNotificationIdsRef = useRef(new Set<string>());
+  const remotelyReceivedIdsRef = useRef(new Set<string>());
+  const fallbackTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   useEffect(() => {
+    const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
+      const notificationId = notification.request.content.data?.notificationId;
+      if (typeof notificationId !== 'string') return;
+      remotelyReceivedIdsRef.current.add(notificationId);
+      const fallbackTimer = fallbackTimersRef.current.get(notificationId);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      fallbackTimersRef.current.delete(notificationId);
+    });
     const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const notificationId = response.notification.request.content.data?.notificationId;
       if (typeof notificationId === 'string') markRead(notificationId).catch(() => {});
@@ -95,20 +115,69 @@ export function SystemNotifications() {
       })
       .catch(() => {});
 
-    return () => responseSubscription.remove();
+    return () => {
+      receivedSubscription.remove();
+      responseSubscription.remove();
+    };
   }, [markRead]);
 
   useEffect(() => {
-    if (!user) return;
-    const ownerUid = getAuth().currentUser?.uid;
-    if (!ownerUid) return;
+    if (!user || isLoading) return;
+    const session = `${user.role}:${user.id}`;
+    if (notificationSessionRef.current !== session) {
+      notificationSessionRef.current = session;
+      knownNotificationIdsRef.current = new Set(notifications.map((notification) => notification.id));
+      return;
+    }
 
+    const reporterIds = new Set([user.id, reporter?.id].filter((id): id is string => !!id));
+    const newNotifications = notifications.filter((notification) => {
+      if (knownNotificationIdsRef.current.has(notification.id)) return false;
+      if (notification.audience !== user.role) return false;
+      return user.role === 'admin' || (!!notification.reporterId && reporterIds.has(notification.reporterId));
+    });
+    notifications.forEach((notification) => knownNotificationIdsRef.current.add(notification.id));
+
+    newNotifications.forEach((notification) => {
+      if (remotelyReceivedIdsRef.current.has(notification.id)) return;
+      const timer = setTimeout(() => {
+        fallbackTimersRef.current.delete(notification.id);
+        if (remotelyReceivedIdsRef.current.has(notification.id)) return;
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: notification.title,
+            body: notification.message,
+            sound: NOTIFICATION_SOUND,
+            data: {
+              notificationId: notification.id,
+              audience: notification.audience,
+              type: notification.type,
+              ...(notification.articleId ? { articleId: notification.articleId } : {}),
+              ...(notification.reporterId ? { reporterId: notification.reporterId } : {}),
+            },
+          },
+          trigger: Platform.OS === 'android' ? { channelId: CHANNEL_ID } : null,
+        }).catch((error) => console.warn('Local notification fallback failed:', error));
+      }, 3000);
+      fallbackTimersRef.current.set(notification.id, timer);
+    });
+  }, [isLoading, notifications, reporter?.id, user]);
+
+  useEffect(() => () => {
+    fallbackTimersRef.current.forEach((timer) => clearTimeout(timer));
+    fallbackTimersRef.current.clear();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
     let isActive = true;
-    let tokenDocumentId: string | undefined;
-    getPushToken()
-      .then(async (token) => {
+    const registerPushToken = async () => {
+      const ownerUid = getAuth().currentUser?.uid;
+      if (!ownerUid) return;
+      try {
+        const token = await getPushToken();
         if (!token || !isActive) return;
-        tokenDocumentId = encodeURIComponent(token);
+        const tokenDocumentId = encodeURIComponent(`${ownerUid}:${user.role}:${token}`);
         await setDoc(
           doc(db, TOKENS_COLLECTION, tokenDocumentId),
           stripUndefined({
@@ -120,12 +189,19 @@ export function SystemNotifications() {
             updatedAt: new Date().toISOString(),
           }),
         );
-      })
-      .catch((error) => console.warn('Push notification registration failed:', error));
+      } catch (error) {
+        console.warn('Push notification registration failed:', error);
+      }
+    };
+
+    registerPushToken();
+    const appStateSubscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') registerPushToken();
+    });
 
     return () => {
       isActive = false;
-      if (tokenDocumentId) deleteDoc(doc(db, TOKENS_COLLECTION, tokenDocumentId)).catch(() => {});
+      appStateSubscription.remove();
     };
   }, [reporter?.id, user]);
 

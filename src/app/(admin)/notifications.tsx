@@ -1,11 +1,11 @@
 import { router } from 'expo-router';
-import { useEffect } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { IconButton } from '@/components/ui/Button';
 import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
-import { EmptyState } from '@/components/ui/StateViews';
+import { EmptyState, ErrorState } from '@/components/ui/StateViews';
 import { useNotifications } from '@/context/NotificationsContext';
 import { useAppTheme } from '@/theme';
 import type { NotificationType } from '@/types/models';
@@ -37,20 +37,48 @@ function timeAgo(iso: string) {
 
 export default function AdminNotificationsScreen() {
   const theme = useAppTheme();
-  const { getForAudience, markAllRead } = useNotifications();
+  const { getForAudience, isLoading, loadError, markAllRead, testAdminNotification } = useNotifications();
+  const [testing, setTesting] = useState(false);
   const notifications = getForAudience('admin');
-  const unreadIds = notifications.filter((notification) => !notification.isRead).map((notification) => notification.id);
+  const unreadIds = useMemo(
+    () => notifications.filter((notification) => !notification.isRead).map((notification) => notification.id),
+    [notifications],
+  );
 
   useEffect(() => {
     if (unreadIds.length > 0) markAllRead(unreadIds).catch(() => {});
-  }, [markAllRead, unreadIds.join(',')]);
+  }, [markAllRead, unreadIds]);
+
+  const runNotificationTest = async () => {
+    if (testing) return;
+    setTesting(true);
+    try {
+      const recipientCount = await testAdminNotification();
+      Alert.alert(
+        'Notification Test Sent',
+        `The panel record was saved and Expo accepted the push for ${recipientCount} registered admin device${recipientCount === 1 ? '' : 's'}.`,
+      );
+    } catch (error) {
+      Alert.alert(
+        'Push Test Failed',
+        `The notification panel record was saved, but remote push failed. ${error instanceof Error ? error.message : 'Please check notification permission and try again.'}`,
+      );
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.header}>
         <IconButton icon="arrow-back" onPress={() => router.back()} />
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Notifications</Text>
-        <View style={{ width: 40 }} />
+        <IconButton
+          icon="paper-plane-outline"
+          accessibilityLabel="Test admin notifications"
+          disabled={testing}
+          onPress={runNotificationTest}
+        />
       </View>
 
       <FlatList
@@ -84,12 +112,41 @@ export default function AdminNotificationsScreen() {
                 <Text style={[styles.notifMessage, { color: theme.colors.textSecondary }]} numberOfLines={2}>
                   {item.message}
                 </Text>
+                {item.pushStatus ? (
+                  <Text
+                    style={[
+                      styles.deliveryStatus,
+                      { color: item.pushStatus === 'failed' ? theme.colors.danger : theme.colors.textMuted },
+                    ]}
+                    numberOfLines={2}>
+                    {item.pushStatus === 'accepted'
+                      ? `Push accepted for ${item.pushRecipientCount ?? 0} device${item.pushRecipientCount === 1 ? '' : 's'}`
+                      : item.pushStatus === 'failed'
+                        ? `Push failed: ${item.pushError ?? 'Unknown delivery error'}`
+                        : 'Sending push...'}
+                  </Text>
+                ) : null}
                 <Text style={[styles.notifTime, { color: theme.colors.textMuted }]}>{timeAgo(item.createdAt)}</Text>
               </View>
             </Pressable>
           );
         }}
-        ListEmptyComponent={<EmptyState icon="notifications-off-outline" title="No notifications" />}
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={styles.loadingState}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={{ color: theme.colors.textSecondary }}>Loading notifications...</Text>
+            </View>
+          ) : loadError ? (
+            <ErrorState title="Notifications unavailable" message={loadError} />
+          ) : (
+            <EmptyState
+              icon="notifications-off-outline"
+              title="No notifications"
+              message="New reporter, article, and payment alerts will appear here."
+            />
+          )
+        }
       />
     </ScreenContainer>
   );
@@ -111,6 +168,12 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 40,
     gap: 10,
+  },
+  loadingState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 64,
   },
   row: {
     flexDirection: 'row',
@@ -139,5 +202,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     marginTop: 6,
+  },
+  deliveryStatus: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 5,
   },
 });

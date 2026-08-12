@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Modal, Image as RNImage, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, Image as RNImage, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
 import { BlogTextEditor, countArticleWords, limitArticleWords } from '@/components/ui/BlogTextEditor';
@@ -101,6 +101,10 @@ export default function CreateArticleScreen() {
       orderedSelection: mode === 'gallery',
     });
     if (result.canceled) return;
+    if (mode === 'ad') {
+      setAdvertisements((current) => [...current, ...result.assets.map((asset) => asset.uri)]);
+      return;
+    }
     const selectedTargets = result.assets.map((asset) => ({
       uri: asset.uri,
       width: asset.width,
@@ -658,6 +662,7 @@ export default function CreateArticleScreen() {
         imageWidth={cropTarget?.width ?? 1}
         imageHeight={cropTarget?.height ?? 1}
         aspect={null}
+        preserveOriginal={cropTarget?.kind === 'ad'}
         onCancel={handleCropCancel}
         onCropComplete={handleCropComplete}
       />

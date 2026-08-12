@@ -132,9 +132,34 @@ function AdImage({ uri, radius, wide, shareMode = false, onPress }: {
   shareMode?: boolean;
   onPress?: () => void;
 }) {
+  const [ratio, setRatio] = useState(16 / 9);
+
+  useEffect(() => {
+    if (!wide) return;
+    let cancelled = false;
+    RNImage.getSize(
+      uri,
+      (width, height) => {
+        if (!cancelled && width > 0 && height > 0) setRatio(width / height);
+      },
+      () => {},
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [uri, wide]);
+
   const content = (
     <>
-      <Image source={{ uri }} style={styles.adImage} contentFit="cover" transition={0} />
+      <Image
+        source={{ uri }}
+        style={styles.adImage}
+        contentFit={wide ? 'contain' : 'cover'}
+        transition={0}
+        onLoad={({ source }) => {
+          if (wide && source.width > 0 && source.height > 0) setRatio(source.width / source.height);
+        }}
+      />
       {onPress ? (
         <View style={styles.editImageBadge}>
           <Icon name="crop-outline" size={16} color="#FFFFFF" />
@@ -145,7 +170,8 @@ function AdImage({ uri, radius, wide, shareMode = false, onPress }: {
   const containerStyle = [
     styles.adImageContainer,
     wide ? styles.adImageContainerWide : styles.adImageContainerHalf,
-    shareMode && (wide ? styles.shareAdImageWide : styles.shareAdImageHalf),
+    shareMode && !wide && styles.shareAdImageHalf,
+    wide && { aspectRatio: ratio },
     { borderRadius: radius, overflow: 'hidden' as const },
   ];
   if (onPress) {
@@ -655,11 +681,7 @@ const styles = StyleSheet.create({
   },
   adImageContainerWide: {
     width: '100%',
-    height: 200,
     marginBottom: 4,
-  },
-  shareAdImageWide: {
-    height: 240,
   },
   adImageContainerHalf: {
     width: '48.5%',

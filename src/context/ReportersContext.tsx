@@ -12,6 +12,8 @@ import { uploadLocalFile } from '@/lib/cloudinary';
 import { db, stripUndefined } from '@/lib/firebase';
 import type { Reporter } from '@/types/models';
 
+import { useAuth } from './AuthContext';
+
 const COLLECTION = 'reporters';
 const MOCK_REPORTER_IDS = new Set(Array.from({ length: 10 }, (_, index) => `rep-${index + 1}`));
 
@@ -62,9 +64,14 @@ async function resolveReporterPhoto(reporterId: string, data: Partial<Reporter>)
 export function ReportersProvider({ children }: { children: ReactNode }) {
   const [reporters, setReporters] = useState<Reporter[]>([]);
   const [rawReporters, setRawReporters] = useState<Reporter[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loadedSession, setLoadedSession] = useState<string | null>(null);
+  const { user } = useAuth();
+  const session = user ? `${user.role}:${user.id}` : null;
 
   useEffect(() => {
+    if (!user) return;
+
+    const currentSession = `${user.role}:${user.id}`;
     const unsubscribe = onSnapshot(
       collection(db, COLLECTION),
       (snapshot) => {
@@ -74,31 +81,41 @@ export function ReportersProvider({ children }: { children: ReactNode }) {
           .map((reporterDoc) => reporterDoc.data() as Reporter);
         setRawReporters(all);
         setReporters(dedupeByEmail(all));
-        setIsLoading(false);
+        setLoadedSession(currentSession);
         if (mockDocuments.length > 0) {
           Promise.all(mockDocuments.map((reporterDoc) => deleteDoc(reporterDoc.ref))).catch(() => {});
         }
       },
-      () => setIsLoading(false),
+      () => setLoadedSession(currentSession),
     );
     return unsubscribe;
-  }, []);
+  }, [user]);
+
+  const visibleReporters = useMemo(
+    () => (loadedSession === session ? reporters : []),
+    [loadedSession, reporters, session],
+  );
+  const visibleRawReporters = useMemo(
+    () => (loadedSession === session ? rawReporters : []),
+    [loadedSession, rawReporters, session],
+  );
+  const isLoading = session !== null && loadedSession !== session;
 
   const getReporter = useCallback(
     (id: string) => {
-      const direct = reporters.find((r) => r.id === id);
+      const direct = visibleReporters.find((r) => r.id === id);
       if (direct) return direct;
       // The id may belong to an older duplicate that dedupeByEmail filtered out (e.g. a stale
       // notification deep-link) - resolve it to that person's current canonical record instead.
-      const stale = rawReporters.find((r) => r.id === id);
-      if (stale) return reporters.find((r) => r.email.toLowerCase() === stale.email.toLowerCase());
-      return reporters.find((reporter) => reporterIdAliases(reporter).includes(id));
+      const stale = visibleRawReporters.find((r) => r.id === id);
+      if (stale) return visibleReporters.find((r) => r.email.toLowerCase() === stale.email.toLowerCase());
+      return visibleReporters.find((reporter) => reporterIdAliases(reporter).includes(id));
     },
-    [reporters, rawReporters],
+    [visibleReporters, visibleRawReporters],
   );
   const getReporterByEmail = useCallback(
-    (email: string) => reporters.find((r) => r.email.toLowerCase() === email.toLowerCase()),
-    [reporters],
+    (email: string) => visibleReporters.find((r) => r.email.toLowerCase() === email.toLowerCase()),
+    [visibleReporters],
   );
 
   const addReporter = useCallback(async (reporter: Reporter) => {
@@ -123,8 +140,8 @@ export function ReportersProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<ReportersContextValue>(
-    () => ({ reporters, isLoading, getReporter, getReporterByEmail, addReporter, updateReporter, deleteReporter }),
-    [reporters, isLoading, getReporter, getReporterByEmail, addReporter, updateReporter, deleteReporter],
+    () => ({ reporters: visibleReporters, isLoading, getReporter, getReporterByEmail, addReporter, updateReporter, deleteReporter }),
+    [visibleReporters, isLoading, getReporter, getReporterByEmail, addReporter, updateReporter, deleteReporter],
   );
 
   return <ReportersContext.Provider value={value}>{children}</ReportersContext.Provider>;

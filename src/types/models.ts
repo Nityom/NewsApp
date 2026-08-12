@@ -90,6 +90,9 @@ export interface AppNotification {
   /** Recipient for reporter alerts, or the related reporter for admin alerts and deep-linking. */
   reporterId?: string;
   audience: 'reporter' | 'admin';
+  pushStatus?: 'pending' | 'accepted' | 'failed';
+  pushRecipientCount?: number;
+  pushError?: string;
 }
 
 export type PaymentStatus = 'paid' | 'pending' | 'failed';

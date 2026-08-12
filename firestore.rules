@@ -6,7 +6,9 @@ service cloud.firestore {
         && request.resource.data.ownerUid == request.auth.uid;
       allow delete: if request.auth != null
         && resource.data.ownerUid == request.auth.uid;
-      allow read: if false;
+      // Spark-compatible push delivery: authenticated event creators query recipient tokens
+      // and send through Expo Push Service directly because Cloud Functions require Blaze.
+      allow read: if request.auth != null;
     }
 
     // MVP rules: any signed-in user (reporter or admin) can read/write.

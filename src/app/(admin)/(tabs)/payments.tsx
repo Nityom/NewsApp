@@ -46,7 +46,7 @@ export default function AdminPaymentsScreen() {
         reporterAvatar: reporter.avatar,
         amount: reporter.joinFeeAmount!,
         status: 'pending',
-        method: 'UPI / QR',
+        method: 'Legacy payment',
         articlesCount: 0,
         period: 'Joining Fee',
         createdAt: reporter.joinedAt,
@@ -156,7 +156,7 @@ export default function AdminPaymentsScreen() {
               <Text style={[styles.amount, { color: theme.colors.text }]}>₹{item.amount.toLocaleString('en-IN')}</Text>
               <PaymentStatusBadge status={item.status} size="sm" />
             </View>
-            {item.status === 'pending' ? (
+            {item.status === 'pending' && item.purpose !== 'joining_fee' ? (
               <View style={styles.actions}>
                 <Button
                   label="Reject"
@@ -172,6 +172,8 @@ export default function AdminPaymentsScreen() {
                   loading={updatingId === item.id}
                 />
               </View>
+            ) : item.status === 'pending' ? (
+              <Text style={[styles.autoConfirmation, { color: theme.colors.textMuted }]}>Cashfree confirmation pending</Text>
             ) : null}
           </Card>
         )}
@@ -237,6 +239,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 8,
+  },
+  autoConfirmation: {
+    width: '100%',
+    fontSize: 11.5,
+    textAlign: 'right',
   },
   reporterName: {
     fontSize: 14,

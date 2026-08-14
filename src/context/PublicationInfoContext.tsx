@@ -1,9 +1,7 @@
-import { doc, getDoc, onSnapshot, setDoc } from '@react-native-firebase/firestore';
-import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { useMutation, useQuery } from 'convex/react';
+import { createContext, ReactNode, useCallback, useContext } from 'react';
 
-import { db, stripUndefined } from '@/lib/firebase';
-
-const DOC_PATH = 'settings/publicationInfo';
+import { api } from '@convex/_generated/api';
 
 const MARATHI_MONTHS = [
   'जानेवारी', 'फेब्रुवारी', 'मार्च', 'एप्रिल', 'मे', 'जून',
@@ -45,40 +43,17 @@ interface PublicationInfoContextValue {
 const PublicationInfoContext = createContext<PublicationInfoContextValue | null>(null);
 
 export function PublicationInfoProvider({ children }: { children: ReactNode }) {
-  const [info, setInfo] = useState<PublicationInfo>(DEFAULT_INFO);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      doc(db, DOC_PATH),
-      (snapshot) => {
-        if (snapshot.exists()) setInfo({ ...DEFAULT_INFO, ...(snapshot.data() as PublicationInfo) });
-        setIsLoading(false);
-      },
-      () => setIsLoading(false),
-    );
-    return unsubscribe;
-  }, []);
-
-  // One-time on app start: seed the document if it doesn't exist yet.
-  useEffect(() => {
-    (async () => {
-      try {
-        const snapshot = await getDoc(doc(db, DOC_PATH));
-        if (!snapshot.exists()) await setDoc(doc(db, DOC_PATH), DEFAULT_INFO);
-      } catch {
-        // best-effort - the app still works from whatever the live listener has
-      }
-    })();
-  }, []);
+  const result = useQuery(api.settings.getPublicationInfo) as PublicationInfo | null | undefined;
+  const info = { ...DEFAULT_INFO, ...(result ?? {}) };
+  const isLoading = result === undefined;
+  const saveInfo = useMutation(api.settings.updatePublicationInfo);
 
   const updateInfo = useCallback(
     async (patch: Partial<PublicationInfo>) => {
       const next = { ...info, ...patch };
-      setInfo(next);
-      await setDoc(doc(db, DOC_PATH), stripUndefined(next));
+      await saveInfo({ info: next });
     },
-    [info],
+    [info, saveInfo],
   );
 
   return (

@@ -1,17 +1,8 @@
-import {
-    collection,
-    doc,
-    onSnapshot,
-    setDoc,
-    updateDoc,
-    writeBatch,
-} from '@react-native-firebase/firestore';
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery } from 'convex/react';
+import { createContext, ReactNode, useCallback, useContext, useMemo } from 'react';
 
-import { db, stripUndefined } from '@/lib/firebase';
 import type { Payment, PaymentStatus } from '@/types/models';
-
-const COLLECTION = 'payments';
+import { api } from '@convex/_generated/api';
 
 interface PaymentsContextValue {
   payments: Payment[];
@@ -24,54 +15,30 @@ interface PaymentsContextValue {
 const PaymentsContext = createContext<PaymentsContextValue | null>(null);
 
 export function PaymentsProvider({ children }: { children: ReactNode }) {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, COLLECTION),
-      (snapshot) => {
-        const next = snapshot.docs
-          .map((paymentDoc) => paymentDoc.data() as Payment)
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        setPayments(next);
-        setIsLoading(false);
-      },
-      () => setIsLoading(false),
-    );
-    return unsubscribe;
-  }, []);
+  const result = useQuery(api.payments.list) as Payment[] | undefined;
+  const payments = useMemo(
+    () => [...(result ?? [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [result],
+  );
+  const isLoading = result === undefined;
+  const upsertPayment = useMutation(api.payments.upsert);
+  const setStatus = useMutation(api.payments.updateStatus);
+  const setJoiningFeeStatus = useMutation(api.payments.updateJoiningFeeStatus);
 
   const addPayment = useCallback(async (payment: Payment) => {
-    await setDoc(doc(db, COLLECTION, payment.id), stripUndefined(payment));
-    setPayments((current) => [payment, ...current.filter((item) => item.id !== payment.id)]);
-  }, []);
+    await upsertPayment({ payment });
+  }, [upsertPayment]);
 
   const updatePaymentStatus = useCallback(async (id: string, status: PaymentStatus) => {
-    const updatedAt = new Date().toISOString();
-    await updateDoc(doc(db, COLLECTION, id), { status, updatedAt });
-    setPayments((current) => current.map((payment) =>
-      payment.id === id ? { ...payment, status, updatedAt } : payment,
-    ));
-  }, []);
+    await setStatus({ id, status });
+  }, [setStatus]);
 
   const updateJoiningFeeStatus = useCallback(async (
     payment: Payment,
     status: Extract<PaymentStatus, 'paid' | 'failed'>,
   ) => {
-    const updatedAt = new Date().toISOString();
-    const updatedPayment = { ...payment, status, updatedAt };
-    const batch = writeBatch(db);
-    batch.set(doc(db, COLLECTION, payment.id), stripUndefined(updatedPayment), { merge: true });
-    batch.update(
-      doc(db, 'reporters', payment.reporterId),
-      status === 'paid'
-        ? { requestStatus: 'approved', isActive: true, isVerified: true }
-        : { requestStatus: 'awaiting_payment' },
-    );
-    await batch.commit();
-    setPayments((current) => [updatedPayment, ...current.filter((item) => item.id !== payment.id)]);
-  }, []);
+    await setJoiningFeeStatus({ payment, status });
+  }, [setJoiningFeeStatus]);
 
   const value = useMemo(
     () => ({ payments, isLoading, addPayment, updatePaymentStatus, updateJoiningFeeStatus }),

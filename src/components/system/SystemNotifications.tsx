@@ -1,5 +1,5 @@
 import { getAuth } from '@react-native-firebase/auth';
-import { doc, setDoc } from '@react-native-firebase/firestore';
+import { useMutation } from 'convex/react';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
@@ -9,11 +9,10 @@ import { AppState, Platform } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
 import { useReporters } from '@/context/ReportersContext';
-import { db, stripUndefined } from '@/lib/firebase';
+import { api } from '@convex/_generated/api';
 
 const CHANNEL_ID = 'news-alerts-v4';
 const NOTIFICATION_SOUND = 'news_alert.wav';
-const TOKENS_COLLECTION = 'pushTokens';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -89,6 +88,7 @@ export function SystemNotifications() {
   const knownNotificationIdsRef = useRef(new Set<string>());
   const remotelyReceivedIdsRef = useRef(new Set<string>());
   const fallbackTimersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const registerToken = useMutation(api.notifications.registerPushToken);
 
   useEffect(() => {
     const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
@@ -177,18 +177,13 @@ export function SystemNotifications() {
       try {
         const token = await getPushToken();
         if (!token || !isActive) return;
-        const tokenDocumentId = encodeURIComponent(`${ownerUid}:${user.role}:${token}`);
-        await setDoc(
-          doc(db, TOKENS_COLLECTION, tokenDocumentId),
-          stripUndefined({
-            token,
-            ownerUid,
-            audience: user.role,
-            reporterIds: user.role === 'reporter' ? [user.id, reporter?.id].filter(Boolean) : [],
-            platform: Platform.OS,
-            updatedAt: new Date().toISOString(),
-          }),
-        );
+        await registerToken({
+          key: encodeURIComponent(`${ownerUid}:${user.role}:${token}`),
+          token,
+          audience: user.role,
+          reporterIds: user.role === 'reporter' ? [user.id, reporter?.id].filter((id): id is string => !!id) : [],
+          platform: Platform.OS,
+        });
       } catch (error) {
         console.warn('Push notification registration failed:', error);
       }
@@ -203,7 +198,7 @@ export function SystemNotifications() {
       isActive = false;
       appStateSubscription.remove();
     };
-  }, [reporter?.id, user]);
+  }, [registerToken, reporter?.id, user]);
 
   return null;
 }

@@ -17,7 +17,7 @@ import type { Reporter } from '@/types/models';
 
 export default function ReporterDetailsScreen() {
   const theme = useAppTheme();
-  const { user } = useAuth();
+  const { user, updateUserProfile } = useAuth();
   const { addReporter } = useReporters();
   const { addNotification } = useNotifications();
 
@@ -102,6 +102,7 @@ export default function ReporterDetailsScreen() {
         requestStatus: 'pending',
         reporterCode,
       };
+      await updateUserProfile({ name: reporter.name, phone: reporter.phone, city: reporter.city });
       await addReporter(reporter);
       await addNotification({
         type: 'reporter_joined',
@@ -110,7 +111,7 @@ export default function ReporterDetailsScreen() {
         message: `${reporter.name} wants to join as a reporter from ${reporter.village}.`,
         reporterId: reporter.id,
       });
-      // Lets the dashboard gate show "pending" immediately instead of racing the Firestore
+      // Lets the dashboard gate show "pending" immediately instead of racing the Convex
       // listener for this brand-new record to arrive.
       setJustSubmittedReporterId(reporter.id);
       Alert.alert(

@@ -1,21 +1,27 @@
-import { Image } from 'expo-image';
+import { CFEnvironment, CFSession } from 'cashfree-pg-api-contract';
+import { useAction, useMutation } from 'convex/react';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { CFPaymentGatewayService } from 'react-native-cashfree-pg-sdk';
 
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useAuth } from '@/context/AuthContext';
-import { useNotifications } from '@/context/NotificationsContext';
-import { usePayments } from '@/context/PaymentsContext';
 import { useReporters } from '@/context/ReportersContext';
+import { createJoiningFeeOrder, verifyJoiningFeeOrder } from '@/lib/cashfree';
 import { clearJustSubmittedReporterId, getJustSubmittedReporterId } from '@/lib/joinRequestFlag';
 import { isGooglePlayReviewEmail } from '@/lib/reviewAccount';
 import { useAppTheme } from '@/theme';
 import type { Reporter } from '@/types/models';
+import { api } from '@convex/_generated/api';
 
-const paymentQr = require('../../../assets/images/PaymentQr.jpeg');
+const CONVENIENCE_FEE_RATE = 0.023;
+
+function roundCurrency(amount: number) {
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+}
 
 function PendingApprovalScreen({ reason }: { reason?: string }) {
   const theme = useAppTheme();
@@ -41,46 +47,65 @@ function PendingApprovalScreen({ reason }: { reason?: string }) {
 function PaymentScreen({ reporter }: { reporter: Reporter }) {
   const theme = useAppTheme();
   const { logout } = useAuth();
-  const { updateReporter } = useReporters();
-  const { addNotification } = useNotifications();
-  const { addPayment } = usePayments();
   const [submitting, setSubmitting] = useState(false);
+  const [requestingHelp, setRequestingHelp] = useState(false);
+  const createOrder = useAction(api.cashfree.createJoiningFeeOrder);
+  const verifyOrder = useAction(api.cashfree.verifyJoiningFeeOrder);
+  const requestPaymentAssistance = useMutation(api.notifications.requestPaymentAssistance);
+  const baseAmount = roundCurrency(reporter.joinFeeAmount ?? 0);
+  const convenienceFee = roundCurrency(baseAmount * CONVENIENCE_FEE_RATE);
+  const totalAmount = roundCurrency(baseAmount + convenienceFee);
 
-  const markPaymentDone = async () => {
+  useEffect(() => {
+    CFPaymentGatewayService.setCallback({
+      onVerify: async (orderId) => {
+        setSubmitting(true);
+        try {
+          await verifyJoiningFeeOrder(verifyOrder, orderId);
+          Alert.alert('Payment Confirmed', 'Your reporter account is active. Welcome to your dashboard.');
+          router.replace('/(reporter)/(tabs)');
+        } catch (error) {
+          Alert.alert('Verification Pending', error instanceof Error ? error.message : 'Please try again shortly.');
+        } finally {
+          setSubmitting(false);
+        }
+      },
+      onError: (error) => {
+        setSubmitting(false);
+        Alert.alert('Payment Not Completed', error.getMessage());
+      },
+    });
+    return () => CFPaymentGatewayService.removeCallback();
+  }, [verifyOrder]);
+
+  const startPayment = async () => {
+    if (submitting) return;
     setSubmitting(true);
     try {
-      const createdAt = new Date().toISOString();
-      await addPayment({
-        id: `joining-fee-${reporter.id}`,
-        reporterId: reporter.id,
-        reporterName: reporter.name,
-        reporterAvatar: reporter.avatar,
-        amount: reporter.joinFeeAmount ?? 0,
-        status: 'pending',
-        method: 'UPI / QR',
-        articlesCount: 0,
-        period: 'Joining Fee',
-        createdAt,
-        updatedAt: createdAt,
-        purpose: 'joining_fee',
-      });
-      await updateReporter(reporter.id, { requestStatus: 'payment_submitted' });
-      try {
-        await addNotification({
-          type: 'payment',
-          audience: 'admin',
-          title: 'Payment Marked as Done',
-          message: `${reporter.name} says they have paid the ₹${reporter.joinFeeAmount} joining fee. Please confirm receipt.`,
-          reporterId: reporter.id,
-        });
-        Alert.alert('Thanks!', 'The admin has been notified. You will get access once payment is confirmed.');
-      } catch {
-        Alert.alert('Payment Recorded', 'Your payment is visible to the admin, but the alert could not be sent.');
-      }
-    } catch {
-      Alert.alert('Could Not Submit Payment', 'Your payment confirmation was not recorded. Please try again.');
-    } finally {
+      const order = await createJoiningFeeOrder(createOrder, reporter.id);
+      const session = new CFSession(order.paymentSessionId, order.orderId, CFEnvironment.SANDBOX);
+      CFPaymentGatewayService.doWebPayment(session);
+    } catch (error) {
       setSubmitting(false);
+      Alert.alert('Could Not Start Payment', error instanceof Error ? error.message : 'Please try again.');
+    }
+  };
+
+  const sendRequestToAdmin = async () => {
+    if (requestingHelp) return;
+    setRequestingHelp(true);
+    try {
+      const result = await requestPaymentAssistance({});
+      Alert.alert(
+        result.created ? 'Request Sent' : 'Request Already Sent',
+        result.created
+          ? 'The admin has been notified that you need help completing your payment.'
+          : 'Your previous payment-assistance request is still waiting for the admin.',
+      );
+    } catch (error) {
+      Alert.alert('Could Not Send Request', error instanceof Error ? error.message : 'Please try again.');
+    } finally {
+      setRequestingHelp(false);
     }
   };
 
@@ -94,14 +119,31 @@ function PaymentScreen({ reporter }: { reporter: Reporter }) {
             styles.feeHighlight,
             { backgroundColor: theme.colors.primaryMuted, borderColor: theme.colors.primary },
           ]}>
-          <Text style={[styles.feeLabel, { color: theme.colors.textSecondary }]}>AMOUNT TO PAY</Text>
-          <Text style={[styles.feeAmount, { color: theme.colors.text }]}>₹{reporter.joinFeeAmount}</Text>
+          <View style={styles.feeRow}>
+            <Text style={[styles.feeLabel, { color: theme.colors.textSecondary }]}>Joining fee</Text>
+            <Text style={[styles.feeLineAmount, { color: theme.colors.text }]}>₹{baseAmount.toLocaleString('en-IN')}</Text>
+          </View>
+          <View style={styles.feeRow}>
+            <Text style={[styles.feeLabel, { color: theme.colors.textSecondary }]}>Convenience fee (2.3%)</Text>
+            <Text style={[styles.feeLineAmount, { color: theme.colors.text }]}>₹{convenienceFee.toLocaleString('en-IN')}</Text>
+          </View>
+          <View style={[styles.feeDivider, { backgroundColor: theme.colors.border }]} />
+          <View style={styles.feeRow}>
+            <Text style={[styles.totalLabel, { color: theme.colors.text }]}>Total</Text>
+            <Text style={[styles.feeAmount, { color: theme.colors.text }]}>₹{totalAmount.toLocaleString('en-IN')}</Text>
+          </View>
         </View>
         <Text style={[styles.pendingText, { color: theme.colors.textSecondary }]}>
-          Scan the QR code below to pay the joining fee, then tap "Payment Done".
+          Pay securely with Cashfree. Your account will be approved automatically after payment confirmation.
         </Text>
-        <Image source={paymentQr} style={styles.qrImage} contentFit="contain" />
-        <Button label="Payment Done" onPress={markPaymentDone} loading={submitting} fullWidth size="lg" />
+        <Button label={`Pay ₹${totalAmount.toLocaleString('en-IN')}`} onPress={startPayment} loading={submitting} fullWidth size="lg" />
+        <Button
+          label="Send Request to Admin"
+          variant="outline"
+          onPress={sendRequestToAdmin}
+          loading={requestingHelp}
+          fullWidth
+        />
         <Button label="Log Out" variant="outline" onPress={logout} fullWidth />
       </ScrollView>
     </ScreenContainer>
@@ -115,10 +157,9 @@ function AwaitingConfirmationScreen({ reporter }: { reporter: Reporter }) {
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.pendingWrap}>
         <Icon name="time-outline" size={48} color={theme.colors.primary} />
-        <Text style={[styles.pendingTitle, { color: theme.colors.text }]}>Confirming Your Payment</Text>
+        <Text style={[styles.pendingTitle, { color: theme.colors.text }]}>Previous Payment Submission</Text>
         <Text style={[styles.pendingText, { color: theme.colors.textSecondary }]}>
-          We've told the admin you paid ₹{reporter.joinFeeAmount}. You'll get access to your dashboard once the
-          admin confirms it was received.
+          This payment was submitted through the previous process. Please contact the admin for a new Cashfree payment request.
         </Text>
         <Button label="Log Out" variant="outline" onPress={logout} />
       </View>
@@ -213,27 +254,40 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     gap: 14,
   },
-  qrImage: {
-    width: 220,
-    height: 220,
-    marginVertical: 8,
-  },
   feeHighlight: {
     width: '100%',
     maxWidth: 280,
-    alignItems: 'center',
-    gap: 4,
+    gap: 8,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
   feeLabel: {
-    fontSize: 11,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  feeRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  feeDivider: {
+    width: '100%',
+    height: StyleSheet.hairlineWidth,
+  },
+  feeLineAmount: {
+    fontSize: 14,
     fontWeight: '700',
   },
+  totalLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
   feeAmount: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '900',
   },
   pendingTitle: {

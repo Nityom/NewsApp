@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, Image as RNImage, StyleSheet, Text, View } from 'react-native';
 
 import { formatRegistrationDate, getCurrentPeriodLabel, usePublicationInfo } from '@/context/PublicationInfoContext';
+import { advertisementOrientation, advertisementWidths } from '@/lib/advertisementLayout';
 import { useAppTheme } from '@/theme';
 import type { Article } from '@/types/models';
 import { Icon } from './Icon';
@@ -15,6 +16,9 @@ const MUTED_INK = '#606060';
 const RULE = '#D7D7D7';
 // Keeps an additional article (added via the "+" section button) from pushing content onto a second page.
 export const MAX_SECTION_BODY_CHARS = 500;
+// Bounds on the auto-fit photo frame so very tall or very wide photos still fit the page cleanly.
+const MIN_PHOTO_ASPECT = 0.68;
+const MAX_PHOTO_ASPECT = 1.9;
 
 function truncate(text: string, max: number) {
   if (text.length <= max) return text;
@@ -44,23 +48,24 @@ function renderInlineText(text: string, keyPrefix = 'inline'): ReactNode[] {
   });
 }
 
-function ArticleBody({ content }: { content: string }) {
-  return content.split(/\n+/).filter(Boolean).map((line, index) => {
+function renderBodyLines(lines: string[], keyPrefix: string) {
+  return lines.map((line, index) => {
+    const key = `${keyPrefix}-${index}`;
     if (line.startsWith('# ')) {
-      return <Text key={index} style={styles.bodyHeading}>{renderInlineText(line.slice(2), `heading-${index}`)}</Text>;
+      return <Text key={key} style={styles.bodyHeading}>{renderInlineText(line.slice(2), `heading-${key}`)}</Text>;
     }
     if (line.startsWith('- ')) {
       return (
-        <View key={index} style={styles.bulletRow}>
+        <View key={key} style={styles.bulletRow}>
           <Text style={styles.bulletMark}>•</Text>
-          <Text style={[styles.body, styles.bulletText]}>{renderInlineText(line.slice(2), `bullet-${index}`)}</Text>
+          <Text style={[styles.body, styles.bulletText]}>{renderInlineText(line.slice(2), `bullet-${key}`)}</Text>
         </View>
       );
     }
     if (line.startsWith('> ')) {
-      return <Text key={index} style={styles.bodyQuote}>{renderInlineText(line.slice(2), `quote-${index}`)}</Text>;
+      return <Text key={key} style={styles.bodyQuote}>{renderInlineText(line.slice(2), `quote-${key}`)}</Text>;
     }
-    return <Text key={index} style={styles.body}>{renderInlineText(line, `body-${index}`)}</Text>;
+    return <Text key={key} style={styles.body}>{renderInlineText(line, `body-${key}`)}</Text>;
   });
 }
 
@@ -105,19 +110,22 @@ function AutoImage({
     };
   }, [uri]);
 
-  const imageStyle = [styles.autoImage, style, { aspectRatio: fixedRatio ?? ratio, borderRadius: radius }];
+  // Clamp extreme photo shapes so the frame never grows tall/wide enough to overflow the page.
+  const frameRatio = fixedRatio ?? Math.min(MAX_PHOTO_ASPECT, Math.max(MIN_PHOTO_ASPECT, ratio));
+  const imageStyle = [styles.autoImage, style, { aspectRatio: frameRatio, borderRadius: radius }];
+  // The frame matches each photo's own shape and uses "contain", so photos are always shown whole — never cropped.
   if (!onPress) return (
     <Image
       source={{ uri }}
       style={imageStyle}
-      contentFit={fixedRatio ? 'contain' : 'cover'}
+      contentFit="contain"
       transition={0}
     />
   );
 
   return (
     <Pressable onPress={onPress} style={imageStyle} accessibilityRole="button" accessibilityLabel="Adjust photo">
-      <Image source={{ uri }} style={styles.editableImage} contentFit={fixedRatio ? 'contain' : 'cover'} transition={0} />
+      <Image source={{ uri }} style={styles.editableImage} contentFit="contain" transition={0} />
       <View style={styles.editImageBadge}>
         <Icon name="crop-outline" size={16} color="#FFFFFF" />
       </View>
@@ -125,17 +133,15 @@ function AutoImage({
   );
 }
 
-function AdImage({ uri, radius, wide, shareMode = false, onPress }: {
+function AdImage({ uri, radius, width, onPress }: {
   uri: string;
   radius: number;
-  wide: boolean;
-  shareMode?: boolean;
+  width: `${number}%`;
   onPress?: () => void;
 }) {
   const [ratio, setRatio] = useState(16 / 9);
 
   useEffect(() => {
-    if (!wide) return;
     let cancelled = false;
     RNImage.getSize(
       uri,
@@ -147,17 +153,17 @@ function AdImage({ uri, radius, wide, shareMode = false, onPress }: {
     return () => {
       cancelled = true;
     };
-  }, [uri, wide]);
+  }, [uri]);
 
   const content = (
     <>
       <Image
         source={{ uri }}
         style={styles.adImage}
-        contentFit={wide ? 'contain' : 'cover'}
+        contentFit="contain"
         transition={0}
         onLoad={({ source }) => {
-          if (wide && source.width > 0 && source.height > 0) setRatio(source.width / source.height);
+          if (source.width > 0 && source.height > 0) setRatio(source.width / source.height);
         }}
       />
       {onPress ? (
@@ -169,9 +175,7 @@ function AdImage({ uri, radius, wide, shareMode = false, onPress }: {
   );
   const containerStyle = [
     styles.adImageContainer,
-    wide ? styles.adImageContainerWide : styles.adImageContainerHalf,
-    shareMode && !wide && styles.shareAdImageHalf,
-    wide && { aspectRatio: ratio },
+    { width, aspectRatio: ratio },
     { borderRadius: radius, overflow: 'hidden' as const },
   ];
   if (onPress) {
@@ -187,6 +191,55 @@ function AdImage({ uri, radius, wide, shareMode = false, onPress }: {
   }
   return (
     <View style={containerStyle}>{content}</View>
+  );
+}
+
+function AdvertisementGrid({
+  uris,
+  radius,
+  onImagePress,
+}: {
+  uris: string[];
+  radius: number;
+  onImagePress?: ArticleNewspaperLayoutProps['onImagePress'];
+}) {
+  const [ratios, setRatios] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    uris.forEach((uri, index) => {
+      RNImage.getSize(uri, (width, height) => {
+        if (!cancelled && width > 0 && height > 0) {
+          setRatios((current) => current[index] === width / height
+            ? current
+            : { ...current, [index]: width / height });
+        }
+      }, () => {});
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [uris]);
+
+  const resolvedRatios = uris.map((_, index) => ratios[index] ?? 16 / 9);
+  const orientations = resolvedRatios.map(advertisementOrientation);
+  const widths = advertisementWidths(resolvedRatios);
+  const mixedPair = uris.length === 2 && orientations[0] !== orientations[1];
+
+  return (
+    <View style={[styles.adGrid, uris.length === 1 && styles.adGridSingle, mixedPair && styles.adGridMixed]}>
+      {uris.map((uri, index) => {
+        return (
+          <AdImage
+            key={`${uri}-${index}`}
+            uri={uri}
+            radius={radius}
+            width={widths[index]}
+            onPress={onImagePress ? () => onImagePress({ kind: 'ad', index, uri }) : undefined}
+          />
+        );
+      })}
+    </View>
   );
 }
 
@@ -281,9 +334,9 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
             />
           </View>
 
-          {/* Single-column body */}
+          {/* Single-column body, matching the reference layout */}
           <View style={styles.simpleBody}>
-            <ArticleBody content={article.content} />
+            {renderBodyLines(article.content.split(/\n+/).filter(Boolean), 'body')}
           </View>
         </>
       )}
@@ -291,8 +344,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
       {/* Any further sections beyond the first stack below in full width */}
       {restSections.map((section) => {
         const sContent = truncate(plainArticleText(section.content), MAX_SECTION_BODY_CHARS);
-        const sParas = sContent.split(/\n+/).filter(Boolean);
-        const sMid = Math.ceil(sParas.length / 2);
+        const sLines = sContent.split(/\n+/).filter(Boolean);
         return (
           <View key={section.id} style={styles.sectionBlock}>
             {section.image ? (
@@ -305,14 +357,8 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
             ) : null}
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.headlineRule} />
-            <View style={styles.columns}>
-              <View style={styles.column}>
-                {sParas.slice(0, sMid).map((p, i) => <Text key={i} style={styles.body}>{p}</Text>)}
-              </View>
-              <View style={styles.colDivider} />
-              <View style={styles.column}>
-                {sParas.slice(sMid).map((p, i) => <Text key={i} style={styles.body}>{p}</Text>)}
-              </View>
+            <View style={styles.simpleBody}>
+              {sLines.map((p, i) => <Text key={i} style={styles.body}>{p}</Text>)}
             </View>
           </View>
         );
@@ -337,23 +383,11 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
       {/* Advertisement */}
       {article.advertisements.length > 0 ? (
         <View style={[styles.adSection, shareMode && styles.shareAdSection]}>
-          <View style={styles.adLabelRow}>
-            <View style={styles.adLabelLine} />
-            <Text style={styles.adLabel}>Advertisement</Text>
-            <View style={styles.adLabelLine} />
-          </View>
-          <View style={styles.adGrid}>
-            {article.advertisements.map((uri, i) => (
-              <AdImage
-                key={`${uri}-${i}`}
-                uri={uri}
-                radius={theme.radius.sm}
-                wide={article.advertisements.length === 1}
-                shareMode={shareMode}
-                onPress={onImagePress ? () => onImagePress({ kind: 'ad', index: i, uri }) : undefined}
-              />
-            ))}
-          </View>
+          <AdvertisementGrid
+            uris={article.advertisements}
+            radius={theme.radius.sm}
+            onImagePress={onImagePress}
+          />
         </View>
       ) : null}
 
@@ -559,7 +593,8 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   fullImage: {
-    width: '100%',
+    width: '68%',
+    alignSelf: 'center',
     marginTop: 4,
     marginBottom: 10,
   },
@@ -568,16 +603,7 @@ const styles = StyleSheet.create({
   },
   simpleBody: {
     marginHorizontal: 12,
-  },
-  columns: {
-    flexDirection: 'row',
-    marginHorizontal: 12,
     marginTop: 6,
-    gap: 0,
-  },
-  column: {
-    flex: 1,
-    paddingHorizontal: 4,
   },
   colDivider: {
     width: StyleSheet.hairlineWidth,
@@ -586,9 +612,9 @@ const styles = StyleSheet.create({
   },
   body: {
     color: INK,
-    fontSize: 11,
-    lineHeight: 17,
-    marginBottom: 6,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 8,
   },
   bodyBold: {
     fontWeight: '800',
@@ -598,11 +624,11 @@ const styles = StyleSheet.create({
   },
   bodyHeading: {
     color: INK,
-    fontSize: 16,
-    lineHeight: 21,
+    fontSize: 19,
+    lineHeight: 25,
     fontWeight: '800',
     marginTop: 4,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   bulletRow: {
     flexDirection: 'row',
@@ -611,22 +637,22 @@ const styles = StyleSheet.create({
   },
   bulletMark: {
     color: INK,
-    width: 14,
-    fontSize: 13,
-    lineHeight: 17,
+    width: 16,
+    fontSize: 15,
+    lineHeight: 21,
   },
   bulletText: {
     flex: 1,
   },
   bodyQuote: {
     color: MUTED_INK,
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 14,
+    lineHeight: 21,
     fontStyle: 'italic',
     borderLeftWidth: 3,
     borderLeftColor: RULE,
     paddingLeft: 8,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   gallery: {
     flexDirection: 'row',
@@ -641,7 +667,6 @@ const styles = StyleSheet.create({
   },
   galleryImage: {
     width: '100%',
-    aspectRatio: 4 / 3,
   },
   adSection: {
     marginTop: 16,
@@ -656,45 +681,23 @@ const styles = StyleSheet.create({
     marginHorizontal: 24,
     padding: 14,
   },
-  adLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  adLabelLine: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: RULE,
-  },
-  adLabel: {
-    color: MUTED_INK,
-    fontSize: 9,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-  },
   adImageContainer: {
     backgroundColor: PAPER,
     borderRadius: 4,
     overflow: 'hidden',
-  },
-  adImageContainerWide: {
-    width: '100%',
-    marginBottom: 4,
-  },
-  adImageContainerHalf: {
-    width: '48.5%',
-    height: 140,
     marginBottom: 8,
-  },
-  shareAdImageHalf: {
-    height: 170,
   },
   adGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  adGridSingle: {
+    justifyContent: 'center',
+  },
+  adGridMixed: {
+    justifyContent: 'center',
   },
   adImage: {
     width: '100%',
@@ -712,15 +715,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   sectionImage: {
-    width: '100%',
-    aspectRatio: 16 / 9,
+    width: '68%',
+    alignSelf: 'center',
     marginBottom: 8,
   },
   sectionTitle: {
     color: INK,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
-    lineHeight: 24,
+    lineHeight: 26,
     textTransform: 'uppercase',
     marginHorizontal: 12,
   },

@@ -19,8 +19,8 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 
 import { clearJustSubmittedReporterId } from '@/lib/joinRequestFlag';
 import {
-  GOOGLE_PLAY_REVIEW_PASSWORD,
-  isGooglePlayReviewEmail,
+    GOOGLE_PLAY_REVIEW_PASSWORD,
+    isGooglePlayReviewEmail,
 } from '@/lib/reviewAccount';
 import type { CurrentUser } from '@/types/models';
 
@@ -46,16 +46,14 @@ interface AuthContextValue {
   user: CurrentUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  requiresPhone: boolean;
   login: (email: string, password: string, role: Role) => Promise<void>;
-  loginWithGoogle: (role: Role) => Promise<void>;
-  register: (name: string, email: string, phone: string, password: string) => Promise<void>;
+  loginWithGoogle: (role: Role) => Promise<CurrentUser>;
+  register: (email: string, password: string) => Promise<CurrentUser>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   resendVerificationEmail: () => Promise<void>;
   logout: () => Promise<void>;
   updateUserProfile: (updates: ProfileOverrides) => Promise<void>;
-  submitPhoneNumber: (phone: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -144,11 +142,26 @@ async function refreshSessionExpiry(email: string) {
   }
 }
 
+function loginError(error: unknown): Error {
+  const authError = error as { code?: string; message?: string };
+  const invalidCredentials = new Set([
+    'auth/invalid-credential',
+    'auth/user-not-found',
+    'auth/wrong-password',
+    'auth/invalid-email',
+  ]);
+  if (
+    (authError.code && invalidCredentials.has(authError.code))
+    || authError.message?.toLowerCase().includes('auth credential is incorrect, malformed')
+  ) {
+    return new Error('Account not found or email/password is incorrect.');
+  }
+  return error instanceof Error ? error : new Error('Could not sign in. Please try again.');
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  // Reporters signed in with Google skip the phone field on registration - collect it once, after the fact.
-  const [requiresPhone, setRequiresPhone] = useState(false);
   // Prevents onAuthStateChanged from force-signing-out a brand new session while
   // login()/register() are still in the middle of storing its role.
   const authActionInProgressRef = useRef(false);
@@ -170,7 +183,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
           if (!expiresAt) await refreshSessionExpiry(firebaseUser.email);
           const storedProfile = await getStoredProfile(firebaseUser.email);
-          setRequiresPhone(role === 'reporter' && !storedProfile?.phone);
           setUser(
             profileForRole(role, firebaseUser.email, {
               name: firebaseUser.displayName || undefined,
@@ -216,7 +228,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await storeRole(trimmedEmail, 'reporter');
         await storeProfile(trimmedEmail, { name: 'Google Play Reviewer', phone: '0000000000' });
         await refreshSessionExpiry(trimmedEmail);
-        setRequiresPhone(false);
         setUser(
           profileForRole('reporter', trimmedEmail, {
             name: 'Google Play Reviewer',
@@ -235,7 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (password !== HARDCODED_ADMIN_PASSWORD) {
         throw new Error('Incorrect admin password. Use the configured admin password.');
       }
-      // Back the hardcoded admin shortcut with a real Firebase account so Firestore's
+      // Back the hardcoded admin shortcut with a real Firebase account so Convex's
       // `request.auth != null` rules actually pass for admin sessions too.
       authActionInProgressRef.current = true;
       try {
@@ -271,7 +282,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authActionInProgressRef.current = true;
     try {
       const auth = getAuth();
-      const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      let credential;
+      try {
+        credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      } catch (error) {
+        throw loginError(error);
+      }
       const resolvedEmail = credential.user.email ?? email.trim();
       const storedRole = await getStoredRole(resolvedEmail);
       if (storedRole && storedRole !== role) {
@@ -281,7 +297,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await storeRole(resolvedEmail, role);
       await refreshSessionExpiry(resolvedEmail);
       const storedProfile = await getStoredProfile(resolvedEmail);
-      setRequiresPhone(role === 'reporter' && !storedProfile?.phone);
       setUser(
         profileForRole(role, resolvedEmail, {
           name: credential.user.displayName || undefined,
@@ -293,23 +308,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const register = useCallback(async (name: string, email: string, phone: string, password: string) => {
+  const register = useCallback(async (email: string, password: string) => {
     authActionInProgressRef.current = true;
     try {
       const auth = getAuth();
       const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
       await storeRole(email.trim(), 'reporter');
-      await storeProfile(email.trim(), { name: name.trim(), phone: phone.trim() });
       await refreshSessionExpiry(email.trim());
-      await updateProfile(credential.user, { displayName: name.trim() });
       try {
         await sendEmailVerification(credential.user);
       } catch (verificationError) {
         // Account creation itself succeeded - don't block the user over a flaky verification email send.
         console.warn('sendEmailVerification failed:', verificationError);
       }
-      setRequiresPhone(false);
-      setUser(profileForRole('reporter', email.trim(), { name: name.trim(), phone: phone.trim() }));
+      const registeredUser = profileForRole('reporter', email.trim());
+      setUser(registeredUser);
+      return registeredUser;
     } finally {
       authActionInProgressRef.current = false;
     }
@@ -349,14 +363,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await storeRole(resolvedEmail, role);
       await refreshSessionExpiry(resolvedEmail);
       const storedProfile = await getStoredProfile(resolvedEmail);
-      setRequiresPhone(role === 'reporter' && !storedProfile?.phone);
-      setUser(
-        profileForRole(role, resolvedEmail, {
-          name: credential.user.displayName || undefined,
-          avatar: credential.user.photoURL || undefined,
-          ...storedProfile,
-        }),
-      );
+      const googleUser = profileForRole(role, resolvedEmail, {
+        name: credential.user.displayName || undefined,
+        avatar: credential.user.photoURL || undefined,
+        ...storedProfile,
+      });
+      setUser(googleUser);
+      return googleUser;
     } finally {
       authActionInProgressRef.current = false;
     }
@@ -380,7 +393,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } finally {
       clearJustSubmittedReporterId();
-      setRequiresPhone(false);
       setUser(null);
     }
   }, []);
@@ -400,20 +412,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser((prev) => (prev ? { ...prev, ...updates } : prev));
   }, []);
 
-  const submitPhoneNumber = useCallback(async (phone: string) => {
-    const firebaseUser = getAuth().currentUser;
-    if (!firebaseUser?.email) throw new Error('No user currently signed in.');
-    await storeProfile(firebaseUser.email, { phone: phone.trim() });
-    setUser((prev) => (prev ? { ...prev, phone: phone.trim() } : prev));
-    setRequiresPhone(false);
-  }, []);
-
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
       isAuthenticated: !!user,
       isLoading,
-      requiresPhone,
       login,
       loginWithGoogle,
       register,
@@ -422,12 +425,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resendVerificationEmail,
       logout,
       updateUserProfile,
-      submitPhoneNumber,
     }),
     [
       user,
       isLoading,
-      requiresPhone,
       login,
       loginWithGoogle,
       register,
@@ -436,7 +437,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resendVerificationEmail,
       logout,
       updateUserProfile,
-      submitPhoneNumber,
     ],
   );
 

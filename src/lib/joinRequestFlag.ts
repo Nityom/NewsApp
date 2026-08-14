@@ -1,5 +1,5 @@
 // Transient (in-memory only) flag set right after a reporter submits their join request, so the
-// dashboard gate can show a "pending" state immediately instead of racing the Firestore listener
+// dashboard gate can show a "pending" state immediately instead of racing the Convex query
 // for the new record to arrive. Cleared once the real record is confirmed or on logout.
 let justSubmittedReporterId: string | null = null;
 

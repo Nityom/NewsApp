@@ -20,7 +20,6 @@ import { useAppTheme } from '@/theme';
 import type { Article } from '@/types/models';
 
 const SHARE_WIDTH = 1200;
-const SHARE_HEIGHT = 1800;
 const CAPTURE_LAYOUT_WIDTH = 768;
 const CAPTURE_LAYOUT_HEIGHT = 1152;
 
@@ -44,6 +43,7 @@ export default function ArticleDetailScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [pairArticle, setPairArticle] = useState<Article | null>(null);
   const [pairSharing, setPairSharing] = useState(false);
+  const [captureHeight, setCaptureHeight] = useState(CAPTURE_LAYOUT_HEIGHT);
 
   const pairCandidates = articles.filter((a) => a.status === 'approved' && a.id !== article?.id);
 
@@ -150,9 +150,14 @@ export default function ArticleDetailScreen() {
       <View pointerEvents="none" style={styles.captureHost}>
         <ViewShot
           ref={viewShotRef}
-          style={[styles.articleCapture, { width: CAPTURE_LAYOUT_WIDTH, height: CAPTURE_LAYOUT_HEIGHT }]}
-          options={{ format: 'png', quality: 1, width: SHARE_WIDTH, height: SHARE_HEIGHT }}>
-          <View style={[styles.captureContent, { width: CAPTURE_LAYOUT_WIDTH }]}>
+          style={[styles.articleCapture, { width: CAPTURE_LAYOUT_WIDTH, height: captureHeight }]}
+          options={{ format: 'png', quality: 1, width: SHARE_WIDTH, height: Math.round(SHARE_WIDTH * (captureHeight / CAPTURE_LAYOUT_WIDTH)) }}>
+          <View
+            style={[styles.captureContent, { width: CAPTURE_LAYOUT_WIDTH }]}
+            onLayout={({ nativeEvent }) => {
+              const measured = Math.ceil(nativeEvent.layout.height);
+              if (measured > 0 && measured !== captureHeight) setCaptureHeight(measured);
+            }}>
             <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} shareMode />
           </View>
         </ViewShot>

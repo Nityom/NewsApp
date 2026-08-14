@@ -2,8 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import { doc, getDoc } from '@react-native-firebase/firestore';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Avatar } from '@/components/ui/Avatar';
@@ -19,36 +18,18 @@ import { useArticles } from '@/context/ArticlesContext';
 import { useNotifications } from '@/context/NotificationsContext';
 import { usePayments } from '@/context/PaymentsContext';
 import { useReporters } from '@/context/ReportersContext';
-import { db } from '@/lib/firebase';
 import { useAppTheme } from '@/theme';
-import type { Reporter } from '@/types/models';
-
-const REPORTER_LOOKUP_DELAYS_MS = [0, 400, 1000];
-
-async function loadReporter(id: string) {
-  for (const delay of REPORTER_LOOKUP_DELAYS_MS) {
-    if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
-    const snapshot = await getDoc(doc(db, 'reporters', id));
-    if (snapshot.exists()) return snapshot.data() as Reporter;
-  }
-  return undefined;
-}
 
 export default function ReporterDetailsScreen() {
   const theme = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { isLoading: reportersLoading, getReporter, updateReporter, deleteReporter } = useReporters();
   const { addNotification } = useNotifications();
-  const { payments, updatePaymentStatus, updateJoiningFeeStatus } = usePayments();
+  const { payments, updatePaymentStatus } = usePayments();
   const { articles: allArticles } = useArticles();
   const contextReporter = getReporter(id);
-  const [reporterLookup, setReporterLookup] = useState<{
-    id: string;
-    reporter?: Reporter;
-    finished: boolean;
-  }>({ id, finished: false });
-  const reporter = contextReporter ?? (reporterLookup.id === id ? reporterLookup.reporter : undefined);
-  const lookupFinished = !!contextReporter || (reporterLookup.id === id && reporterLookup.finished);
+  const reporter = contextReporter;
+  const lookupFinished = !reportersLoading;
   const reporterArticles = allArticles.filter((article) => getReporter(article.reporterId)?.id === id);
   const recentArticles = reporterArticles.slice(0, 5);
   const [deleteVisible, setDeleteVisible] = useState(false);
@@ -57,28 +38,8 @@ export default function ReporterDetailsScreen() {
   const [feeVisible, setFeeVisible] = useState(false);
   const [feeAmount, setFeeAmount] = useState('');
   const [sendingFee, setSendingFee] = useState(false);
-  const [confirmingPayment, setConfirmingPayment] = useState(false);
   const [photoVisible, setPhotoVisible] = useState(false);
   const [downloadingPhoto, setDownloadingPhoto] = useState(false);
-
-  useEffect(() => {
-    if (contextReporter) return;
-    let active = true;
-    loadReporter(id)
-      .then((loadedReporter) => {
-        if (!active) return;
-        setReporterLookup({
-          id,
-          reporter: loadedReporter,
-          finished: true,
-        });
-      }, () => {
-        if (active) setReporterLookup({ id, finished: true });
-      });
-    return () => {
-      active = false;
-    };
-  }, [contextReporter, id]);
 
   if (reportersLoading || (!reporter && !lookupFinished)) {
     return (
@@ -129,7 +90,7 @@ export default function ReporterDetailsScreen() {
           type: 'system',
           audience: 'reporter',
           title: 'Joining Fee Requested',
-          message: `${reporter.name}, please pay ₹${amount} to complete your reporter registration.`,
+          message: `${reporter.name}, please pay the ₹${amount} joining fee to complete your registration. A 2.3% convenience fee will be added at Cashfree checkout.`,
           reporterId: reporter.id,
         });
         Alert.alert('Payment Request Sent', `${reporter.name}'s status is now Awaiting Payment.`);
@@ -140,52 +101,6 @@ export default function ReporterDetailsScreen() {
       Alert.alert('Could Not Send Request', 'The reporter status was not updated. Please try again.');
     } finally {
       setSendingFee(false);
-    }
-  };
-
-  const confirmPaymentReceived = async () => {
-    if (confirmingPayment) return;
-    if (!reporter.joinFeeAmount || reporter.joinFeeAmount <= 0) {
-      Alert.alert('Joining Fee Missing', 'Set a valid joining fee before confirming this payment.');
-      return;
-    }
-    setConfirmingPayment(true);
-    const existingPayment = payments.find(
-      (payment) => payment.reporterId === reporter.id && payment.purpose === 'joining_fee',
-    );
-    const paymentId = existingPayment?.id ?? `joining-fee-${reporter.id}`;
-    const createdAt = existingPayment?.createdAt ?? new Date().toISOString();
-    try {
-      await updateJoiningFeeStatus(existingPayment ?? {
-        id: paymentId,
-        reporterId: reporter.id,
-        reporterName: reporter.name,
-        reporterAvatar: reporter.avatar,
-        amount: reporter.joinFeeAmount ?? 0,
-        status: 'pending',
-        method: 'UPI / QR',
-        articlesCount: 0,
-        period: 'Joining Fee',
-        createdAt,
-        updatedAt: createdAt,
-        purpose: 'joining_fee',
-      }, 'paid');
-      try {
-        await addNotification({
-          type: 'system',
-          audience: 'reporter',
-          title: 'Reporter Request Approved',
-          message: `${reporter.name}, your payment is confirmed and your reporter account is approved. You can now start publishing.`,
-          reporterId: reporter.id,
-        });
-        Alert.alert('Approved', `${reporter.name} can now publish articles.`);
-      } catch {
-        Alert.alert('Approved', `${reporter.name} can now publish articles, but the alert could not be sent.`);
-      }
-    } catch {
-      Alert.alert('Could Not Confirm Payment', 'The payment and reporter status were not changed. Please try again.');
-    } finally {
-      setConfirmingPayment(false);
     }
   };
 
@@ -359,7 +274,7 @@ export default function ReporterDetailsScreen() {
           <>
             <View style={{ height: 16 }} />
             <Text style={[styles.bio, { color: theme.colors.textSecondary }]}>
-              Waiting for {reporter.name} to pay ₹{reporter.joinFeeAmount} and confirm payment.
+              Waiting for {reporter.name} to complete the ₹{reporter.joinFeeAmount} Cashfree payment. Approval is automatic after confirmation.
             </Text>
             <Button label="Reject" variant="danger" icon="close" onPress={() => setRejectVisible(true)} fullWidth />
           </>
@@ -369,22 +284,9 @@ export default function ReporterDetailsScreen() {
           <>
             <View style={{ height: 16 }} />
             <Text style={[styles.bio, { color: theme.colors.textSecondary }]}>
-              {reporter.name} says the ₹{reporter.joinFeeAmount} payment is done. Confirm once received in your account.
+              This is a legacy payment submission. Send a new Cashfree payment request to use automatic confirmation.
             </Text>
-            <ButtonRow>
-              <View style={{ flex: 1 }}>
-                <Button label="Reject" variant="danger" icon="close" onPress={() => setRejectVisible(true)} fullWidth />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button
-                  label="Confirm Payment Received"
-                  icon="checkmark"
-                  onPress={confirmPaymentReceived}
-                  loading={confirmingPayment}
-                  fullWidth
-                />
-              </View>
-            </ButtonRow>
+            <Button label="Reject" variant="danger" icon="close" onPress={() => setRejectVisible(true)} fullWidth />
           </>
         ) : null}
 
@@ -462,7 +364,7 @@ export default function ReporterDetailsScreen() {
       <Dialog
         visible={feeVisible}
         title="Set Joining Fee"
-        message={`Enter the amount to charge ${reporter.name} before approving their account.`}
+        message={`Enter the base amount to charge ${reporter.name}. A 2.3% convenience fee will be added at Cashfree checkout.`}
         onRequestClose={() => setFeeVisible(false)}
         actions={[
           { label: 'Cancel', variant: 'outline', onPress: () => setFeeVisible(false) },

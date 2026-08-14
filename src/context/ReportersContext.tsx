@@ -1,20 +1,12 @@
-import {
-    collection,
-    deleteDoc,
-    doc,
-    onSnapshot,
-    setDoc,
-    updateDoc,
-} from '@react-native-firebase/firestore';
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery } from 'convex/react';
+import { createContext, ReactNode, useCallback, useContext, useMemo } from 'react';
 
 import { uploadLocalFile } from '@/lib/cloudinary';
-import { db, stripUndefined } from '@/lib/firebase';
 import type { Reporter } from '@/types/models';
+import { api } from '@convex/_generated/api';
 
 import { useAuth } from './AuthContext';
 
-const COLLECTION = 'reporters';
 const MOCK_REPORTER_IDS = new Set(Array.from({ length: 10 }, (_, index) => `rep-${index + 1}`));
 
 /**
@@ -62,44 +54,17 @@ async function resolveReporterPhoto(reporterId: string, data: Partial<Reporter>)
 }
 
 export function ReportersProvider({ children }: { children: ReactNode }) {
-  const [reporters, setReporters] = useState<Reporter[]>([]);
-  const [rawReporters, setRawReporters] = useState<Reporter[]>([]);
-  const [loadedSession, setLoadedSession] = useState<string | null>(null);
   const { user } = useAuth();
-  const session = user ? `${user.role}:${user.id}` : null;
-
-  useEffect(() => {
-    if (!user) return;
-
-    const currentSession = `${user.role}:${user.id}`;
-    const unsubscribe = onSnapshot(
-      collection(db, COLLECTION),
-      (snapshot) => {
-        const mockDocuments = snapshot.docs.filter((reporterDoc) => MOCK_REPORTER_IDS.has(reporterDoc.id));
-        const all = snapshot.docs
-          .filter((reporterDoc) => !MOCK_REPORTER_IDS.has(reporterDoc.id))
-          .map((reporterDoc) => reporterDoc.data() as Reporter);
-        setRawReporters(all);
-        setReporters(dedupeByEmail(all));
-        setLoadedSession(currentSession);
-        if (mockDocuments.length > 0) {
-          Promise.all(mockDocuments.map((reporterDoc) => deleteDoc(reporterDoc.ref))).catch(() => {});
-        }
-      },
-      () => setLoadedSession(currentSession),
-    );
-    return unsubscribe;
-  }, [user]);
-
-  const visibleReporters = useMemo(
-    () => (loadedSession === session ? reporters : []),
-    [loadedSession, reporters, session],
-  );
+  const result = useQuery(api.reporters.list, user ? {} : 'skip') as Reporter[] | undefined;
   const visibleRawReporters = useMemo(
-    () => (loadedSession === session ? rawReporters : []),
-    [loadedSession, rawReporters, session],
+    () => (result ?? []).filter((reporter) => !MOCK_REPORTER_IDS.has(reporter.id)),
+    [result],
   );
-  const isLoading = session !== null && loadedSession !== session;
+  const visibleReporters = useMemo(() => dedupeByEmail(visibleRawReporters), [visibleRawReporters]);
+  const isLoading = !!user && result === undefined;
+  const upsertReporter = useMutation(api.reporters.upsert);
+  const patchReporter = useMutation(api.reporters.patch);
+  const removeReporter = useMutation(api.reporters.remove);
 
   const getReporter = useCallback(
     (id: string) => {
@@ -120,24 +85,18 @@ export function ReportersProvider({ children }: { children: ReactNode }) {
 
   const addReporter = useCallback(async (reporter: Reporter) => {
     const resolved = { ...reporter, ...(await resolveReporterPhoto(reporter.id, reporter)) } as Reporter;
-    await setDoc(doc(db, COLLECTION, reporter.id), stripUndefined(resolved));
-  }, []);
+    await upsertReporter({ reporter: resolved });
+  }, [upsertReporter]);
 
   const updateReporter = useCallback(async (id: string, patch: Partial<Reporter>) => {
     const resolvedPatch = await resolveReporterPhoto(id, patch);
-    await updateDoc(doc(db, COLLECTION, id), stripUndefined(resolvedPatch));
-    setRawReporters((current) => current.map((reporter) =>
-      reporter.id === id ? { ...reporter, ...resolvedPatch } : reporter,
-    ));
-    setReporters((current) => dedupeByEmail(current.map((reporter) =>
-      reporter.id === id ? { ...reporter, ...resolvedPatch } : reporter,
-    )));
+    await patchReporter({ id, patch: resolvedPatch });
     return resolvedPatch;
-  }, []);
+  }, [patchReporter]);
 
   const deleteReporter = useCallback(async (id: string) => {
-    await deleteDoc(doc(db, COLLECTION, id));
-  }, []);
+    await removeReporter({ id });
+  }, [removeReporter]);
 
   const value = useMemo<ReportersContextValue>(
     () => ({ reporters: visibleReporters, isLoading, getReporter, getReporterByEmail, addReporter, updateReporter, deleteReporter }),

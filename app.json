@@ -2,17 +2,36 @@
   "expo": {
     "name": "Education News",
     "slug": "NewsApp",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/app_logo.png",
     "scheme": "newsapp",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.anonymous.NewsApp"
+      "bundleIdentifier": "com.anonymous.NewsApp",
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "amazonpay",
+          "upi",
+          "credpay",
+          "bhim",
+          "paytmmp",
+          "phonepe",
+          "tez",
+          "navipay",
+          "mobikwik",
+          "myairtel",
+          "popclubapp",
+          "super",
+          "kiwi",
+          "simplypayupi",
+          "whatsapp"
+        ]
+      }
     },
     "android": {
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "backgroundColor": "#F4B400",
         "foregroundImage": "./assets/images/app_logo.png"

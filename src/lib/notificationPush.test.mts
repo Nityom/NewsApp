@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  createExpoPushMessages,
-  filterNotificationsForAudience,
-  filterNotificationsForReporter,
-  selectPushTokens,
+    createExpoPushMessages,
+    filterNotificationsForAudience,
+    filterNotificationsForReporter,
+    selectPushTokens,
 } from './notificationPush.ts';
 
 const registrations = [

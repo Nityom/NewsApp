@@ -26,8 +26,8 @@ export interface Reporter {
   photo?: string;
   /**
    * Admin approval state for the join request:
-   * pending -> admin sets a joining fee -> awaiting_payment -> reporter pays and confirms -> payment_submitted
-   * -> admin confirms receipt -> approved. Existing/seeded reporters default to 'approved'.
+    * pending -> admin sets a joining fee -> awaiting_payment -> Cashfree confirms payment -> approved.
+    * payment_submitted is retained only for records created by the previous manual flow.
    */
   requestStatus: 'pending' | 'awaiting_payment' | 'payment_submitted' | 'approved' | 'rejected';
   requestRejectionReason?: string;
@@ -103,6 +103,9 @@ export interface Payment {
   reporterName: string;
   reporterAvatar: string;
   amount: number;
+  baseAmount?: number;
+  convenienceFee?: number;
+  convenienceFeeRate?: number;
   status: PaymentStatus;
   method: string;
   articlesCount: number;

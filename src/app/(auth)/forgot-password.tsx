@@ -48,7 +48,7 @@ export default function ForgotPasswordScreen() {
             </View>
             <Text style={[styles.title, { color: theme.colors.text }]}>Check your email</Text>
             <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-              We&apos;ve sent password reset instructions to {email}.
+              If an account exists for {email}, you&apos;ll receive password reset instructions shortly.
             </Text>
             <View style={{ marginTop: 28, alignSelf: 'stretch' }}>
               <Button label="Back to Sign In" onPress={() => router.replace('/(auth)/login')} fullWidth size="lg" />

@@ -23,9 +23,39 @@ In the output, you'll find options to open the app in a
 - [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
+## Backend
+
+Firebase Authentication remains the identity provider. Articles, reporters, payments, settings, notification history, push tokens, Cashfree verification, and scheduled cleanup run on Convex.
+
+Configure the public app endpoint in `.env.local`:
+
+```bash
+EXPO_PUBLIC_CONVEX_URL=https://quirky-rooster-395.convex.cloud
+```
+
+Set backend secrets directly in Convex. Never add their values to source control:
+
+```bash
+npx convex env set CASHFREE_APP_ID
+npx convex env set CASHFREE_SECRET_KEY
+npx convex env set CLOUDINARY_CLOUD_NAME
+npx convex env set CLOUDINARY_API_KEY
+npx convex env set CLOUDINARY_API_SECRET
+```
+
+Cashfree must send payment webhooks to `https://quirky-rooster-395.convex.site/cashfree-webhook`.
+
+To replace the Convex tables with the current Firestore data, expose a Firebase service-account JSON value for only the duration of the command and run:
+
+```bash
+FIREBASE_SERVICE_ACCOUNT='...' npm run migrate:firestore
+```
+
+Use `npm run migrate:firestore -- --export-only` to inspect the ignored `.convex-migration/*.jsonl` snapshots without importing them. The normal command uses Convex's `--replace` mode for all six tables.
+
 ## System notifications
 
-The app registers signed-in devices for Expo push notifications. A Firebase Function sends an OS notification whenever a document is created in the `notifications` Firestore collection. Tapping an alert opens its article, reporter, or notification history screen.
+The app registers signed-in devices in Convex for Expo push notifications. A Convex action sends an OS notification whenever the app creates a notification record. Tapping an alert opens its article, reporter, or notification history screen.
 
 Remote notifications require a development or release build; they do not work in Expo Go on Android.
 
@@ -37,10 +67,10 @@ Remote notifications require a development or release build; they do not work in
 
 2. Configure iOS push credentials with `eas credentials --platform ios`. Apple push credentials require a paid Apple Developer account.
 
-3. Deploy the token rules and notification sender. Cloud Functions deployment requires the Firebase project to use the Blaze plan:
+3. Deploy the Convex functions and cron jobs:
 
    ```bash
-   npx firebase-tools deploy --only firestore:rules,functions
+   npx convex dev --once
    ```
 
 4. Rebuild and install the native app because the `expo-notifications` config plugin is a build-time change:

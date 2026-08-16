@@ -30,12 +30,15 @@ function plainArticleText(content: string) {
     .replace(/^(?:# |\- |> )/gm, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/_([^_]+)_/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/<u>([^<]+)<\/u>/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/\n+/g, ' ')
     .trim();
 }
 
 function renderInlineText(text: string, keyPrefix = 'inline'): ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*|_[^_]+_)/g).filter(Boolean);
+  const parts = text.split(/(\*\*[^*]+\*\*|_[^_]+_|~~[^~]+~~|<u>[^<]+<\/u>|\[[^\]]+\]\([^)]+\))/g).filter(Boolean);
   return parts.map((part, index) => {
     const key = `${keyPrefix}-${index}`;
     if (part.startsWith('**') && part.endsWith('**')) {
@@ -44,6 +47,14 @@ function renderInlineText(text: string, keyPrefix = 'inline'): ReactNode[] {
     if (part.startsWith('_') && part.endsWith('_')) {
       return <Text key={key} style={styles.bodyItalic}>{renderInlineText(part.slice(1, -1), key)}</Text>;
     }
+    if (part.startsWith('~~') && part.endsWith('~~')) {
+      return <Text key={key} style={styles.bodyStrike}>{renderInlineText(part.slice(2, -2), key)}</Text>;
+    }
+    if (part.startsWith('<u>') && part.endsWith('</u>')) {
+      return <Text key={key} style={styles.bodyUnderline}>{renderInlineText(part.slice(3, -4), key)}</Text>;
+    }
+    const link = part.match(/^\[([^\]]+)\]\([^)]+\)$/);
+    if (link) return <Text key={key} style={styles.bodyLink}>{renderInlineText(link[1], key)}</Text>;
     return part;
   });
 }
@@ -59,6 +70,15 @@ function renderBodyLines(lines: string[], keyPrefix: string) {
         <View key={key} style={styles.bulletRow}>
           <Text style={styles.bulletMark}>•</Text>
           <Text style={[styles.body, styles.bulletText]}>{renderInlineText(line.slice(2), `bullet-${key}`)}</Text>
+        </View>
+      );
+    }
+    const ordered = line.match(/^(\d+)\.\s+(.*)$/);
+    if (ordered) {
+      return (
+        <View key={key} style={styles.bulletRow}>
+          <Text style={styles.bulletMark}>{ordered[1]}.</Text>
+          <Text style={[styles.body, styles.bulletText]}>{renderInlineText(ordered[2], `ordered-${key}`)}</Text>
         </View>
       );
     }
@@ -358,7 +378,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.headlineRule} />
             <View style={styles.simpleBody}>
-              {sLines.map((p, i) => <Text key={i} style={styles.body}>{p}</Text>)}
+              {renderBodyLines(sLines, `section-${section.id}`)}
             </View>
           </View>
         );
@@ -621,6 +641,15 @@ const styles = StyleSheet.create({
   },
   bodyItalic: {
     fontStyle: 'italic',
+  },
+  bodyUnderline: {
+    textDecorationLine: 'underline',
+  },
+  bodyStrike: {
+    textDecorationLine: 'line-through',
+  },
+  bodyLink: {
+    textDecorationLine: 'underline',
   },
   bodyHeading: {
     color: INK,

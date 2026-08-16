@@ -67,22 +67,35 @@ export default function EditProfileScreen() {
 
     setSubmitting(true);
     try {
-      const resolvedProfile = await updateReporter(reporter.id, {
+      const sharedProfile = {
         name: name.trim(),
         phone: phone.trim(),
         city: city.trim(),
+        avatar,
+      };
+      const previousReporterProfile = {
+        name: reporter.name,
+        phone: reporter.phone,
+        city: reporter.city,
+        village: reporter.village,
+        address: reporter.address,
+        aadharNumber: reporter.aadharNumber,
+        avatar: reporter.avatar,
+        photo: reporter.photo,
+      };
+      const resolvedProfile = await updateReporter(reporter.id, {
+        ...sharedProfile,
         village: village.trim() || undefined,
         address: address.trim() || undefined,
         aadharNumber: aadharNumber.trim() || undefined,
-        avatar,
         photo: avatar,
       });
-      await updateUserProfile({
-        name: name.trim(),
-        phone: phone.trim(),
-        city: city.trim(),
-        avatar: resolvedProfile.avatar ?? avatar,
-      });
+      try {
+        await updateUserProfile({ ...sharedProfile, avatar: resolvedProfile.avatar ?? avatar });
+      } catch (error) {
+        await updateReporter(reporter.id, previousReporterProfile);
+        throw error;
+      }
       Alert.alert('Profile Updated', 'Your profile has been saved.', [
         { text: 'OK', onPress: () => router.back() },
       ]);

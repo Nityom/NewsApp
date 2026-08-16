@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text } from 'react-native';
 
 import { useAuth } from '@/context/AuthContext';
+import { wasNotificationNavigationHandled } from '@/lib/notificationNavigation';
 import { palette } from '@/theme';
 
 const appLogo = require('../../assets/images/app_logo.png');
@@ -29,6 +30,8 @@ export default function SplashRoute() {
 
   useEffect(() => {
     if (isLoading || !minimumDisplayComplete) return;
+    // A notification tap already routed the app; don't bounce it back to the dashboard.
+    if (wasNotificationNavigationHandled()) return;
 
     if (user?.role === 'admin') {
       router.replace('/(admin)/(tabs)');

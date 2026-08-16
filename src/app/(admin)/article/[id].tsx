@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import type { ElementRef } from 'react';
 import { useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
 import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
@@ -37,7 +37,7 @@ function parseRegistrationDate(label?: string, fallbackIso?: string) {
 export default function AdminArticleDetailScreen() {
   const theme = useAppTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getArticle, updateArticle, deleteArticle } = useArticles();
+  const { getArticle, updateArticle, deleteArticle, isLoading } = useArticles();
   const article = getArticle(id);
   const { getReporter } = useReporters();
   const reporter = article ? getReporter(article.reporterId) : undefined;
@@ -57,6 +57,17 @@ export default function AdminArticleDetailScreen() {
   const viewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
   const [sharing, setSharing] = useState(false);
   const [captureHeight, setCaptureHeight] = useState(CAPTURE_LAYOUT_HEIGHT);
+
+  if (isLoading && !article) {
+    return (
+      <ScreenContainer>
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={{ color: theme.colors.textSecondary }}>Loading article...</Text>
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   if (!article) {
     return (
@@ -119,7 +130,12 @@ export default function AdminArticleDetailScreen() {
   const approve = async () => {
     const now = new Date().toISOString();
     const registrationLabel = registrationDate || formatRegistrationDate(now);
-    await updateArticle(article.id, { status: 'approved', reviewedAt: now, registrationDate: registrationLabel });
+    await updateArticle(article.id, {
+      status: 'approved',
+      reviewedAt: now,
+      registrationDate: registrationLabel,
+      advertisements,
+    });
     setRegistrationDate(registrationLabel);
     Alert.alert('Article Approved', 'The article has been published successfully.', [
       { text: 'OK', onPress: () => router.back() },
@@ -133,6 +149,7 @@ export default function AdminArticleDetailScreen() {
       status: 'rejected',
       rejectionReason: reason.trim(),
       reviewedAt: new Date().toISOString(),
+      advertisements,
     });
     Alert.alert('Article Rejected', 'Feedback has been sent to the reporter.', [
       { text: 'OK', onPress: () => router.back() },
@@ -336,6 +353,12 @@ export default function AdminArticleDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

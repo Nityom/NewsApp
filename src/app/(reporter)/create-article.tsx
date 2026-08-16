@@ -1,90 +1,45 @@
-import DateTimePicker from '@expo/ui/community/datetime-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
-import { Alert, Modal, Pressable, Image as RNImage, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
-import { BlogTextEditor, countArticleWords, limitArticleWords } from '@/components/ui/BlogTextEditor';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
-import { Icon } from '@/components/ui/Icon';
-import { ImageCropModal } from '@/components/ui/ImageCropModal';
+import { Icon, IconName } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
-import { formatRegistrationDate } from '@/context/PublicationInfoContext';
-import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 import type { Article, ArticleSection } from '@/types/models';
 
-const MAX_ARTICLE_WORDS = 500;
-
-type CropTarget = {
-  uri: string;
-  width: number;
-  height: number;
-  kind: 'banner' | 'gallery' | 'ad' | 'section';
-  index?: number;
-  sectionId?: string;
-};
-
-const articleSummary = (value: string) =>
-  value
-    .replace(/^(?:# |\- |> )/gm, '')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/_([^_]+)_/g, '$1')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 140);
-
-function parseRegistrationDate(label?: string) {
-  const match = label?.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  return match
-    ? new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]))
-    : new Date();
-}
+const formatTools: { icon: IconName; token: string; label: string }[] = [
+  { icon: 'text', token: '# ', label: 'Heading' },
+  { icon: 'reorder-four', token: '\n- ', label: 'Bullet' },
+  { icon: 'chatbox-ellipses-outline', token: '"', label: 'Quote' },
+  { icon: 'link', token: '[link]', label: 'Link' },
+];
 
 export default function CreateArticleScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
   const { articles, addArticle, updateArticle } = useArticles();
-  const { getReporterByEmail } = useReporters();
-  const reporter = user?.email ? getReporterByEmail(user.email) : undefined;
   const params = useLocalSearchParams<{ id?: string }>();
-  const reporterIds = useMemo(
-    () => new Set([reporter?.id, user?.id].filter((id): id is string => !!id)),
-    [reporter?.id, user?.id],
-  );
   const editingDraft = useMemo(
-    () => (params.id ? articles.find((article) =>
-      article.id === params.id && (user?.role === 'admin' || reporterIds.has(article.reporterId))) : undefined),
-    [articles, params.id, reporterIds, user?.role],
+    () => (params.id ? articles.find((a) => a.id === params.id) : undefined),
+    [params.id, articles],
   );
 
-  const isAdminEditing = isAdmin && !!editingDraft;
+  const isAdminEditing = user?.role === 'admin' && !!editingDraft;
 
   const [banner, setBanner] = useState<string | undefined>(editingDraft?.banner);
   const [title, setTitle] = useState(editingDraft?.title ?? '');
   const [content, setContent] = useState(editingDraft?.content ?? '');
-  const pageScrollRef = useRef<ScrollView>(null);
-  const editorTopRef = useRef(0);
   const [images, setImages] = useState<string[]>(editingDraft?.images ?? []);
   const [advertisements, setAdvertisements] = useState<string[]>(editingDraft?.advertisements ?? []);
   const [sections, setSections] = useState<ArticleSection[]>(editingDraft?.sections ?? []);
   const [submitting, setSubmitting] = useState<'draft' | 'submit' | 'save' | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [registrationDate, setRegistrationDate] = useState(
-    editingDraft?.registrationDate ?? formatRegistrationDate(new Date().toISOString()),
-  );
-  const [selectedRegistrationDate, setSelectedRegistrationDate] = useState(() =>
-    parseRegistrationDate(editingDraft?.registrationDate),
-  );
-  const [datePickerVisible, setDatePickerVisible] = useState(false);
-  const [cropTarget, setCropTarget] = useState<CropTarget | null>(null);
-  const [pendingCropTargets, setPendingCropTargets] = useState<CropTarget[]>([]);
 
   const pickImage = async (mode: 'banner' | 'gallery' | 'ad') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -95,37 +50,25 @@ export default function CreateArticleScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
-      quality: 1,
-      allowsMultipleSelection: mode === 'gallery',
-      selectionLimit: mode === 'gallery' ? 2 : 1,
-      orderedSelection: mode === 'gallery',
+      quality: mode === 'ad' ? 1 : 0.9,
+      allowsMultipleSelection: false,
     });
     if (result.canceled) return;
-    if (mode === 'ad') {
-      setAdvertisements((current) => [...current, ...result.assets.map((asset) => asset.uri)]);
-      return;
-    }
-    const selectedTargets = result.assets.map((asset) => ({
-      uri: asset.uri,
-      width: asset.width,
-      height: asset.height,
-      kind: mode,
-    } satisfies CropTarget));
-    const [firstTarget, ...remainingTargets] = selectedTargets;
-    if (!firstTarget) return;
+    const asset = result.assets[0];
+    if (!asset) return;
 
-    setPendingCropTargets(remainingTargets);
-    setCropTarget(firstTarget);
+    if (mode === 'banner') {
+      setBanner(asset.uri);
+    } else if (mode === 'gallery') {
+      setImages((prev) => [...prev, asset.uri]);
+    } else {
+      setAdvertisements((prev) => [...prev, asset.uri]);
+    }
   };
 
+  const insertToken = (token: string) => setContent((prev) => `${prev}${token}`);
+
   const addSection = () => {
-    if (countArticleWords(content) > MAX_ARTICLE_WORDS) {
-      Alert.alert(
-        'Shorten the main article',
-        `Two-in-one articles are limited to ${MAX_ARTICLE_WORDS} words per story. Shorten the main article before adding another one.`,
-      );
-      return;
-    }
     setSections((prev) => [...prev, { id: `sec-${Date.now()}`, title: '', content: '' }]);
   };
 
@@ -146,69 +89,13 @@ export default function CreateArticleScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
-      quality: 1,
+      quality: 0.9,
       allowsMultipleSelection: false,
     });
     if (result.canceled) return;
     const asset = result.assets[0];
-    if (asset) {
-      setCropTarget({
-        uri: asset.uri,
-        width: asset.width,
-        height: asset.height,
-        kind: 'section',
-        sectionId: id,
-      });
-    }
-  };
-
-  const handleCropComplete = (uri: string) => {
-    if (!cropTarget) return;
-    if (cropTarget.kind === 'banner') {
-      setBanner(uri);
-    } else if (cropTarget.kind === 'gallery') {
-      setImages((prev) => cropTarget.index === undefined
-        ? [...prev, uri]
-        : prev.map((image, index) => index === cropTarget.index ? uri : image));
-    } else if (cropTarget.kind === 'ad') {
-      setAdvertisements((prev) => cropTarget.index === undefined
-        ? [...prev, uri]
-        : prev.map((image, index) => index === cropTarget.index ? uri : image));
-    } else if (cropTarget.sectionId) {
-      updateSection(cropTarget.sectionId, { image: uri });
-    }
-    const [nextTarget, ...remainingTargets] = pendingCropTargets;
-    setPendingCropTargets(remainingTargets);
-    setCropTarget(nextTarget ?? null);
-  };
-
-  const handleCropCancel = () => {
-    const [nextTarget, ...remainingTargets] = pendingCropTargets;
-    setPendingCropTargets(remainingTargets);
-    setCropTarget(nextTarget ?? null);
-  };
-
-  const adjustPreviewImage = async (target: {
-    kind: 'banner' | 'gallery' | 'ad' | 'section';
-    index?: number;
-    sectionId?: string;
-    uri: string;
-  }) => {
-    try {
-      const uri = target.uri.startsWith('file://')
-        ? target.uri
-        : (await FileSystem.downloadAsync(
-            target.uri,
-            `${FileSystem.cacheDirectory}article-adjust-${Date.now()}.jpg`,
-          )).uri;
-      RNImage.getSize(
-        uri,
-        (width, height) => setCropTarget({ ...target, uri, width, height }),
-        () => Alert.alert('Could not edit photo', 'The selected image could not be loaded. Please choose it again.'),
-      );
-    } catch {
-      Alert.alert('Could not edit photo', 'The selected image could not be downloaded. Check your connection and try again.');
-    }
+    if (!asset) return;
+    updateSection(id, { image: asset.uri });
   };
 
   const handleSave = async (kind: 'draft' | 'submit' | 'save') => {
@@ -220,67 +107,45 @@ export default function CreateArticleScreen() {
       Alert.alert('Banner required', 'Please upload a news photo before continuing.');
       return;
     }
-    if (sections.length > 0 && countArticleWords(content) > MAX_ARTICLE_WORDS) {
-      Alert.alert(
-        'Main article is too long',
-        `Two-in-one articles are limited to ${MAX_ARTICLE_WORDS} words per story. Shorten the main article before continuing.`,
-      );
-      return;
-    }
-    const oversizedSectionIndex = sections.findIndex(
-      (section) => countArticleWords(section.content) > MAX_ARTICLE_WORDS,
-    );
-    if (oversizedSectionIndex >= 0) {
-      Alert.alert(
-        `Article ${oversizedSectionIndex + 2} is too long`,
-        `Each story in a combined article is limited to ${MAX_ARTICLE_WORDS} words.`,
-      );
-      return;
-    }
     setSubmitting(kind);
     const now = new Date().toISOString();
-    const status = kind === 'draft' ? 'draft' : kind === 'submit' ? (isAdmin ? 'approved' : 'pending') : editingDraft?.status ?? 'pending';
+    const status = kind === 'draft' ? 'draft' : kind === 'submit' ? 'pending' : editingDraft?.status ?? 'pending';
     const cleanSections = sections.filter((s) => s.title.trim() || s.content.trim() || s.image);
-    const adminPublicationFields = isAdmin
-      ? { registrationDate }
-      : {};
 
     try {
       if (editingDraft) {
         await updateArticle(editingDraft.id, {
           title,
-          summary: articleSummary(content),
+          summary: content.slice(0, 140),
           content,
           banner,
           images,
           advertisements,
           sections: cleanSections,
+          category: editingDraft.category,
           status,
           updatedAt: now,
           submittedAt: kind === 'submit' ? now : editingDraft.submittedAt,
-          reviewedAt: kind === 'submit' && isAdmin ? now : editingDraft.reviewedAt,
-          ...adminPublicationFields,
         });
       } else {
         const newArticle: Article = {
           id: `art-${Date.now()}`,
           title,
-          summary: articleSummary(content),
+          summary: content.slice(0, 140),
           content,
           banner,
           images,
           advertisements,
           sections: cleanSections,
+          category: 'Education',
           status,
-          reporterId: reporter?.id ?? user?.id ?? 'unknown',
+          reporterId: user?.id ?? 'unknown',
           reporterName: user?.name ?? 'Unknown Reporter',
           reporterAvatar: user?.avatar ?? '',
           reporterPhone: user?.phone,
           createdAt: now,
           updatedAt: now,
           submittedAt: kind === 'submit' ? now : undefined,
-          reviewedAt: kind === 'submit' && isAdmin ? now : undefined,
-          ...adminPublicationFields,
           views: 0,
           likes: 0,
           readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
@@ -291,33 +156,15 @@ export default function CreateArticleScreen() {
       setSubmitting(null);
       const messages: Record<typeof kind, [string, string]> = {
         draft: ['Saved to Drafts', 'Your article has been saved as a draft.'],
-        submit: isAdmin
-          ? ['Article Published', 'The article has been published successfully.']
-          : ['Submitted for Review', 'Your article has been submitted to the editorial team for review.'],
+        submit: ['Submitted for Review', 'Your article has been submitted to the editorial team for review.'],
         save: ['Changes Saved', 'The article has been updated.'],
       };
       const [title_, message] = messages[kind];
       setPreviewVisible(false);
-      Alert.alert(title_, message, [{
-        text: 'OK',
-        onPress: () => {
-          if (isAdmin) {
-            router.replace({
-              pathname: '/(admin)/(tabs)/articles',
-              params: { status },
-            });
-          } else {
-            router.back();
-          }
-        },
-      }]);
-    } catch (error) {
+      Alert.alert(title_, message, [{ text: 'OK', onPress: () => router.back() }]);
+    } catch {
       setSubmitting(null);
-      console.error('Failed to save article:', error);
-      Alert.alert(
-        'Something went wrong',
-        `Could not save the article. ${error instanceof Error ? error.message : 'Please try again.'}`,
-      );
+      Alert.alert('Something went wrong', 'Could not save the article. Please try again.');
     }
   };
 
@@ -337,25 +184,25 @@ export default function CreateArticleScreen() {
     () => ({
       id: editingDraft?.id ?? 'preview',
       title,
-      summary: articleSummary(content),
+      summary: content.slice(0, 140),
       content,
       banner: banner ?? '',
       images,
       advertisements,
       sections: sections.filter((s) => s.title.trim() || s.content.trim() || s.image),
+      category: editingDraft?.category ?? 'Education',
       status: editingDraft?.status ?? 'pending',
-      reporterId: editingDraft?.reporterId ?? reporter?.id ?? user?.id ?? 'unknown',
+      reporterId: editingDraft?.reporterId ?? user?.id ?? 'unknown',
       reporterName: editingDraft?.reporterName ?? user?.name ?? 'Unknown Reporter',
       reporterAvatar: editingDraft?.reporterAvatar ?? user?.avatar ?? '',
       reporterPhone: editingDraft?.reporterPhone ?? user?.phone,
       createdAt: editingDraft?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      registrationDate: isAdmin ? registrationDate : editingDraft?.registrationDate,
       views: editingDraft?.views ?? 0,
       likes: editingDraft?.likes ?? 0,
       readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
     }),
-    [editingDraft, title, content, banner, images, advertisements, sections, isAdmin, registrationDate, reporter?.id, user],
+    [editingDraft, title, content, banner, images, advertisements, sections, user],
   );
 
   return (
@@ -368,7 +215,7 @@ export default function CreateArticleScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView ref={pageScrollRef} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>News Photo</Text>
         <View
           style={[
@@ -409,24 +256,26 @@ export default function CreateArticleScreen() {
           Article Body
         </Text>
         <View
-          onLayout={(event) => {
-            editorTopRef.current = event.nativeEvent.layout.y;
-          }}>
-          <BlogTextEditor
-            initialValue={content}
-            onChange={setContent}
-            maxWords={sections.length > 0 ? MAX_ARTICLE_WORDS : undefined}
-            onCursorPosition={(offsetY) => {
-              pageScrollRef.current?.scrollTo({
-                y: Math.max(0, editorTopRef.current + offsetY - 180),
-                animated: true,
-              });
-            }}
-          />
-          <Text style={[styles.sectionCharCount, { color: theme.colors.textMuted }]}>
-            {countArticleWords(content)}{sections.length > 0 ? `/${MAX_ARTICLE_WORDS}` : ''} words
-          </Text>
+          style={[
+            styles.toolbar,
+            { backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md },
+          ]}>
+          {formatTools.map((tool) => (
+            <IconButton key={tool.label} icon={tool.icon} size={18} onPress={() => insertToken(tool.token)} />
+          ))}
         </View>
+        <TextInput
+          value={content}
+          onChangeText={setContent}
+          placeholder="Start writing your story..."
+          placeholderTextColor={theme.colors.textMuted}
+          style={[
+            styles.bodyInput,
+            { color: theme.colors.text, borderColor: theme.colors.border, borderRadius: theme.radius.md },
+          ]}
+          multiline
+          textAlignVertical="top"
+        />
 
         <View style={styles.imagesHeader}>
           <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
@@ -520,9 +369,7 @@ export default function CreateArticleScreen() {
             />
             <TextInput
               value={section.content}
-              onChangeText={(text) => updateSection(section.id, {
-                content: limitArticleWords(text, MAX_ARTICLE_WORDS),
-              })}
+              onChangeText={(text) => updateSection(section.id, { content: text })}
               placeholder="Write this story..."
               placeholderTextColor={theme.colors.textMuted}
               style={[
@@ -532,46 +379,8 @@ export default function CreateArticleScreen() {
               multiline
               textAlignVertical="top"
             />
-            <Text
-              style={[
-                styles.sectionCharCount,
-                { color: theme.colors.textMuted },
-              ]}>
-              {countArticleWords(section.content)}/{MAX_ARTICLE_WORDS} words
-            </Text>
           </View>
         ))}
-
-        {isAdmin ? (
-          <View style={styles.dateSection}>
-            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>Publication Date</Text>
-            <Pressable
-              onPress={() => setDatePickerVisible(true)}
-              style={[
-                styles.dateButton,
-                { backgroundColor: theme.colors.backgroundSubtle, borderColor: theme.colors.border },
-              ]}>
-              <Icon name="calendar-outline" size={20} color={theme.colors.primary} />
-              <Text style={[styles.dateValue, { color: theme.colors.text }]}>{registrationDate}</Text>
-              <Icon name="chevron-down" size={18} color={theme.colors.textMuted} />
-            </Pressable>
-            {datePickerVisible ? (
-              <DateTimePicker
-                value={selectedRegistrationDate}
-                mode="date"
-                display="calendar"
-                presentation="dialog"
-                accentColor={theme.colors.primary}
-                onValueChange={(_, date) => {
-                  setDatePickerVisible(false);
-                  setSelectedRegistrationDate(date);
-                  setRegistrationDate(formatRegistrationDate(date.toISOString()));
-                }}
-                onDismiss={() => setDatePickerVisible(false)}
-              />
-            ) : null}
-          </View>
-        ) : null}
 
         {user ? (
           <View
@@ -589,26 +398,13 @@ export default function CreateArticleScreen() {
         ) : null}
 
         <View style={{ height: 24 }} />
-        {isAdmin ? (
-          <ButtonRow>
-            <View style={{ flex: 1 }}>
-              <Button
-                label={isAdminEditing ? 'Save Changes' : 'Save as Draft'}
-                variant="outline"
-                onPress={() => handleSave(isAdminEditing ? 'save' : 'draft')}
-                loading={submitting === (isAdminEditing ? 'save' : 'draft')}
-                fullWidth
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button
-                label="Publish Now"
-                onPress={requestSubmit}
-                loading={submitting === 'submit'}
-                fullWidth
-              />
-            </View>
-          </ButtonRow>
+        {isAdminEditing ? (
+          <Button
+            label="Save Changes"
+            onPress={() => handleSave('save')}
+            loading={submitting === 'save'}
+            fullWidth
+          />
         ) : (
           <ButtonRow>
             <View style={{ flex: 1 }}>
@@ -643,11 +439,11 @@ export default function CreateArticleScreen() {
             <View style={{ width: 40 }} />
           </View>
           <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent}>
-            <ArticleNewspaperLayout article={previewArticle} onImagePress={adjustPreviewImage} />
+            <ArticleNewspaperLayout article={previewArticle} />
           </ScrollView>
           <View style={styles.previewFooter}>
             <Button
-              label={isAdmin ? 'Confirm & Publish' : 'Confirm & Submit'}
+              label="Confirm & Submit"
               onPress={() => handleSave('submit')}
               loading={submitting === 'submit'}
               fullWidth
@@ -655,18 +451,6 @@ export default function CreateArticleScreen() {
           </View>
         </ScreenContainer>
       </Modal>
-
-      <ImageCropModal
-        visible={!!cropTarget}
-        imageUri={cropTarget?.uri ?? null}
-        imageWidth={cropTarget?.width ?? 1}
-        imageHeight={cropTarget?.height ?? 1}
-        aspect={null}
-        preserveOriginal={cropTarget?.kind === 'ad'}
-        onCancel={handleCropCancel}
-        onCropComplete={handleCropComplete}
-      />
-
     </ScreenContainer>
   );
 }
@@ -733,11 +517,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  sectionCharCount: {
-    fontSize: 11,
-    marginTop: 6,
-    textAlign: 'right',
-  },
   sectionImageWrap: {
     aspectRatio: 4 / 3,
     borderWidth: StyleSheet.hairlineWidth,
@@ -771,23 +550,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     padding: 14,
   },
-  dateSection: {
-    marginTop: 20,
-  },
-  dateButton: {
-    minHeight: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-  },
-  dateValue: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-  },
   reporterFooterText: {
     fontSize: 14,
     fontWeight: '700',
@@ -800,17 +562,25 @@ const styles = StyleSheet.create({
     padding: 14,
     minHeight: 54,
   },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  toolbar: {
+    flexDirection: 'row',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
   bodyInput: {
     fontSize: 14.5,
     lineHeight: 22,
     borderWidth: 1,
     padding: 14,
-    minHeight: 120,
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    minHeight: 200,
   },
   imagesHeader: {
     marginTop: 20,

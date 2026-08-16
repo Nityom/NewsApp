@@ -8,6 +8,7 @@ import { AppState, Platform } from 'react-native';
 
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/context/NotificationsContext';
+import { markNotificationNavigationHandled } from '@/lib/notificationNavigation';
 import { useReporters } from '@/context/ReportersContext';
 import { api } from '@convex/_generated/api';
 
@@ -102,6 +103,7 @@ export function SystemNotifications() {
     const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const notificationId = response.notification.request.content.data?.notificationId;
       if (typeof notificationId === 'string') markRead(notificationId).catch(() => {});
+      markNotificationNavigationHandled();
       openNotification(response.notification);
     });
 
@@ -110,6 +112,7 @@ export function SystemNotifications() {
         if (!response) return;
         const notificationId = response.notification.request.content.data?.notificationId;
         if (typeof notificationId === 'string') markRead(notificationId).catch(() => {});
+        markNotificationNavigationHandled();
         openNotification(response.notification);
         return Notifications.clearLastNotificationResponseAsync();
       })

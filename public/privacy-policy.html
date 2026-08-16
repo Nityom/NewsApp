@@ -94,6 +94,13 @@
         font-family: Arial, Helvetica, sans-serif;
         font-size: 13px;
       }
+
+      footer nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 18px;
+        margin-bottom: 12px;
+      }
     </style>
   </head>
   <body>
@@ -105,7 +112,7 @@
     </header>
 
     <main>
-      <p class="updated">Effective and last updated: August 12, 2026</p>
+      <p class="updated">Effective and last updated: August 16, 2026</p>
       <p>
         This Privacy Policy explains how Education News ("we", "us", or "our") collects, uses, shares, and
         protects information when you use the Education News mobile application (the "App").
@@ -117,7 +124,7 @@
           <li><strong>Account information:</strong> name, email address, phone number, and authentication details.</li>
           <li><strong>Reporter profile information:</strong> village, address, profile photo, and optional Aadhaar number supplied during reporter registration.</li>
           <li><strong>Content:</strong> articles, drafts, images, banners, advertisements, and other material you submit.</li>
-          <li><strong>Payment information:</strong> joining-fee and payout status or references. We do not collect or store payment-card numbers.</li>
+          <li><strong>Payment information:</strong> joining-fee amount, Cashfree order and transaction references, payment method category, status, and reporter payout records. We do not collect or store complete card, bank-account, or UPI credentials.</li>
           <li><strong>Device and technical information:</strong> notification tokens, app diagnostics, and basic device information needed to operate and secure the App.</li>
         </ul>
       </section>
@@ -148,8 +155,10 @@
         <p>
           We do not sell personal information. We share information only as needed to operate the App, comply with law,
           protect users, or complete a business transfer. Our service providers include Google Firebase for
-          authentication, database, and notifications; Google Sign-In when selected; and Cloudinary for uploaded image
-          hosting. These providers process information under their own terms and privacy policies.
+          authentication and notifications; Google Sign-In when selected; Convex for application data and server
+          functions; Cloudinary for uploaded image hosting; and Cashfree for payment processing. Cashfree receives the
+          customer and transaction information needed to create, process, verify, and refund payments. These providers
+          process information under their own terms and privacy policies.
         </p>
         <p>
           Approved article content and reporter attribution may be made public as part of the publishing service.
@@ -206,7 +215,14 @@
         </p>
       </section>
 
-      <footer>Education News &middot; Privacy Policy</footer>
+      <footer>
+        <nav aria-label="Policy links">
+          <a href="/terms-and-conditions">Terms and Conditions</a>
+          <a href="/refund-policy">Refund Policy</a>
+          <a href="/privacy-policy">Privacy Policy</a>
+        </nav>
+        Education News &middot; Privacy Policy
+      </footer>
     </main>
   </body>
 </html>

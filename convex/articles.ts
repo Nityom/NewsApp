@@ -24,7 +24,13 @@ export const upsert = mutation({
     const data = cleanData(article);
     const existing = await findByExternalId(ctx.db, 'articles', data.id);
     const reporter = isAdminEmail(email) ? null : await getReporterForEmail(ctx.db, email);
-    if (!isAdminEmail(email) && (!reporter || data.reporterId !== reporter.id)) throw new Error('You can only create your own articles.');
+    if (!isAdminEmail(email)) {
+      if (!reporter) throw new Error('Reporter record not found.');
+      data.reporterId = reporter.id;
+      data.reporterName = reporter.data.name;
+      data.reporterAvatar = reporter.data.avatar;
+      data.reporterPhone = reporter.data.phone;
+    }
     if (!isAdminEmail(email) && !['draft', 'pending'].includes(data.status)) throw new Error('Only an administrator can publish an article.');
     if (existing) throw new Error('Article already exists.');
     await ctx.db.insert('articles', { id: data.id, reporterId: data.reporterId, data });

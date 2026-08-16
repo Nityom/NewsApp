@@ -60,21 +60,6 @@ export const patch = mutation({
     }
     const data = cleanData({ ...existing.data, ...args.patch });
     await ctx.db.patch(existing._id, { email: String(data.email).toLowerCase(), data });
-
-    if (args.patch.name !== undefined || args.patch.avatar !== undefined || args.patch.photo !== undefined) {
-      const payments = await ctx.db
-        .query('payments')
-        .withIndex('by_reporter', (query) => query.eq('reporterId', existing.id))
-        .collect();
-      const reporterAvatar = String(data.avatar ?? data.photo ?? '');
-      await Promise.all(payments.map((payment) => ctx.db.patch(payment._id, {
-        data: {
-          ...payment.data,
-          reporterName: String(data.name),
-          reporterAvatar,
-        },
-      })));
-    }
     return args.patch;
   },
 });

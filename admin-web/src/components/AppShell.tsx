@@ -10,7 +10,6 @@ import {
     Menu,
     Settings,
     Users,
-    X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -39,7 +38,6 @@ export function AppShell() {
       <aside className={`sidebar ${open ? 'sidebar-open' : ''}`}>
         <div className="brand-block">
           <img src="/app-logo.png" alt="Education News" />
-          <button type="button" className="icon-button sidebar-close" onClick={() => setOpen(false)} aria-label="Close menu"><X /></button>
         </div>
         <nav>
           {links.map(({ to, label, icon: Icon }) => (

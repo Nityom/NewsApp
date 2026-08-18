@@ -5,7 +5,7 @@ import { useRef, useState } from 'react';
 import { Alert, LayoutChangeEvent, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
-import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
+import { ArticleNewspaperLayout, plainArticleText } from '@/components/ui/ArticleNewspaperLayout';
 import { StatusBadge } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -60,7 +60,7 @@ export default function ArticleDetailScreen() {
         Alert.alert('Sharing unavailable', 'Sharing is not supported on this device.');
         return;
       }
-      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: article.title });
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: plainArticleText(article.title) });
     } catch {
       Alert.alert('Share failed', 'Could not generate the article image. Please try again.');
     } finally {

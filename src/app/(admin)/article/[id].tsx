@@ -1,14 +1,14 @@
 import DateTimePicker from '@expo/ui/community/datetime-picker';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import type { ElementRef } from 'react';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
-import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
+import { ArticleNewspaperLayout, plainArticleText } from '@/components/ui/ArticleNewspaperLayout';
 import { Avatar } from '@/components/ui/Avatar';
 import { StatusBadge } from '@/components/ui/Badge';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
@@ -41,7 +41,7 @@ export default function AdminArticleDetailScreen() {
   const article = getArticle(id);
   const { getReporter } = useReporters();
   const reporter = article ? getReporter(article.reporterId) : undefined;
-  const reporterPhone = article?.reporterPhone ?? reporter?.phone;
+  const reporterPhone = article?.reporterPhone?.trim() || reporter?.phone;
   const reporterPhoto = reporter?.photo || reporter?.avatar || article?.reporterAvatar;
   const [rejectVisible, setRejectVisible] = useState(false);
   const [deleteVisible, setDeleteVisible] = useState(false);
@@ -87,7 +87,7 @@ export default function AdminArticleDetailScreen() {
         Alert.alert('Sharing unavailable', 'Sharing is not supported on this device.');
         return;
       }
-      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: article.title });
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: plainArticleText(article.title) });
     } catch {
       Alert.alert('Share failed', 'Could not generate the article image. Please try again.');
     } finally {
@@ -188,7 +188,7 @@ export default function AdminArticleDetailScreen() {
           ) : null}
           <IconButton
             icon="create-outline"
-            onPress={() => router.push({ pathname: '/(reporter)/create-article', params: { id: article.id } })}
+            onPress={() => router.push(`/(admin)/create-article?id=${encodeURIComponent(article.id)}` as Href)}
           />
           <IconButton icon="trash-outline" color={theme.colors.danger} onPress={() => setDeleteVisible(true)} />
         </View>

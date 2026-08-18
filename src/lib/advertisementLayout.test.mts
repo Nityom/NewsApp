@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { advertisementWidths } from './advertisementLayout.ts';
+import { HORIZONTAL_AD_ASPECT, VERTICAL_AD_ASPECT, advertisementFrameRatio, advertisementWidths } from './advertisementLayout.ts';
+
+test('keeps advertisement frames at stable newspaper ratios', () => {
+  assert.equal(advertisementFrameRatio(2.4), HORIZONTAL_AD_ASPECT);
+  assert.equal(advertisementFrameRatio(0.4), VERTICAL_AD_ASPECT);
+});
 
 test('sizes a single horizontal or vertical ad without cropping', () => {
   assert.deepEqual(advertisementWidths([16 / 9]), ['100%']);

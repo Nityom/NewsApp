@@ -68,6 +68,7 @@ function drawRichText(context: CanvasRenderingContext2D, blocks: RichTextBlock[]
       const tokens = run.text.match(/\n|\S+\s*/g) ?? [];
       for (const token of tokens) {
         context.font = richTextFont(run.marks, size, heading, quote);
+        context.fillStyle = run.marks.color ?? '#171717';
         const tokenWidth = context.measureText(token).width;
         if (token === '\n' || (cursorX > blockX && cursorX + tokenWidth > blockX + blockWidth)) {
           lineY += lineHeight;
@@ -84,6 +85,28 @@ function drawRichText(context: CanvasRenderingContext2D, blocks: RichTextBlock[]
     y = lineY + lineHeight + px(8);
   }
   return y;
+}
+
+function drawRichTitle(context: CanvasRenderingContext2D, blocks: RichTextBlock[], x: number, y: number, maxWidth: number) {
+  const size = px(26);
+  const lineHeight = px(32);
+  let cursorX = x;
+  let lineY = y;
+  for (const run of blocks.flatMap((block) => block.runs)) {
+    for (const token of run.text.toUpperCase().match(/\S+\s*/g) ?? []) {
+      context.font = richTextFont(run.marks, size, true);
+      context.fillStyle = run.marks.color ?? '#171717';
+      const tokenWidth = context.measureText(token).width;
+      if (cursorX > x && cursorX + tokenWidth > x + maxWidth) {
+        lineY += lineHeight;
+        cursorX = x;
+      }
+      context.fillText(token, cursorX, lineY);
+      cursorX += tokenWidth;
+    }
+  }
+  context.fillStyle = '#171717';
+  return lineY + lineHeight;
 }
 
 function drawContainedImage(context: CanvasRenderingContext2D, image: ImageBitmap, x: number, y: number, width: number, maxHeight: number) {
@@ -132,8 +155,7 @@ export async function exportArticleAsPng(article: Article, publication?: Publica
   context.textAlign = 'left';
   y += px(44);
 
-  context.font = `900 ${px(26)}px Arial, sans-serif`;
-  y = drawLines(context, wrapText(context, article.title.toUpperCase(), CONTENT_WIDTH), MARGIN, y, px(32)) + px(8);
+  y = drawRichTitle(context, parseRichText(article.title), MARGIN, y, CONTENT_WIDTH) + px(8);
   context.fillRect(MARGIN, y, CONTENT_WIDTH, 1);
   y += px(8);
 

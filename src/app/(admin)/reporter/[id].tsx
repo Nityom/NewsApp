@@ -5,6 +5,7 @@ import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { plainArticleText } from '@/components/ui/ArticleNewspaperLayout';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
@@ -304,7 +305,7 @@ export default function ReporterDetailsScreen() {
         {recentArticles.map((article) => (
           <Card key={article.id} style={styles.articleRow}>
             <Text style={[styles.articleTitle, { color: theme.colors.text }]} numberOfLines={2}>
-              {article.title}
+              {plainArticleText(article.title)}
             </Text>
             <Badge label={article.status} tone={article.status === 'approved' ? 'success' : article.status === 'rejected' ? 'danger' : 'warning'} size="sm" />
           </Card>

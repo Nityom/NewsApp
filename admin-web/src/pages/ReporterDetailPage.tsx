@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { Button, Dialog, EmptyState, LoadingState, PageHeader, StatusBadge } from '../components/ui';
 import { api } from '../lib/api';
+import { plainRichText } from '../lib/richText';
 import { currency, dedupeReporters, errorMessage, formatDate } from '../lib/utils';
 import type { Payment } from '../types';
 
@@ -144,7 +145,7 @@ export function ReporterDetailPage() {
               <Button variant="danger" onClick={() => { if (window.confirm(`Delete ${reporter.name}'s account?`)) void run('delete', async () => { await removeReporter({ id: reporter.id }); navigate('/reporters'); }); }} loading={busy === 'delete'}><Trash2 size={17} /> Delete account</Button>
             </div>
           </section>
-          <section className="panel"><header><span className="eyebrow">Publishing record</span><h2>Recent articles</h2></header><div className="compact-list">{reporterArticles.slice(0, 6).map((article) => <Link to={`/articles/${article.id}`} key={article.id}><span><strong>{article.title}</strong><small>{formatDate(article.createdAt)}</small></span><StatusBadge value={article.status} /></Link>)}{!reporterArticles.length ? <p className="muted">No articles submitted.</p> : null}</div></section>
+          <section className="panel"><header><span className="eyebrow">Publishing record</span><h2>Recent articles</h2></header><div className="compact-list">{reporterArticles.slice(0, 6).map((article) => <Link to={`/articles/${article.id}`} key={article.id}><span><strong>{plainRichText(article.title)}</strong><small>{formatDate(article.createdAt)}</small></span><StatusBadge value={article.status} /></Link>)}{!reporterArticles.length ? <p className="muted">No articles submitted.</p> : null}</div></section>
           <section className="panel"><header><span className="eyebrow">Transactions</span><h2>Payment history</h2></header><div className="compact-list">{reporterPayments.map((payment) => <div key={payment.id}><span><strong>{currency.format(payment.amount)}</strong><small>{formatDate(payment.createdAt)} · {payment.method}</small></span><StatusBadge value={payment.status} /></div>)}{!reporterPayments.length ? <p className="muted">No payment records.</p> : null}</div></section>
         </div>
       </div>

@@ -14,6 +14,11 @@ import { dateInputValue, errorMessage, publicationDate, stripHtml } from '../lib
 import type { Article, ArticleSection, ArticleStatus } from '../types';
 
 type UploadTarget = 'banner' | 'gallery' | 'advertisements';
+const TWO_NEWS_WORD_LIMIT = 320;
+
+function wordCount(value: string) {
+  return stripHtml(value).match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu)?.length ?? 0;
+}
 
 export function CreateArticlePage() {
   const { id } = useParams();
@@ -40,7 +45,7 @@ export function CreateArticlePage() {
   useEffect(() => {
     if (!selectedArticle || initializedArticle.current === selectedArticle.id) return;
     initializedArticle.current = selectedArticle.id;
-    setTitle(selectedArticle.title);
+    setTitle(articleMarkupToHtml(selectedArticle.title));
     setContent(articleMarkupToHtml(selectedArticle.content));
     setBanner(selectedArticle.banner);
     setImages(selectedArticle.images);
@@ -54,10 +59,12 @@ export function CreateArticlePage() {
 
   const now = new Date().toISOString();
   const plainContent = stripHtml(content);
+  const savedTitle = htmlToArticleMarkup(title);
+  const isTwoNewsLayout = sections.length > 0;
   const previewArticle: Article = {
     ...(selectedArticle ?? {}),
     id: selectedArticle?.id ?? 'preview',
-    title: title || 'Your headline will appear here',
+    title: savedTitle || 'Your headline will appear here',
     summary: plainContent.slice(0, 140),
     content: content || 'Write the article body to preview the newspaper layout.',
     banner,
@@ -121,7 +128,7 @@ export function CreateArticlePage() {
   }
 
   async function save(status: ArticleStatus) {
-    if (!title.trim()) { setMessage('Enter an article headline.'); return; }
+    if (!stripHtml(title).trim()) { setMessage('Enter an article headline.'); return; }
     if (!content.trim()) { setMessage('Enter the article body.'); return; }
     if (!banner) { setMessage('Upload a lead news image.'); return; }
     setBusy(status);
@@ -132,7 +139,7 @@ export function CreateArticlePage() {
       const savedSections = previewArticle.sections?.map((section) => ({ ...section, content: htmlToArticleMarkup(section.content) }));
       if (selectedArticle) {
         await patchArticle({ id: selectedArticle.id, patch: {
-          title: title.trim(),
+          title: savedTitle,
           summary: plainContent.slice(0, 140),
           content: savedContent,
           banner,
@@ -149,7 +156,7 @@ export function CreateArticlePage() {
       const article: Article = {
         ...previewArticle,
         id: `art-admin-${Date.now()}`,
-        title: title.trim(),
+        title: savedTitle,
         summary: plainContent.slice(0, 140),
         content: savedContent,
         sections: savedSections,
@@ -182,8 +189,8 @@ export function CreateArticlePage() {
         <form className="composer-form" onSubmit={(event) => event.preventDefault()}>
           <section className="panel composer-section">
             <span className="eyebrow">Main story</span>
-            <label>Headline<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Enter a clear news headline" /></label>
-            <label>Article body<RichTextEditor value={content} onChange={setContent} placeholder="Write the complete article here..." /></label>
+            <label>Headline<RichTextEditor value={title} onChange={setTitle} placeholder="Enter a clear news headline" minHeight={58} variant="title" /></label>
+            <label>Article body{isTwoNewsLayout ? ` (${wordCount(content)}/${TWO_NEWS_WORD_LIMIT} words)` : ''}<RichTextEditor value={content} onChange={setContent} placeholder="Write the complete article here..." maxWords={isTwoNewsLayout ? TWO_NEWS_WORD_LIMIT : undefined} /></label>
             <label>Publication date<input type="date" value={registrationDate} onChange={(event) => setRegistrationDate(event.target.value)} /></label>
           </section>
 
@@ -197,7 +204,7 @@ export function CreateArticlePage() {
             <div className="section-editor-list">{sections.map((section, index) => <div className="section-editor" key={section.id}>
               <div className="section-editor-head"><strong>Section {index + 1}</strong><button type="button" className="icon-button" onClick={() => setSections((current) => current.filter((item) => item.id !== section.id))} aria-label="Remove section"><Trash2 size={16} /></button></div>
               <label>Section headline<input value={section.title} onChange={(event) => updateSection(section.id, { title: event.target.value })} /></label>
-              <label>Section body<RichTextEditor value={section.content} onChange={(value) => updateSection(section.id, { content: value })} minHeight={150} /></label>
+              <label>Section body{index === 0 ? ` (${wordCount(section.content)}/${TWO_NEWS_WORD_LIMIT} words)` : ''}<RichTextEditor value={section.content} onChange={(value) => updateSection(section.id, { content: value })} minHeight={150} maxWords={index === 0 ? TWO_NEWS_WORD_LIMIT : undefined} /></label>
               <label className="upload-button"><ImagePlus size={16} /> {section.image ? 'Replace image' : 'Add image'}<input type="file" accept="image/*" onChange={(event) => void uploadSectionImage(section.id, event)} /></label>
               {section.image ? <div className="section-thumb"><img src={section.image} alt="" /><button type="button" onClick={() => updateSection(section.id, { image: undefined })}><X size={14} /></button></div> : null}
             </div>)}</div>

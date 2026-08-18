@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
@@ -78,9 +78,9 @@ export default function AdminArticlesScreen() {
               showAuthor
               showStatus={false}
               onPress={() => router.push(
-                item.status === 'draft'
-                  ? { pathname: '/(reporter)/create-article', params: { id: item.id } }
-                  : `/(admin)/article/${item.id}`,
+                (item.status === 'draft'
+                  ? { pathname: '/(admin)/create-article', params: { id: item.id } }
+                  : `/(admin)/article/${item.id}`) as Href,
               )}
             />
           </View>
@@ -89,7 +89,7 @@ export default function AdminArticlesScreen() {
           <EmptyState icon="document-text-outline" title="No articles" message={`No ${activeTab} articles right now.`} />
         }
       />
-      <FAB onPress={() => router.push('/(reporter)/create-article')} />
+      <FAB onPress={() => router.push('/(admin)/create-article' as Href)} />
     </ScreenContainer>
   );
 }

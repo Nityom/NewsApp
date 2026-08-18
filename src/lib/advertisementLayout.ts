@@ -1,7 +1,14 @@
 export type AdvertisementOrientation = 'horizontal' | 'vertical';
 
+export const HORIZONTAL_AD_ASPECT = 16 / 9;
+export const VERTICAL_AD_ASPECT = 3 / 4;
+
 export function advertisementOrientation(ratio: number): AdvertisementOrientation {
   return ratio >= 1 ? 'horizontal' : 'vertical';
+}
+
+export function advertisementFrameRatio(ratio: number) {
+  return advertisementOrientation(ratio) === 'horizontal' ? HORIZONTAL_AD_ASPECT : VERTICAL_AD_ASPECT;
 }
 
 export function advertisementWidths(ratios: number[]): `${number}%`[] {

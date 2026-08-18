@@ -24,7 +24,7 @@ export function ArticlePreview({ article, publication }: { article: Article; pub
         </div>
       ) : (
         <>
-          <h1>{article.title}</h1>
+          <h1><RichTitle value={article.title} /></h1>
           <div className="newspaper-rule" />
           <img className="lead-photo" src={article.banner} alt="" />
           <RichTextContent value={article.content} className="story-body" />
@@ -62,13 +62,18 @@ function RichRun({ run }: { run: RichTextRun }) {
   if (run.marks.underline) content = <u>{content}</u>;
   if (run.marks.strike) content = <s>{content}</s>;
   if (run.marks.href) content = <a href={run.marks.href} target="_blank" rel="noreferrer">{content}</a>;
+  if (run.marks.color) content = <span style={{ color: run.marks.color }}>{content}</span>;
   return content;
+}
+
+function RichTitle({ value }: { value: string }) {
+  return parseRichText(value).flatMap((block) => block.runs).map((run, index) => <RichRun key={index} run={run} />);
 }
 
 function CompactStory({ title, image, content }: { title: string; image: string; content: string }) {
   return (
     <section>
-      <h2>{title}</h2>
+      <h2><RichTitle value={title} /></h2>
       <img src={image} alt="" />
       <p>{stripHtml(content).slice(0, 900)}</p>
     </section>

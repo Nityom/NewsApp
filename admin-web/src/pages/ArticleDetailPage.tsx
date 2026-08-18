@@ -7,6 +7,7 @@ import { ArticlePreview } from '../components/ArticlePreview';
 import { Button, Dialog, EmptyState, LoadingState, PageHeader, StatusBadge } from '../components/ui';
 import { api } from '../lib/api';
 import { exportArticleAsPng } from '../lib/exportArticle';
+import { plainRichText } from '../lib/richText';
 import { uploadImage } from '../lib/upload';
 import { articleImageFilename, dateInputValue, errorMessage, publicationDate } from '../lib/utils';
 
@@ -29,6 +30,7 @@ export function ArticleDetailPage() {
   if (!articles || publication === undefined) return <LoadingState />;
   if (!selectedArticle) return <div className="page"><EmptyState title="Article not found" message="It may have been permanently deleted." /></div>;
   const article = selectedArticle;
+  const plainTitle = plainRichText(article.title);
   const currentAds = ads ?? article.advertisements;
   const currentDate = date || dateInputValue(article.registrationDate ?? article.reviewedAt);
   const previewArticle = { ...article, advertisements: currentAds, registrationDate: currentDate ? publicationDate(currentDate) : article.registrationDate };
@@ -46,7 +48,7 @@ export function ArticleDetailPage() {
       reporterId: article.reporterId,
       articleId: article.id,
       title: status === 'approved' ? 'Article Approved' : 'Article Needs Changes',
-      message: status === 'approved' ? `“${article.title}” has been approved for publication.` : reason || 'Please review the editorial feedback.',
+      message: status === 'approved' ? `“${plainTitle}” has been approved for publication.` : reason || 'Please review the editorial feedback.',
     } });
   }
 
@@ -96,7 +98,7 @@ export function ArticleDetailPage() {
     await run('download', async () => {
       const url = await exportArticleAsPng(previewArticle, publication);
       const link = document.createElement('a');
-      link.download = articleImageFilename(article.title);
+      link.download = articleImageFilename(plainTitle);
       link.href = url;
       link.click();
     });
@@ -105,7 +107,7 @@ export function ArticleDetailPage() {
   return (
     <div className="page article-detail-page">
       <Link to="/articles" className="back-link"><ArrowLeft size={17} /> Back to articles</Link>
-      <PageHeader title={article.title} description={`${article.reporterName} · Editorial workspace`} actions={<><StatusBadge value={article.status} />{article.status === 'pending' || article.status === 'approved' ? <Link to={`/articles/${article.id}/edit`}><Button variant="secondary"><Pencil size={16} /> Edit</Button></Link> : null}<Button variant="secondary" onClick={() => void downloadPreview()} loading={busy === 'download'}><Download size={16} /> Download</Button></>} />
+      <PageHeader title={plainTitle} description={`${article.reporterName} · Editorial workspace`} actions={<><StatusBadge value={article.status} />{article.status === 'pending' || article.status === 'approved' ? <Link to={`/articles/${article.id}/edit`}><Button variant="secondary"><Pencil size={16} /> Edit</Button></Link> : null}<Button variant="secondary" onClick={() => void downloadPreview()} loading={busy === 'download'}><Download size={16} /> Download</Button></>} />
       {message ? <div className="form-error">{message}</div> : null}
       <div className="article-workspace">
         <div className="preview-stage"><ArticlePreview article={previewArticle} publication={publication} /></div>

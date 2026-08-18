@@ -4,6 +4,7 @@ export interface RichTextMarks {
   underline?: boolean;
   strike?: boolean;
   href?: string;
+  color?: string;
 }
 
 export interface RichTextRun {
@@ -55,6 +56,7 @@ export function parseRichText(value: string): RichTextBlock[] {
       ...(tag === 'u' ? { underline: true } : {}),
       ...(tag === 's' || tag === 'strike' ? { strike: true } : {}),
       ...(tag === 'a' && safeHref(node.getAttribute('href')) ? { href: node.getAttribute('href') ?? undefined } : {}),
+      ...(normalizeColor(node.style.color) ? { color: normalizeColor(node.style.color) } : {}),
     };
     return [...node.childNodes].flatMap((child) => inlineRuns(child, nextMarks));
   }
@@ -85,16 +87,18 @@ export function parseRichText(value: string): RichTextBlock[] {
   return blocks;
 }
 
-function parseInlineMarkup(value: string) {
-  const pattern = /(\*\*[^*]+\*\*|_[^_]+_|~~[^~]+~~|<u>[^<]+<\/u>|\[[^\]]+\]\([^)]+\))/g;
-  return value.split(pattern).filter(Boolean).map((text): RichTextRun => {
-    if (text.startsWith('**')) return { text: text.slice(2, -2), marks: { bold: true } };
-    if (text.startsWith('_')) return { text: text.slice(1, -1), marks: { italic: true } };
-    if (text.startsWith('~~')) return { text: text.slice(2, -2), marks: { strike: true } };
-    if (text.startsWith('<u>')) return { text: text.slice(3, -4), marks: { underline: true } };
+function parseInlineMarkup(value: string, inherited: RichTextMarks = {}): RichTextRun[] {
+  const pattern = /(\[color=#[0-9a-f]{6}\][\s\S]*?\[\/color\]|\*\*[^*]+\*\*|_[^_]+_|~~[^~]+~~|<u>[^<]+<\/u>|\[[^\]]+\]\([^)]+\))/gi;
+  return value.split(pattern).filter(Boolean).flatMap((text): RichTextRun[] => {
+    const colored = text.match(/^\[color=(#[0-9a-f]{6})\]([\s\S]*)\[\/color\]$/i);
+    if (colored) return parseInlineMarkup(colored[2], { ...inherited, color: colored[1] });
+    if (text.startsWith('**')) return parseInlineMarkup(text.slice(2, -2), { ...inherited, bold: true });
+    if (text.startsWith('_')) return parseInlineMarkup(text.slice(1, -1), { ...inherited, italic: true });
+    if (text.startsWith('~~')) return parseInlineMarkup(text.slice(2, -2), { ...inherited, strike: true });
+    if (text.startsWith('<u>')) return parseInlineMarkup(text.slice(3, -4), { ...inherited, underline: true });
     const link = text.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-    if (link) return { text: link[1], marks: { href: safeHref(link[2]) } };
-    return { text, marks: {} };
+    if (link) return [{ text: link[1], marks: { ...inherited, href: safeHref(link[2]) } }];
+    return [{ text, marks: inherited }];
   });
 }
 
@@ -112,6 +116,10 @@ export function htmlToArticleMarkup(value: string) {
       case 'u': return `<u>${content}</u>`;
       case 's': case 'strike': return `~~${content}~~`;
       case 'a': return safeHref(node.getAttribute('href')) ? `[${content}](${node.getAttribute('href')})` : content;
+      case 'span': {
+        const color = normalizeColor(node.style.color);
+        return color ? `[color=${color}]${content}[/color]` : content;
+      }
       case 'br': return '\n';
       default: return content;
     }
@@ -144,6 +152,7 @@ export function articleMarkupToHtml(value: string) {
       if (run.marks.underline) text = `<u>${text}</u>`;
       if (run.marks.strike) text = `<s>${text}</s>`;
       if (run.marks.href) text = `<a href="${escapeHtml(run.marks.href)}">${text}</a>`;
+      if (run.marks.color) text = `<span style="color: ${run.marks.color}">${text}</span>`;
       return text;
     }).join('');
     if (block.type === 'heading') return `<h2>${content}</h2>`;
@@ -152,6 +161,17 @@ export function articleMarkupToHtml(value: string) {
     if (block.type === 'ordered') return `<ol start="${block.number ?? 1}"><li>${content}</li></ol>`;
     return `<p>${content}</p>`;
   }).join('');
+}
+
+export function plainRichText(value: string) {
+  return parseRichText(value).flatMap((block) => block.runs.map((run) => run.text)).join(' ').trim();
+}
+
+function normalizeColor(value: string) {
+  if (/^#[0-9a-f]{6}$/i.test(value)) return value.toLowerCase();
+  const rgb = value.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+  if (!rgb) return undefined;
+  return `#${rgb.slice(1).map((channel) => Number(channel).toString(16).padStart(2, '0')).join('')}`;
 }
 
 export function safeHref(value: string | null) {

@@ -2,28 +2,25 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ArticleNewspaperLayout } from '@/components/ui/ArticleNewspaperLayout';
+import { ArticleNewspaperLayout, MAX_TWO_NEWS_BODY_WORDS } from '@/components/ui/ArticleNewspaperLayout';
+import { BlogTextEditor, countArticleWords, limitArticleWords } from '@/components/ui/BlogTextEditor';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
-import { Icon, IconName } from '@/components/ui/Icon';
+import { Icon } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
+import { useReporters } from '@/context/ReportersContext';
+import { ADMIN_PHONE } from '@/lib/adminProfile';
 import { useAppTheme } from '@/theme';
 import type { Article, ArticleSection } from '@/types/models';
-
-const formatTools: { icon: IconName; token: string; label: string }[] = [
-  { icon: 'text', token: '# ', label: 'Heading' },
-  { icon: 'reorder-four', token: '\n- ', label: 'Bullet' },
-  { icon: 'chatbox-ellipses-outline', token: '"', label: 'Quote' },
-  { icon: 'link', token: '[link]', label: 'Link' },
-];
 
 export default function CreateArticleScreen() {
   const theme = useAppTheme();
   const { user } = useAuth();
   const { articles, addArticle, updateArticle } = useArticles();
+  const { getReporter, getReporterByEmail } = useReporters();
   const params = useLocalSearchParams<{ id?: string }>();
   const editingDraft = useMemo(
     () => (params.id ? articles.find((a) => a.id === params.id) : undefined),
@@ -31,6 +28,14 @@ export default function CreateArticleScreen() {
   );
 
   const isAdminEditing = user?.role === 'admin' && !!editingDraft;
+  const isAdmin = user?.role === 'admin';
+  const authorReporter = editingDraft
+    ? getReporter(editingDraft.reporterId)
+    : user?.email ? getReporterByEmail(user.email) : undefined;
+  const resolvedAuthorPhone = editingDraft?.reporterPhone?.trim()
+    || authorReporter?.phone.trim()
+    || user?.phone?.trim()
+    || (isAdmin ? ADMIN_PHONE : undefined);
 
   const [banner, setBanner] = useState<string | undefined>(editingDraft?.banner);
   const [title, setTitle] = useState(editingDraft?.title ?? '');
@@ -40,6 +45,8 @@ export default function CreateArticleScreen() {
   const [sections, setSections] = useState<ArticleSection[]>(editingDraft?.sections ?? []);
   const [submitting, setSubmitting] = useState<'draft' | 'submit' | 'save' | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const authorPhone = resolvedAuthorPhone;
+  const authorName = editingDraft?.reporterName ?? user?.name ?? 'Unknown Reporter';
 
   const pickImage = async (mode: 'banner' | 'gallery' | 'ad') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -66,14 +73,23 @@ export default function CreateArticleScreen() {
     }
   };
 
-  const insertToken = (token: string) => setContent((prev) => `${prev}${token}`);
+  const limitTwoNewsBody = (value: string) => limitArticleWords(value, MAX_TWO_NEWS_BODY_WORDS);
+  const hasTwoNews = sections.length > 0;
 
   const addSection = () => {
+    // The lead story becomes one side of the two-news layout as soon as a second story is added.
+    setContent((current) => limitTwoNewsBody(current));
     setSections((prev) => [...prev, { id: `sec-${Date.now()}`, title: '', content: '' }]);
   };
 
   const updateSection = (id: string, patch: Partial<ArticleSection>) => {
-    setSections((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+    setSections((prev) => prev.map((s, index) => {
+      if (s.id !== id) return s;
+      const next = { ...s, ...patch };
+      return index === 0 && patch.content !== undefined
+        ? { ...next, content: limitTwoNewsBody(patch.content) }
+        : next;
+    }));
   };
 
   const removeSection = (id: string) => {
@@ -109,7 +125,11 @@ export default function CreateArticleScreen() {
     }
     setSubmitting(kind);
     const now = new Date().toISOString();
-    const status = kind === 'draft' ? 'draft' : kind === 'submit' ? 'pending' : editingDraft?.status ?? 'pending';
+    const status = kind === 'draft'
+      ? 'draft'
+      : kind === 'submit'
+        ? (isAdmin ? 'approved' : 'pending')
+        : editingDraft?.status ?? (isAdmin ? 'approved' : 'pending');
     const cleanSections = sections.filter((s) => s.title.trim() || s.content.trim() || s.image);
 
     try {
@@ -122,10 +142,11 @@ export default function CreateArticleScreen() {
           images,
           advertisements,
           sections: cleanSections,
-          category: editingDraft.category,
+          reporterPhone: authorPhone,
           status,
           updatedAt: now,
           submittedAt: kind === 'submit' ? now : editingDraft.submittedAt,
+          reviewedAt: kind === 'submit' && isAdmin ? now : editingDraft.reviewedAt,
         });
       } else {
         const newArticle: Article = {
@@ -137,15 +158,15 @@ export default function CreateArticleScreen() {
           images,
           advertisements,
           sections: cleanSections,
-          category: 'Education',
           status,
           reporterId: user?.id ?? 'unknown',
           reporterName: user?.name ?? 'Unknown Reporter',
           reporterAvatar: user?.avatar ?? '',
-          reporterPhone: user?.phone,
+          reporterPhone: authorPhone,
           createdAt: now,
           updatedAt: now,
           submittedAt: kind === 'submit' ? now : undefined,
+          reviewedAt: kind === 'submit' && isAdmin ? now : undefined,
           views: 0,
           likes: 0,
           readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
@@ -156,7 +177,9 @@ export default function CreateArticleScreen() {
       setSubmitting(null);
       const messages: Record<typeof kind, [string, string]> = {
         draft: ['Saved to Drafts', 'Your article has been saved as a draft.'],
-        submit: ['Submitted for Review', 'Your article has been submitted to the editorial team for review.'],
+        submit: isAdmin
+          ? ['Article Published', 'Your article has been approved and published.']
+          : ['Submitted for Review', 'Your article has been submitted to the editorial team for review.'],
         save: ['Changes Saved', 'The article has been updated.'],
       };
       const [title_, message] = messages[kind];
@@ -190,19 +213,18 @@ export default function CreateArticleScreen() {
       images,
       advertisements,
       sections: sections.filter((s) => s.title.trim() || s.content.trim() || s.image),
-      category: editingDraft?.category ?? 'Education',
-      status: editingDraft?.status ?? 'pending',
+      status: editingDraft?.status ?? (isAdmin ? 'approved' : 'pending'),
       reporterId: editingDraft?.reporterId ?? user?.id ?? 'unknown',
-      reporterName: editingDraft?.reporterName ?? user?.name ?? 'Unknown Reporter',
+      reporterName: authorName,
       reporterAvatar: editingDraft?.reporterAvatar ?? user?.avatar ?? '',
-      reporterPhone: editingDraft?.reporterPhone ?? user?.phone,
+      reporterPhone: authorPhone,
       createdAt: editingDraft?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       views: editingDraft?.views ?? 0,
       likes: editingDraft?.likes ?? 0,
       readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
     }),
-    [editingDraft, title, content, banner, images, advertisements, sections, user],
+    [editingDraft, title, content, banner, images, advertisements, sections, user, isAdmin, authorPhone, authorName],
   );
 
   return (
@@ -240,41 +262,15 @@ export default function CreateArticleScreen() {
         <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
           Title
         </Text>
-        <TextInput
-          value={title}
-          onChangeText={setTitle}
-          placeholder="Enter a compelling headline"
-          placeholderTextColor={theme.colors.textMuted}
-          style={[
-            styles.titleInput,
-            { color: theme.colors.text, borderColor: theme.colors.border, borderRadius: theme.radius.md },
-          ]}
-          multiline
-        />
+        <BlogTextEditor initialValue={title} onChange={setTitle} variant="title" />
 
         <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
-          Article Body
+          Article Body{hasTwoNews ? ` (${countArticleWords(content)}/${MAX_TWO_NEWS_BODY_WORDS} words)` : ''}
         </Text>
-        <View
-          style={[
-            styles.toolbar,
-            { backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md },
-          ]}>
-          {formatTools.map((tool) => (
-            <IconButton key={tool.label} icon={tool.icon} size={18} onPress={() => insertToken(tool.token)} />
-          ))}
-        </View>
-        <TextInput
-          value={content}
-          onChangeText={setContent}
-          placeholder="Start writing your story..."
-          placeholderTextColor={theme.colors.textMuted}
-          style={[
-            styles.bodyInput,
-            { color: theme.colors.text, borderColor: theme.colors.border, borderRadius: theme.radius.md },
-          ]}
-          multiline
-          textAlignVertical="top"
+        <BlogTextEditor
+          initialValue={content}
+          onChange={setContent}
+          maxWords={hasTwoNews ? MAX_TWO_NEWS_BODY_WORDS : undefined}
         />
 
         <View style={styles.imagesHeader}>
@@ -341,7 +337,7 @@ export default function CreateArticleScreen() {
               { backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md, borderColor: theme.colors.border },
             ]}>
             <View style={styles.sectionCardHeader}>
-              <Text style={[styles.sectionCardLabel, { color: theme.colors.textMuted }]}>Article {i + 2}</Text>
+              <Text style={[styles.sectionCardLabel, { color: theme.colors.textMuted }]}>Article {i + 2}{i === 0 ? ` (${countArticleWords(section.content)}/${MAX_TWO_NEWS_BODY_WORDS} words)` : ''}</Text>
               <IconButton icon="trash-outline" size={18} onPress={() => removeSection(section.id)} />
             </View>
             <View
@@ -356,29 +352,20 @@ export default function CreateArticleScreen() {
                 </View>
               )}
             </View>
-            <TextInput
-              value={section.title}
-              onChangeText={(text) => updateSection(section.id, { title: text })}
-              placeholder="Headline for this story"
-              placeholderTextColor={theme.colors.textMuted}
-              style={[
-                styles.titleInput,
-                { color: theme.colors.text, borderColor: theme.colors.border, borderRadius: theme.radius.md, fontSize: 15, marginTop: 12 },
-              ]}
-              multiline
-            />
-            <TextInput
-              value={section.content}
-              onChangeText={(text) => updateSection(section.id, { content: text })}
-              placeholder="Write this story..."
-              placeholderTextColor={theme.colors.textMuted}
-              style={[
-                styles.bodyInput,
-                { color: theme.colors.text, borderColor: theme.colors.border, borderRadius: theme.radius.md, minHeight: 100, marginTop: 10 },
-              ]}
-              multiline
-              textAlignVertical="top"
-            />
+            <View style={styles.sectionTitleEditor}>
+              <BlogTextEditor
+                initialValue={section.title}
+                onChange={(title) => updateSection(section.id, { title })}
+                variant="title"
+              />
+            </View>
+            <View style={styles.sectionBodyEditor}>
+              <BlogTextEditor
+                initialValue={section.content}
+                onChange={(content) => updateSection(section.id, { content })}
+                maxWords={i === 0 ? MAX_TWO_NEWS_BODY_WORDS : undefined}
+              />
+            </View>
           </View>
         ))}
 
@@ -392,7 +379,7 @@ export default function CreateArticleScreen() {
               Published Footer
             </Text>
             <Text style={[styles.reporterFooterText, { color: theme.colors.text }]}>
-              {user.name} : {user.phone}
+              {authorName}{authorPhone ? ` : ${authorPhone}` : ''}
             </Text>
           </View>
         ) : null}
@@ -418,7 +405,7 @@ export default function CreateArticleScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Button
-                label="Submit for Review"
+                label={isAdmin ? 'Publish Now' : 'Submit for Review'}
                 onPress={requestSubmit}
                 loading={submitting === 'submit'}
                 fullWidth
@@ -443,7 +430,7 @@ export default function CreateArticleScreen() {
           </ScrollView>
           <View style={styles.previewFooter}>
             <Button
-              label="Confirm & Submit"
+              label={isAdmin ? 'Confirm & Publish' : 'Confirm & Submit'}
               onPress={() => handleSave('submit')}
               loading={submitting === 'submit'}
               fullWidth
@@ -527,6 +514,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  sectionTitleEditor: {
+    marginTop: 12,
+  },
+  sectionBodyEditor: {
+    marginTop: 10,
+  },
   bannerWrap: {
     height: 160,
     borderWidth: StyleSheet.hairlineWidth,
@@ -566,21 +559,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-  },
-  toolbar: {
-    flexDirection: 'row',
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    marginBottom: 8,
-    alignSelf: 'flex-start',
-  },
-  bodyInput: {
-    fontSize: 14.5,
-    lineHeight: 22,
-    borderWidth: 1,
-    padding: 14,
-    minHeight: 200,
   },
   imagesHeader: {
     marginTop: 20,

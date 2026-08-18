@@ -199,7 +199,11 @@ textarea { resize: vertical; }
 .rich-text-toolbar button:hover { background: white; color: var(--ink); }
 .rich-text-toolbar button.active { background: var(--ink); color: white; }
 .rich-text-toolbar button:disabled { opacity: .3; cursor: default; }
+.rich-text-color { position: relative; width: 31px; height: 31px; display: grid; place-items: center; color: #58564f; cursor: pointer; }
+.rich-text-color input { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; opacity: 0; cursor: pointer; }
 .rich-text-surface { padding: 12px; outline: none; color: var(--ink); font-size: 14px; font-weight: 400; line-height: 1.65; }
+.rich-title-surface { font-size: 18px; font-weight: 700; line-height: 1.35; }
+.rich-title-surface p { margin-bottom: 0; }
 .rich-text-surface p { margin: 0 0 10px; }
 .rich-text-surface h2, .rich-text-surface h3 { margin: 18px 0 8px; font-family: 'Newsreader', serif; }
 .rich-text-surface ul, .rich-text-surface ol { padding-left: 24px; }

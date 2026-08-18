@@ -11,6 +11,7 @@ export default function AdminLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="create-article" options={{ presentation: 'modal' }} />
       <Stack.Screen name="reporter/[id]" />
       <Stack.Screen name="article/[id]" />
       <Stack.Screen name="analytics" />

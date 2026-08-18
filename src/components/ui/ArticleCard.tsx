@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAppTheme } from '@/theme';
 import type { Article } from '@/types/models';
+import { plainArticleText } from './ArticleNewspaperLayout';
 import { StatusBadge } from './Badge';
 import { Icon } from './Icon';
 
@@ -46,7 +47,7 @@ export function ArticleCard({ article, onPress, showStatus = true, showAuthor = 
           </View>
         ) : null}
         <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={2}>
-          {article.title}
+          {plainArticleText(article.title)}
         </Text>
         <Text style={[styles.summary, { color: theme.colors.textSecondary }]} numberOfLines={2}>
           {article.summary}

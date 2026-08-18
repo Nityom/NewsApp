@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { Pressable, Image as RNImage, StyleSheet, Text, View } from 'react-native';
 
 import { formatRegistrationDate, getCurrentPeriodLabel, usePublicationInfo } from '@/context/PublicationInfoContext';
-import { advertisementOrientation, advertisementWidths } from '@/lib/advertisementLayout';
+import { ADMIN_PHONE } from '@/lib/adminProfile';
+import { advertisementFrameRatio, advertisementOrientation, advertisementWidths } from '@/lib/advertisementLayout';
 import { useAppTheme } from '@/theme';
 import type { Article } from '@/types/models';
 import { Icon } from './Icon';
@@ -14,8 +15,9 @@ const PAPER = '#FFFFFF';
 const INK = '#171717';
 const MUTED_INK = '#606060';
 const RULE = '#D7D7D7';
-// Keeps an additional article (added via the "+" section button) from pushing content onto a second page.
+// Keeps full-width follow-up sections from pushing content onto a second page.
 export const MAX_SECTION_BODY_CHARS = 500;
+export const MAX_TWO_NEWS_BODY_WORDS = 540;
 // Bounds on the auto-fit photo frame so very tall or very wide photos still fit the page cleanly.
 const MIN_PHOTO_ASPECT = 0.68;
 const MAX_PHOTO_ASPECT = 1.9;
@@ -25,22 +27,33 @@ function truncate(text: string, max: number) {
   return `${text.slice(0, max).trimEnd()}…`;
 }
 
-function plainArticleText(content: string) {
+function truncateWords(text: string, maxWords: number) {
+  const words = text.trim().split(/\s+/);
+  if (words.length <= maxWords) return text;
+  return `${words.slice(0, maxWords).join(' ')}…`;
+}
+
+export function plainArticleText(content: string) {
   return content
     .replace(/^(?:# |\- |> )/gm, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/_([^_]+)_/g, '$1')
     .replace(/~~([^~]+)~~/g, '$1')
     .replace(/<u>([^<]+)<\/u>/g, '$1')
+    .replace(/\[color=#[0-9a-f]{6}\]([\s\S]*?)\[\/color\]/gi, '$1')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/\n+/g, ' ')
     .trim();
 }
 
 function renderInlineText(text: string, keyPrefix = 'inline'): ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*|_[^_]+_|~~[^~]+~~|<u>[^<]+<\/u>|\[[^\]]+\]\([^)]+\))/g).filter(Boolean);
+  const parts = text.split(/(\[color=#[0-9a-f]{6}\][\s\S]*?\[\/color\]|\*\*[^*]+\*\*|_[^_]+_|~~[^~]+~~|<u>[^<]+<\/u>|\[[^\]]+\]\([^)]+\))/gi).filter(Boolean);
   return parts.map((part, index) => {
     const key = `${keyPrefix}-${index}`;
+    const colored = part.match(/^\[color=(#[0-9a-f]{6})\]([\s\S]*)\[\/color\]$/i);
+    if (colored) {
+      return <Text key={key} style={{ color: colored[1] }}>{renderInlineText(colored[2], key)}</Text>;
+    }
     if (part.startsWith('**') && part.endsWith('**')) {
       return <Text key={key} style={styles.bodyBold}>{renderInlineText(part.slice(2, -2), key)}</Text>;
     }
@@ -86,6 +99,26 @@ function renderBodyLines(lines: string[], keyPrefix: string) {
       return <Text key={key} style={styles.bodyQuote}>{renderInlineText(line.slice(2), `quote-${key}`)}</Text>;
     }
     return <Text key={key} style={styles.body}>{renderInlineText(line, `body-${key}`)}</Text>;
+  });
+}
+
+function renderCompactBodyLines(content: string, shareMode: boolean) {
+  return content.split(/\n+/).filter(Boolean).map((line, index) => {
+    const key = `compact-body-${index}`;
+    const ordered = line.match(/^(\d+)\.\s+(.*)$/);
+    if (line.startsWith('# ')) {
+      return <Text key={key} style={[styles.storyBody, styles.compactBodyHeading, shareMode && styles.shareStoryBody]}>{renderInlineText(line.slice(2), key)}</Text>;
+    }
+    if (line.startsWith('- ')) {
+      return <Text key={key} style={[styles.storyBody, shareMode && styles.shareStoryBody]}>• {renderInlineText(line.slice(2), key)}</Text>;
+    }
+    if (ordered) {
+      return <Text key={key} style={[styles.storyBody, shareMode && styles.shareStoryBody]}>{ordered[1]}. {renderInlineText(ordered[2], key)}</Text>;
+    }
+    if (line.startsWith('> ')) {
+      return <Text key={key} style={[styles.storyBody, styles.compactBodyQuote, shareMode && styles.shareStoryBody]}>{renderInlineText(line.slice(2), key)}</Text>;
+    }
+    return <Text key={key} style={[styles.storyBody, shareMode && styles.shareStoryBody]}>{renderInlineText(line, key)}</Text>;
   });
 }
 
@@ -153,28 +186,13 @@ function AutoImage({
   );
 }
 
-function AdImage({ uri, radius, width, onPress }: {
+function AdImage({ uri, radius, width, frameRatio, onPress }: {
   uri: string;
   radius: number;
   width: `${number}%`;
+  frameRatio: number;
   onPress?: () => void;
 }) {
-  const [ratio, setRatio] = useState(16 / 9);
-
-  useEffect(() => {
-    let cancelled = false;
-    RNImage.getSize(
-      uri,
-      (width, height) => {
-        if (!cancelled && width > 0 && height > 0) setRatio(width / height);
-      },
-      () => {},
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [uri]);
-
   const content = (
     <>
       <Image
@@ -182,9 +200,6 @@ function AdImage({ uri, radius, width, onPress }: {
         style={styles.adImage}
         contentFit="contain"
         transition={0}
-        onLoad={({ source }) => {
-          if (source.width > 0 && source.height > 0) setRatio(source.width / source.height);
-        }}
       />
       {onPress ? (
         <View style={styles.editImageBadge}>
@@ -195,7 +210,7 @@ function AdImage({ uri, radius, width, onPress }: {
   );
   const containerStyle = [
     styles.adImageContainer,
-    { width, aspectRatio: ratio },
+    { width, aspectRatio: frameRatio },
     { borderRadius: radius, overflow: 'hidden' as const },
   ];
   if (onPress) {
@@ -255,6 +270,7 @@ function AdvertisementGrid({
             uri={uri}
             radius={radius}
             width={widths[index]}
+            frameRatio={advertisementFrameRatio(resolvedRatios[index])}
             onPress={onImagePress ? () => onImagePress({ kind: 'ad', index, uri }) : undefined}
           />
         );
@@ -300,7 +316,9 @@ function PublicationInfoBar({
  */
 export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = false, onImagePress }: ArticleNewspaperLayoutProps) {
   const theme = useAppTheme();
-  const phone = article.reporterPhone ?? reporterPhone;
+  const phone = article.reporterPhone?.trim()
+    || reporterPhone?.trim()
+    || (article.reporterId === 'admin' ? ADMIN_PHONE : undefined);
   const [firstSection, ...restSections] = article.sections ?? [];
   // Extra sections beyond the first stack as additional pages; the first shares the lead page.
   const pageCount = 1 + restSections.length;
@@ -322,7 +340,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
             title={article.title}
             image={article.banner}
             content={article.content}
-            maxBodyChars={MAX_SECTION_BODY_CHARS}
+            maxBodyWords={MAX_TWO_NEWS_BODY_WORDS}
             shareMode={shareMode}
             onImagePress={onImagePress ? () => onImagePress({ kind: 'banner', uri: article.banner }) : undefined}
           />
@@ -331,7 +349,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
             title={firstSection.title}
             image={firstSection.image ?? article.banner}
             content={firstSection.content}
-            maxBodyChars={MAX_SECTION_BODY_CHARS}
+            maxBodyWords={MAX_TWO_NEWS_BODY_WORDS}
             shareMode={shareMode}
             onImagePress={onImagePress ? () => onImagePress(firstSection.image
               ? { kind: 'section', sectionId: firstSection.id, uri: firstSection.image }
@@ -341,7 +359,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
       ) : (
         <>
           {/* Headline */}
-          <Text style={styles.title}>{article.title}</Text>
+          <Text style={styles.title}>{renderInlineText(article.title, 'title')}</Text>
           <View style={styles.headlineRule} />
 
           {/* Full-width photo */}
@@ -375,7 +393,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
                 onPress={onImagePress ? () => onImagePress({ kind: 'section', sectionId: section.id, uri: section.image! }) : undefined}
               />
             ) : null}
-            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Text style={styles.sectionTitle}>{renderInlineText(section.title, `section-title-${section.id}`)}</Text>
             <View style={styles.headlineRule} />
             <View style={styles.simpleBody}>
               {renderBodyLines(sLines, `section-${section.id}`)}
@@ -426,8 +444,8 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
 interface TwoArticleNewspaperLayoutProps {
   articles: [Article, Article];
   reporterPhone?: string;
-  /** Max characters kept per article body when squeezing two stories onto one page. */
-  maxBodyChars?: number;
+  /** Max words kept per article body in the two-story layout. */
+  maxBodyWords?: number;
 }
 
 function CompactStory({
@@ -435,6 +453,7 @@ function CompactStory({
   image,
   content,
   footer,
+  maxBodyWords,
   maxBodyChars,
   shareMode = false,
   onImagePress,
@@ -443,16 +462,24 @@ function CompactStory({
   image: string;
   content: string;
   footer?: string;
-  maxBodyChars: number;
+  maxBodyWords?: number;
+  maxBodyChars?: number;
   shareMode?: boolean;
   onImagePress?: () => void;
 }) {
   const theme = useAppTheme();
-  const body = truncate(plainArticleText(content), maxBodyChars);
+  const plainContent = plainArticleText(content);
+  const withinWordLimit = maxBodyWords === undefined || plainContent.split(/\s+/).filter(Boolean).length <= maxBodyWords;
+  const body = withinWordLimit
+    ? content
+    : truncateWords(plainContent, maxBodyWords);
+  const displayedBody = maxBodyWords === undefined && plainContent.length > (maxBodyChars ?? MAX_SECTION_BODY_CHARS)
+    ? truncate(plainContent, maxBodyChars ?? MAX_SECTION_BODY_CHARS)
+    : body;
 
   return (
     <View style={[styles.storyColumn, shareMode && styles.shareStoryColumn]}>
-      <Text style={[styles.storyTitle, shareMode && styles.shareStoryTitle]}>{title}</Text>
+      <Text style={[styles.storyTitle, shareMode && styles.shareStoryTitle]}>{renderInlineText(title, 'compact-title')}</Text>
       <View style={styles.headlineRule} />
       <AutoImage
         uri={image}
@@ -461,7 +488,7 @@ function CompactStory({
         fixedRatio={4 / 3}
         onPress={onImagePress}
       />
-      <Text style={[styles.storyBody, shareMode && styles.shareStoryBody]}>{body}</Text>
+      <View>{renderCompactBodyLines(displayedBody, shareMode)}</View>
       {footer ? (
         <View style={styles.storyFooter}>
           <Text style={styles.reporterName}>{footer}</Text>
@@ -478,10 +505,15 @@ function CompactStory({
 export function TwoArticleNewspaperLayout({
   articles,
   reporterPhone,
-  maxBodyChars = 420,
+  maxBodyWords = 500,
 }: TwoArticleNewspaperLayoutProps) {
   const [first, second] = articles;
-  const byline = (a: Article) => `${a.reporterName}${(a.reporterPhone ?? reporterPhone) ? ` : ${a.reporterPhone ?? reporterPhone}` : ''}`;
+  const byline = (article: Article) => {
+    const phone = article.reporterPhone?.trim()
+      || reporterPhone?.trim()
+      || (article.reporterId === 'admin' ? ADMIN_PHONE : undefined);
+    return `${article.reporterName}${phone ? ` : ${phone}` : ''}`;
+  };
   // Collapse into one line when both stories share the same reporter.
   const bylines = Array.from(new Set([byline(first), byline(second)]));
   const registrationLabel =
@@ -501,14 +533,14 @@ export function TwoArticleNewspaperLayout({
           title={first.title}
           image={first.banner}
           content={first.content}
-          maxBodyChars={maxBodyChars}
+          maxBodyWords={maxBodyWords}
         />
         <View style={styles.colDivider} />
         <CompactStory
           title={second.title}
           image={second.banner}
           content={second.content}
-          maxBodyChars={maxBodyChars}
+          maxBodyWords={maxBodyWords}
         />
       </View>
 
@@ -834,6 +866,13 @@ const styles = StyleSheet.create({
     color: INK,
     fontSize: 10.5,
     lineHeight: 15,
+    marginBottom: 3,
+  },
+  compactBodyHeading: {
+    fontWeight: '800',
+  },
+  compactBodyQuote: {
+    fontStyle: 'italic',
   },
   shareStoryBody: {
     fontSize: 16,

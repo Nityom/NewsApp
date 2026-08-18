@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 
 import { LoadingState, PageHeader, StatusBadge } from '../components/ui';
 import { api } from '../lib/api';
+import { plainRichText } from '../lib/richText';
 import { currency, dedupeReporters, formatDate } from '../lib/utils';
 
 export function DashboardPage() {
@@ -39,7 +40,7 @@ export function DashboardPage() {
             {recent.map((article) => (
               <Link to={`/articles/${article.id}`} key={article.id} className="article-list-row">
                 <img src={article.banner} alt="" />
-                <div><strong>{article.title}</strong><span>{article.reporterName} · {formatDate(article.createdAt)}</span></div>
+                <div><strong>{plainRichText(article.title)}</strong><span>{article.reporterName} · {formatDate(article.createdAt)}</span></div>
                 <StatusBadge value={article.status} />
                 <ArrowRight size={17} />
               </Link>

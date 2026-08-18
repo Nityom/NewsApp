@@ -5,6 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { Button, EmptyState, LoadingState, PageHeader, SearchInput, StatusBadge } from '../components/ui';
 import { api } from '../lib/api';
+import { plainRichText } from '../lib/richText';
 import { formatDate } from '../lib/utils';
 import type { ArticleStatus } from '../types';
 
@@ -20,7 +21,7 @@ export function ArticlesPage() {
   const normalized = search.toLowerCase();
   const visible = [...articles]
     .filter((article) => filter === 'all' || article.status === filter)
-    .filter((article) => `${article.title} ${article.reporterName}`.toLowerCase().includes(normalized))
+    .filter((article) => `${plainRichText(article.title)} ${article.reporterName}`.toLowerCase().includes(normalized))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
   return (
@@ -39,7 +40,7 @@ export function ArticlesPage() {
           <div className="table-head"><span>Story</span><span>Reporter</span><span>Submitted</span><span>Status</span><span /></div>
           {visible.map((article) => (
             <Link className="table-row" to={`/articles/${article.id}`} key={article.id}>
-              <div className="story-cell"><img src={article.banner} alt="" /><span><strong>{article.title}</strong><small>{article.summary || `${article.views ?? 0} views`}</small></span></div>
+              <div className="story-cell"><img src={article.banner} alt="" /><span><strong>{plainRichText(article.title)}</strong><small>{article.summary || `${article.views ?? 0} views`}</small></span></div>
               <span>{article.reporterName}</span>
               <span>{formatDate(article.submittedAt ?? article.createdAt)}</span>
               <StatusBadge value={article.status} />
@@ -50,7 +51,7 @@ export function ArticlesPage() {
         {!visible.length ? <EmptyState title="No articles found" message="Try another status or search phrase." /> : null}
       </section>
       <div className="mobile-records">{visible.map((article) => (
-        <Link to={`/articles/${article.id}`} key={article.id}><FileText /><div><strong>{article.title}</strong><span>{article.reporterName} · {formatDate(article.createdAt)}</span></div><StatusBadge value={article.status} /></Link>
+        <Link to={`/articles/${article.id}`} key={article.id}><FileText /><div><strong>{plainRichText(article.title)}</strong><span>{article.reporterName} · {formatDate(article.createdAt)}</span></div><StatusBadge value={article.status} /></Link>
       ))}</div>
     </div>
   );

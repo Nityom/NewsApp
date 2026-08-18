@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useMemo } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
@@ -107,7 +107,7 @@ export default function AdminDashboardScreen() {
           </View>
         )}
       />
-      <FAB onPress={() => router.push('/(reporter)/create-article')} />
+      <FAB onPress={() => router.push('/(admin)/create-article' as Href)} />
     </ScreenContainer>
   );
 }

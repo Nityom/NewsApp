@@ -38,7 +38,12 @@ export function ArticlePreview({ article, publication }: { article: Article; pub
         </section>
       ))}
       {article.images.length ? <div className="newspaper-gallery">{article.images.map((image) => <img key={image} src={image} alt="" />)}</div> : null}
-      {article.advertisements.length ? <div className="newspaper-ads">{article.advertisements.map((image) => <img key={image} src={image} alt="Advertisement" />)}</div> : null}
+      {article.advertisements.length ? (
+        <>
+          <div className="newspaper-divider-rule" />
+          <div className="newspaper-ads">{article.advertisements.map((image) => <img key={image} src={image} alt="Advertisement" />)}</div>
+        </>
+      ) : null}
       <footer><span>News Reporter</span><strong>{byline.name}{byline.phone ? ` : ${byline.phone}` : ''}</strong></footer>
     </article>
   );

@@ -14,7 +14,8 @@ import { dateInputValue, errorMessage, publicationDate, stripHtml } from '../lib
 import type { Article, ArticleSection, ArticleStatus } from '../types';
 
 type UploadTarget = 'banner' | 'gallery' | 'advertisements';
-const TWO_NEWS_WORD_LIMIT = 320;
+const SINGLE_ARTICLE_WORD_LIMIT = 600;
+const TWO_NEWS_WORD_LIMIT = 300;
 
 function wordCount(value: string) {
   return stripHtml(value).match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu)?.length ?? 0;
@@ -28,6 +29,7 @@ export function CreateArticlePage() {
   const articles = useQuery(api.articles.list, {});
   const createArticle = useMutation(api.articles.upsert);
   const patchArticle = useMutation(api.articles.patch);
+  const [articleMode, setArticleMode] = useState<'single' | 'two'>('single');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [banner, setBanner] = useState('');
@@ -45,6 +47,7 @@ export function CreateArticlePage() {
   useEffect(() => {
     if (!selectedArticle || initializedArticle.current === selectedArticle.id) return;
     initializedArticle.current = selectedArticle.id;
+    setArticleMode(selectedArticle.sections && selectedArticle.sections.length > 0 ? 'two' : 'single');
     setTitle(articleMarkupToHtml(selectedArticle.title));
     setContent(articleMarkupToHtml(selectedArticle.content));
     setBanner(selectedArticle.banner);
@@ -60,7 +63,6 @@ export function CreateArticlePage() {
   const now = new Date().toISOString();
   const plainContent = stripHtml(content);
   const savedTitle = htmlToArticleMarkup(title);
-  const isTwoNewsLayout = sections.length > 0;
   const previewArticle: Article = {
     ...(selectedArticle ?? {}),
     id: selectedArticle?.id ?? 'preview',
@@ -187,24 +189,49 @@ export function CreateArticlePage() {
       {message ? <div className="form-error">{message}</div> : null}
       <div className={`composer-layout ${previewVisible ? '' : 'composer-full'}`}>
         <form className="composer-form" onSubmit={(event) => event.preventDefault()}>
+          <div className="composer-mode-selector">
+            <button
+              type="button"
+              className={`composer-mode-btn ${articleMode === 'single' ? 'active' : ''}`}
+              onClick={() => {
+                setArticleMode('single');
+                setSections([]);
+              }}>
+              Article 1 (Single)
+              <span className="composer-mode-badge">{SINGLE_ARTICLE_WORD_LIMIT}w</span>
+            </button>
+            <button
+              type="button"
+              className={`composer-mode-btn ${articleMode === 'two' ? 'active' : ''}`}
+              onClick={() => {
+                setArticleMode('two');
+                if (!sections.length) {
+                  setSections([{ id: `sec-${Date.now()}`, title: '', content: '' }]);
+                }
+              }}>
+              Article 2 (Two News)
+              <span className="composer-mode-badge">{TWO_NEWS_WORD_LIMIT}w ea</span>
+            </button>
+          </div>
+
           <section className="panel composer-section">
-            <span className="eyebrow">Main story</span>
-            <label>Headline<RichTextEditor value={title} onChange={setTitle} placeholder="Enter a clear news headline" minHeight={58} variant="title" /></label>
-            <label>Article body{isTwoNewsLayout ? ` (${wordCount(content)}/${TWO_NEWS_WORD_LIMIT} words)` : ''}<RichTextEditor value={content} onChange={setContent} placeholder="Write the complete article here..." maxWords={isTwoNewsLayout ? TWO_NEWS_WORD_LIMIT : undefined} /></label>
+            <span className="eyebrow">{articleMode === 'two' ? 'Article 1' : 'Main story'}</span>
+            <label>{articleMode === 'two' ? 'Article 1 headline' : 'Headline'}<RichTextEditor value={title} onChange={setTitle} placeholder="Enter a clear news headline" minHeight={58} variant="title" /></label>
+            <label>{articleMode === 'two' ? `Article 1 body (${wordCount(content)}/${TWO_NEWS_WORD_LIMIT} words)` : `Article body (${wordCount(content)}/${SINGLE_ARTICLE_WORD_LIMIT} words)`}<RichTextEditor value={content} onChange={setContent} placeholder="Write the complete article here..." maxWords={articleMode === 'two' ? TWO_NEWS_WORD_LIMIT : SINGLE_ARTICLE_WORD_LIMIT} /></label>
             <label>Publication date<input type="date" value={registrationDate} onChange={(event) => setRegistrationDate(event.target.value)} /></label>
           </section>
 
           <section className="panel composer-section">
-            <div className="section-heading"><div><span className="eyebrow">Lead media</span><h2>News image</h2></div><label className="upload-button"><ImagePlus size={16} /> {banner ? 'Replace' : 'Upload'}<input type="file" accept="image/*" onChange={(event) => void uploadFiles('banner', event)} /></label></div>
+            <div className="section-heading"><div><span className="eyebrow">{articleMode === 'two' ? 'Article 1 image' : 'Lead media'}</span><h2>News image</h2></div><label className="upload-button"><ImagePlus size={16} /> {banner ? 'Replace' : 'Upload'}<input type="file" accept="image/*" onChange={(event) => void uploadFiles('banner', event)} /></label></div>
             {banner ? <div className="composer-image"><img src={banner} alt="Lead" /><button type="button" onClick={() => setBanner('')} aria-label="Remove lead image"><X size={16} /></button></div> : <div className="upload-placeholder"><ImagePlus />Upload the main article photograph</div>}
           </section>
 
           <section className="panel composer-section">
-            <div className="section-heading"><div><span className="eyebrow">Additional coverage</span><h2>Story sections</h2></div><Button type="button" variant="secondary" onClick={addSection}><Plus size={16} /> Add section</Button></div>
+            <div className="section-heading"><div><span className="eyebrow">Additional coverage</span><h2>Story sections</h2></div><Button type="button" variant="secondary" onClick={() => { setArticleMode('two'); addSection(); }}><Plus size={16} /> Add section</Button></div>
             <div className="section-editor-list">{sections.map((section, index) => <div className="section-editor" key={section.id}>
-              <div className="section-editor-head"><strong>Section {index + 1}</strong><button type="button" className="icon-button" onClick={() => setSections((current) => current.filter((item) => item.id !== section.id))} aria-label="Remove section"><Trash2 size={16} /></button></div>
-              <label>Section headline<input value={section.title} onChange={(event) => updateSection(section.id, { title: event.target.value })} /></label>
-              <label>Section body{index === 0 ? ` (${wordCount(section.content)}/${TWO_NEWS_WORD_LIMIT} words)` : ''}<RichTextEditor value={section.content} onChange={(value) => updateSection(section.id, { content: value })} minHeight={150} maxWords={index === 0 ? TWO_NEWS_WORD_LIMIT : undefined} /></label>
+              <div className="section-editor-head"><strong>{index === 0 && articleMode === 'two' ? 'Article 2' : `Section ${index + 1}`}</strong><button type="button" className="icon-button" onClick={() => setSections((current) => current.filter((item) => item.id !== section.id))} aria-label="Remove section"><Trash2 size={16} /></button></div>
+              <label>{index === 0 && articleMode === 'two' ? 'Article 2 headline' : 'Section headline'}<input value={section.title} onChange={(event) => updateSection(section.id, { title: event.target.value })} /></label>
+              <label>{index === 0 ? `Article 2 body (${wordCount(section.content)}/${TWO_NEWS_WORD_LIMIT} words)` : 'Section body'}<RichTextEditor value={section.content} onChange={(value) => updateSection(section.id, { content: value })} minHeight={150} maxWords={index === 0 ? TWO_NEWS_WORD_LIMIT : undefined} /></label>
               <label className="upload-button"><ImagePlus size={16} /> {section.image ? 'Replace image' : 'Add image'}<input type="file" accept="image/*" onChange={(event) => void uploadSectionImage(section.id, event)} /></label>
               {section.image ? <div className="section-thumb"><img src={section.image} alt="" /><button type="button" onClick={() => updateSection(section.id, { image: undefined })}><X size={14} /></button></div> : null}
             </div>)}</div>

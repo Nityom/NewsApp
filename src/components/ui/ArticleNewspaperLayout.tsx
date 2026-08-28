@@ -17,7 +17,8 @@ const MUTED_INK = '#606060';
 const RULE = '#D7D7D7';
 // Keeps full-width follow-up sections from pushing content onto a second page.
 export const MAX_SECTION_BODY_CHARS = 500;
-export const MAX_TWO_NEWS_BODY_WORDS = 540;
+export const MAX_SINGLE_ARTICLE_WORDS = 600;
+export const MAX_TWO_NEWS_BODY_WORDS = 300;
 // Bounds on the auto-fit photo frame so very tall or very wide photos still fit the page cleanly.
 const MIN_PHOTO_ASPECT = 0.68;
 const MAX_PHOTO_ASPECT = 1.9;
@@ -420,13 +421,16 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
 
       {/* Advertisement */}
       {article.advertisements.length > 0 ? (
-        <View style={[styles.adSection, shareMode && styles.shareAdSection]}>
-          <AdvertisementGrid
-            uris={article.advertisements}
-            radius={theme.radius.sm}
-            onImagePress={onImagePress}
-          />
-        </View>
+        <>
+          <View style={[styles.sectionDividerRule, shareMode && styles.shareSectionDividerRule]} />
+          <View style={[styles.adSection, shareMode && styles.shareAdSection]}>
+            <AdvertisementGrid
+              uris={article.advertisements}
+              radius={theme.radius.sm}
+              onImagePress={onImagePress}
+            />
+          </View>
+        </>
       ) : null}
 
       {/* Footer */}
@@ -643,6 +647,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 17,
     fontStyle: 'italic',
+    textAlign: 'justify',
   },
   fullImage: {
     width: '68%',
@@ -667,6 +672,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     marginBottom: 8,
+     textAlign: 'justify',
   },
   bodyBold: {
     fontWeight: '800',
@@ -867,6 +873,7 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     lineHeight: 15,
     marginBottom: 3,
+    textAlign: 'justify',
   },
   compactBodyHeading: {
     fontWeight: '800',
@@ -877,6 +884,20 @@ const styles = StyleSheet.create({
   shareStoryBody: {
     fontSize: 16,
     lineHeight: 23,
+    textAlign: 'justify',
+  },
+  sectionDividerRule: {
+    height: 2,
+    backgroundColor: INK,
+    marginHorizontal: 12,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  shareSectionDividerRule: {
+    height: 2,
+    marginHorizontal: 24,
+    marginTop: 22,
+    marginBottom: 6,
   },
   storyFooter: {
     borderTopWidth: StyleSheet.hairlineWidth,

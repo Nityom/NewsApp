@@ -195,7 +195,9 @@ export async function exportArticleAsPng(article: Article, publication?: Publica
 
   const adImages = advertisements.filter((image): image is ImageBitmap => Boolean(image));
   if (adImages.length) {
-    y += 16;
+    y += px(12);
+    context.fillRect(MARGIN, y, CONTENT_WIDTH, px(2));
+    y += px(14);
     for (const image of adImages) y += drawContainedImage(context, image, MARGIN + 10, y, CONTENT_WIDTH - 20, 560) + 14;
   }
 

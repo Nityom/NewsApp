@@ -2,9 +2,13 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { ArticleNewspaperLayout, MAX_TWO_NEWS_BODY_WORDS } from '@/components/ui/ArticleNewspaperLayout';
+import {
+  ArticleNewspaperLayout,
+  MAX_SINGLE_ARTICLE_WORDS,
+  MAX_TWO_NEWS_BODY_WORDS,
+} from '@/components/ui/ArticleNewspaperLayout';
 import { BlogTextEditor, countArticleWords, limitArticleWords } from '@/components/ui/BlogTextEditor';
 import { Button, ButtonRow, IconButton } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
@@ -37,6 +41,9 @@ export default function CreateArticleScreen() {
     || user?.phone?.trim()
     || (isAdmin ? ADMIN_PHONE : undefined);
 
+  const [articleMode, setArticleMode] = useState<'single' | 'two'>(
+    editingDraft?.sections && editingDraft.sections.length > 0 ? 'two' : 'single',
+  );
   const [banner, setBanner] = useState<string | undefined>(editingDraft?.banner);
   const [title, setTitle] = useState(editingDraft?.title ?? '');
   const [content, setContent] = useState(editingDraft?.content ?? '');
@@ -73,11 +80,28 @@ export default function CreateArticleScreen() {
     }
   };
 
+  const isTwoNews = articleMode === 'two';
+  const limitSingleNewsBody = (value: string) => limitArticleWords(value, MAX_SINGLE_ARTICLE_WORDS);
   const limitTwoNewsBody = (value: string) => limitArticleWords(value, MAX_TWO_NEWS_BODY_WORDS);
-  const hasTwoNews = sections.length > 0;
+
+  const selectMode = (mode: 'single' | 'two') => {
+    setArticleMode(mode);
+    if (mode === 'single') {
+      setContent((current) => limitSingleNewsBody(current));
+      setSections([]);
+    } else {
+      setContent((current) => limitTwoNewsBody(current));
+      setSections((prev) => {
+        if (prev.length === 0) {
+          return [{ id: `sec-${Date.now()}`, title: '', content: '' }];
+        }
+        return prev.map((s, index) => (index === 0 ? { ...s, content: limitTwoNewsBody(s.content) } : s));
+      });
+    }
+  };
 
   const addSection = () => {
-    // The lead story becomes one side of the two-news layout as soon as a second story is added.
+    setArticleMode('two');
     setContent((current) => limitTwoNewsBody(current));
     setSections((prev) => [...prev, { id: `sec-${Date.now()}`, title: '', content: '' }]);
   };
@@ -238,7 +262,91 @@ export default function CreateArticleScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>News Photo</Text>
+        {/* Top Mode Selector: Article 1 vs Article 2 */}
+        <View style={styles.modeSelectorWrap}>
+          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginBottom: 8 }]}>
+            Article Layout & Word Limit
+          </Text>
+          <View
+            style={[
+              styles.modeSelector,
+              { backgroundColor: theme.colors.backgroundSubtle, borderColor: theme.colors.border },
+            ]}>
+            <Pressable
+              onPress={() => selectMode('single')}
+              style={[
+                styles.modeButton,
+                articleMode === 'single' && [styles.modeButtonActive, { backgroundColor: theme.colors.primary }],
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="1 Article Layout">
+              <Icon
+                name="document-text"
+                size={16}
+                color={articleMode === 'single' ? '#FFFFFF' : theme.colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.modeButtonText,
+                  { color: articleMode === 'single' ? '#FFFFFF' : theme.colors.textSecondary },
+                ]}>
+                Article 1 (Single)
+              </Text>
+              <View
+                style={[
+                  styles.modeBadge,
+                  { backgroundColor: articleMode === 'single' ? 'rgba(255,255,255,0.25)' : theme.colors.border },
+                ]}>
+                <Text
+                  style={[
+                    styles.modeBadgeText,
+                    { color: articleMode === 'single' ? '#FFFFFF' : theme.colors.textMuted },
+                  ]}>
+                  {MAX_SINGLE_ARTICLE_WORDS}w
+                </Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              onPress={() => selectMode('two')}
+              style={[
+                styles.modeButton,
+                articleMode === 'two' && [styles.modeButtonActive, { backgroundColor: theme.colors.primary }],
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="2 Articles Layout">
+              <Icon
+                name="newspaper"
+                size={16}
+                color={articleMode === 'two' ? '#FFFFFF' : theme.colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.modeButtonText,
+                  { color: articleMode === 'two' ? '#FFFFFF' : theme.colors.textSecondary },
+                ]}>
+                Article 2 (Two News)
+              </Text>
+              <View
+                style={[
+                  styles.modeBadge,
+                  { backgroundColor: articleMode === 'two' ? 'rgba(255,255,255,0.25)' : theme.colors.border },
+                ]}>
+                <Text
+                  style={[
+                    styles.modeBadgeText,
+                    { color: articleMode === 'two' ? '#FFFFFF' : theme.colors.textMuted },
+                  ]}>
+                  {MAX_TWO_NEWS_BODY_WORDS}w ea
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+        </View>
+
+        <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 14 }]}>
+          {isTwoNews ? 'Article 1 Photo' : 'News Photo'}
+        </Text>
         <View
           style={[
             styles.bannerWrap,
@@ -260,17 +368,19 @@ export default function CreateArticleScreen() {
         </View>
 
         <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
-          Title
+          {isTwoNews ? 'Article 1 Title' : 'Title'}
         </Text>
         <BlogTextEditor initialValue={title} onChange={setTitle} variant="title" />
 
         <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
-          Article Body{hasTwoNews ? ` (${countArticleWords(content)}/${MAX_TWO_NEWS_BODY_WORDS} words)` : ''}
+          {isTwoNews
+            ? `Article 1 Body (${countArticleWords(content)}/${MAX_TWO_NEWS_BODY_WORDS} words)`
+            : `Article Body (${countArticleWords(content)}/${MAX_SINGLE_ARTICLE_WORDS} words)`}
         </Text>
         <BlogTextEditor
           initialValue={content}
           onChange={setContent}
-          maxWords={hasTwoNews ? MAX_TWO_NEWS_BODY_WORDS : undefined}
+          maxWords={isTwoNews ? MAX_TWO_NEWS_BODY_WORDS : MAX_SINGLE_ARTICLE_WORDS}
         />
 
         <View style={styles.imagesHeader}>
@@ -325,7 +435,7 @@ export default function CreateArticleScreen() {
 
         <View style={[styles.imagesHeader, { marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
           <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
-            Additional Articles ({sections.length})
+            {isTwoNews ? `Additional Articles (${sections.length})` : `Additional Articles (${sections.length})`}
           </Text>
           <IconButton icon="add-circle-outline" size={22} onPress={addSection} />
         </View>
@@ -337,7 +447,9 @@ export default function CreateArticleScreen() {
               { backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md, borderColor: theme.colors.border },
             ]}>
             <View style={styles.sectionCardHeader}>
-              <Text style={[styles.sectionCardLabel, { color: theme.colors.textMuted }]}>Article {i + 2}{i === 0 ? ` (${countArticleWords(section.content)}/${MAX_TWO_NEWS_BODY_WORDS} words)` : ''}</Text>
+              <Text style={[styles.sectionCardLabel, { color: theme.colors.textMuted }]}>
+                Article {i + 2} ({countArticleWords(section.content)}/{MAX_TWO_NEWS_BODY_WORDS} words)
+              </Text>
               <IconButton icon="trash-outline" size={18} onPress={() => removeSection(section.id)} />
             </View>
             <View
@@ -355,15 +467,15 @@ export default function CreateArticleScreen() {
             <View style={styles.sectionTitleEditor}>
               <BlogTextEditor
                 initialValue={section.title}
-                onChange={(title) => updateSection(section.id, { title })}
+                onChange={(sTitle) => updateSection(section.id, { title: sTitle })}
                 variant="title"
               />
             </View>
             <View style={styles.sectionBodyEditor}>
               <BlogTextEditor
                 initialValue={section.content}
-                onChange={(content) => updateSection(section.id, { content })}
-                maxWords={i === 0 ? MAX_TWO_NEWS_BODY_WORDS : undefined}
+                onChange={(sContent) => updateSection(section.id, { content: sContent })}
+                maxWords={MAX_TWO_NEWS_BODY_WORDS}
               />
             </View>
           </View>
@@ -482,6 +594,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 48,
+  },
+  modeSelectorWrap: {
+    marginBottom: 10,
+  },
+  modeSelector: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 4,
+    gap: 6,
+  },
+  modeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  modeButtonActive: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  modeButtonText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
+  modeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  modeBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   sectionLabel: {
     fontSize: 13,

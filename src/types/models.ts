@@ -24,6 +24,8 @@ export interface Reporter {
   aadharNumber?: string;
   /** Passport-style photo captured/uploaded at join request time. */
   photo?: string;
+  /** Official designation given to the reporter (e.g., "Senior Reporter", "News Reporter", "Bureau Chief"). */
+  designation?: string;
   /**
    * Admin approval state for the join request:
     * pending -> admin sets a joining fee -> awaiting_payment -> Cashfree confirms payment -> approved.

@@ -47,6 +47,7 @@ export interface Reporter {
   address?: string;
   aadharNumber?: string;
   photo?: string;
+  designation?: string;
   joinedAt: string;
   isVerified: boolean;
   isActive: boolean;
@@ -60,6 +61,8 @@ export interface Reporter {
   joinFeeAmount?: number;
   reporterCode?: string;
 }
+
+export type PublicReporterCard = Pick<Reporter, 'id' | 'name' | 'email' | 'phone' | 'avatar' | 'photo' | 'city' | 'village' | 'designation' | 'reporterCode' | 'joinedAt' | 'isActive' | 'isVerified' | 'requestStatus'>;
 
 export type PaymentStatus = 'paid' | 'pending' | 'failed';
 

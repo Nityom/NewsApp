@@ -27,6 +27,49 @@ export const getByExternalId = query({
   },
 });
 
+export const getPublicCard = query({
+  args: { id: v.string() },
+  handler: async (ctx, { id }) => {
+    const term = id.trim().toLowerCase();
+    let reporter = await findByExternalId(ctx.db, 'reporters', id);
+    if (!reporter) {
+      const all = await ctx.db.query('reporters').collect();
+      const match = all.find((r) => {
+        const d = r.data || {};
+        const aliases = [
+          r.id,
+          r.email,
+          d.id,
+          d.reporterCode,
+          d.email,
+          `rep-${(r.email || '').replace(/[^a-z0-9]+/g, '-')}`,
+          `reporter-${(r.email || '').replace(/[^a-z0-9]+/g, '-')}`,
+        ].filter(Boolean).map((s: string) => s.toLowerCase());
+        return aliases.includes(term);
+      });
+      if (match) reporter = match;
+    }
+    if (!reporter) return null;
+    const data = reporter.data || reporter;
+    return {
+      id: data.id || reporter.id,
+      name: data.name || 'Reporter',
+      email: data.email || reporter.email,
+      phone: data.phone || '',
+      avatar: data.avatar || '',
+      photo: data.photo || data.avatar || '',
+      city: data.city || '',
+      village: data.village || '',
+      designation: data.designation || 'News Reporter',
+      reporterCode: data.reporterCode || data.id || reporter.id,
+      joinedAt: data.joinedAt || new Date().toISOString(),
+      isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+      isVerified: Boolean(data.isVerified),
+      requestStatus: data.requestStatus || 'approved',
+    };
+  },
+});
+
 export const upsert = mutation({
   args: { reporter: v.any() },
   handler: async (ctx, { reporter }) => {

@@ -17,6 +17,7 @@ export const api = {
   },
   reporters: {
     list: query<Record<string, never>, Reporter[]>('reporters:list'),
+    getPublicCard: query<{ id: string }, Reporter | null>('reporters:getPublicCard'),
     patch: mutation<{ id: string; patch: Partial<Reporter> }, Partial<Reporter>>('reporters:patch'),
     remove: mutation<{ id: string }>('reporters:remove'),
   },

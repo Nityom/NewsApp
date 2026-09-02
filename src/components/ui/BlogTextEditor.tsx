@@ -258,22 +258,26 @@ export function BlogTextEditor({ initialValue, onChange, onCursorPosition, maxWo
 
   return (
     <View style={[styles.container, { borderColor: theme.colors.border, borderRadius: theme.radius.md }]}>
-      <RichToolbar
-        getEditor={() => editorRef.current as RichEditor}
-        actions={isTitle ? TITLE_TOOLBAR_ACTIONS : TOOLBAR_ACTIONS}
-        style={[styles.toolbar, { backgroundColor: theme.colors.backgroundSubtle }]}
-        selectedIconTint={theme.colors.primary}
-        iconTint={theme.colors.textSecondary}
-        disabledIconTint={theme.colors.textMuted}
-      />
-      {isTitle ? (
-        <View style={styles.titleColors}>
-          <Pressable onPress={() => setColorPickerVisible(true)} style={[styles.colorPickerButton, { borderColor: theme.colors.border }]} accessibilityRole="button" accessibilityLabel="Choose headline text color">
+      <View style={[styles.toolbarContainer, { backgroundColor: theme.colors.backgroundSubtle }]}>
+        <RichToolbar
+          getEditor={() => editorRef.current as RichEditor}
+          actions={isTitle ? TITLE_TOOLBAR_ACTIONS : TOOLBAR_ACTIONS}
+          style={[styles.toolbar, { backgroundColor: theme.colors.backgroundSubtle }]}
+          selectedIconTint={theme.colors.primary}
+          iconTint={theme.colors.textSecondary}
+          disabledIconTint={theme.colors.textMuted}
+        />
+        <View style={styles.colorActions}>
+          <Pressable
+            onPress={() => setColorPickerVisible(true)}
+            style={[styles.colorPickerButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+            accessibilityRole="button"
+            accessibilityLabel="Choose text color">
             <View style={[styles.colorSwatch, { backgroundColor: chosenColor }]} />
             <Text style={[styles.colorPickerText, { color: theme.colors.text }]}>Color</Text>
           </Pressable>
         </View>
-      ) : null}
+      </View>
       <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
       <RichEditor
         ref={editorRef}
@@ -320,8 +324,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
+  toolbarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingRight: 8,
+  },
   toolbar: {
     height: 48,
+    flex: 1,
+  },
+  colorActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingLeft: 4,
   },
   divider: {
     height: StyleSheet.hairlineWidth,

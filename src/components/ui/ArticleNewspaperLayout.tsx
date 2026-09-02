@@ -34,8 +34,17 @@ function truncateWords(text: string, maxWords: number) {
   return `${words.slice(0, maxWords).join(' ')}…`;
 }
 
+export function isCenterAligned(text?: string) {
+  if (!text) return false;
+  return /\[center\][\s\S]*?\[\/center\]/i.test(text)
+    || /<center[\s\S]*?>/i.test(text)
+    || /text-align\s*:\s*center/i.test(text);
+}
+
 export function plainArticleText(content: string) {
   return content
+    .replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '$1')
+    .replace(/<\/?center>/gi, '')
     .replace(/^(?:# |\- |> )/gm, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/_([^_]+)_/g, '$1')
@@ -48,7 +57,11 @@ export function plainArticleText(content: string) {
 }
 
 function renderInlineText(text: string, keyPrefix = 'inline'): ReactNode[] {
-  const parts = text.split(/(\[color=#[0-9a-f]{6}\][\s\S]*?\[\/color\]|\*\*[^*]+\*\*|_[^_]+_|~~[^~]+~~|<u>[^<]+<\/u>|\[[^\]]+\]\([^)]+\))/gi).filter(Boolean);
+  const parts = text
+    .replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '$1')
+    .replace(/<\/?center>/gi, '')
+    .split(/(\[color=#[0-9a-f]{6}\][\s\S]*?\[\/color\]|\*\*[^*]+\*\*|_[^_]+_|~~[^~]+~~|<u>[^<]+<\/u>|\[[^\]]+\]\([^)]+\))/gi)
+    .filter(Boolean);
   return parts.map((part, index) => {
     const key = `${keyPrefix}-${index}`;
     const colored = part.match(/^\[color=(#[0-9a-f]{6})\]([\s\S]*)\[\/color\]$/i);
@@ -74,16 +87,19 @@ function renderInlineText(text: string, keyPrefix = 'inline'): ReactNode[] {
 }
 
 function renderBodyLines(lines: string[], keyPrefix: string) {
-  return lines.map((line, index) => {
+  return lines.map((rawLine, index) => {
     const key = `${keyPrefix}-${index}`;
+    const isLineCenter = isCenterAligned(rawLine);
+    const line = rawLine.replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '$1').replace(/<\/?center>/gi, '');
+    const alignStyle = isLineCenter ? { textAlign: 'center' as const } : undefined;
     if (line.startsWith('# ')) {
-      return <Text key={key} style={styles.bodyHeading}>{renderInlineText(line.slice(2), `heading-${key}`)}</Text>;
+      return <Text key={key} style={[styles.bodyHeading, alignStyle]}>{renderInlineText(line.slice(2), `heading-${key}`)}</Text>;
     }
     if (line.startsWith('- ')) {
       return (
         <View key={key} style={styles.bulletRow}>
           <Text style={styles.bulletMark}>•</Text>
-          <Text style={[styles.body, styles.bulletText]}>{renderInlineText(line.slice(2), `bullet-${key}`)}</Text>
+          <Text style={[styles.body, styles.bulletText, alignStyle]}>{renderInlineText(line.slice(2), `bullet-${key}`)}</Text>
         </View>
       );
     }
@@ -92,34 +108,37 @@ function renderBodyLines(lines: string[], keyPrefix: string) {
       return (
         <View key={key} style={styles.bulletRow}>
           <Text style={styles.bulletMark}>{ordered[1]}.</Text>
-          <Text style={[styles.body, styles.bulletText]}>{renderInlineText(ordered[2], `ordered-${key}`)}</Text>
+          <Text style={[styles.body, styles.bulletText, alignStyle]}>{renderInlineText(ordered[2], `ordered-${key}`)}</Text>
         </View>
       );
     }
     if (line.startsWith('> ')) {
-      return <Text key={key} style={styles.bodyQuote}>{renderInlineText(line.slice(2), `quote-${key}`)}</Text>;
+      return <Text key={key} style={[styles.bodyQuote, alignStyle]}>{renderInlineText(line.slice(2), `quote-${key}`)}</Text>;
     }
-    return <Text key={key} style={styles.body}>{renderInlineText(line, `body-${key}`)}</Text>;
+    return <Text key={key} style={[styles.body, alignStyle]}>{renderInlineText(line, `body-${key}`)}</Text>;
   });
 }
 
 function renderCompactBodyLines(content: string, shareMode: boolean) {
-  return content.split(/\n+/).filter(Boolean).map((line, index) => {
+  return content.split(/\n+/).filter(Boolean).map((rawLine, index) => {
     const key = `compact-body-${index}`;
+    const isLineCenter = isCenterAligned(rawLine);
+    const line = rawLine.replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '$1').replace(/<\/?center>/gi, '');
+    const alignStyle = isLineCenter ? { textAlign: 'center' as const } : undefined;
     const ordered = line.match(/^(\d+)\.\s+(.*)$/);
     if (line.startsWith('# ')) {
-      return <Text key={key} style={[styles.storyBody, styles.compactBodyHeading, shareMode && styles.shareStoryBody]}>{renderInlineText(line.slice(2), key)}</Text>;
+      return <Text key={key} style={[styles.storyBody, styles.compactBodyHeading, shareMode && styles.shareStoryBody, alignStyle]}>{renderInlineText(line.slice(2), key)}</Text>;
     }
     if (line.startsWith('- ')) {
-      return <Text key={key} style={[styles.storyBody, shareMode && styles.shareStoryBody]}>• {renderInlineText(line.slice(2), key)}</Text>;
+      return <Text key={key} style={[styles.storyBody, shareMode && styles.shareStoryBody, alignStyle]}>• {renderInlineText(line.slice(2), key)}</Text>;
     }
     if (ordered) {
-      return <Text key={key} style={[styles.storyBody, shareMode && styles.shareStoryBody]}>{ordered[1]}. {renderInlineText(ordered[2], key)}</Text>;
+      return <Text key={key} style={[styles.storyBody, shareMode && styles.shareStoryBody, alignStyle]}>{ordered[1]}. {renderInlineText(ordered[2], key)}</Text>;
     }
     if (line.startsWith('> ')) {
-      return <Text key={key} style={[styles.storyBody, styles.compactBodyQuote, shareMode && styles.shareStoryBody]}>{renderInlineText(line.slice(2), key)}</Text>;
+      return <Text key={key} style={[styles.storyBody, styles.compactBodyQuote, shareMode && styles.shareStoryBody, alignStyle]}>{renderInlineText(line.slice(2), key)}</Text>;
     }
-    return <Text key={key} style={[styles.storyBody, shareMode && styles.shareStoryBody]}>{renderInlineText(line, key)}</Text>;
+    return <Text key={key} style={[styles.storyBody, shareMode && styles.shareStoryBody, alignStyle]}>{renderInlineText(line, key)}</Text>;
   });
 }
 
@@ -360,7 +379,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
       ) : (
         <>
           {/* Headline */}
-          <Text style={styles.title}>{renderInlineText(article.title, 'title')}</Text>
+          <Text style={[styles.title, isCenterAligned(article.title) && { textAlign: 'center' }]}>{renderInlineText(article.title, 'title')}</Text>
           <View style={styles.headlineRule} />
 
           {/* Full-width photo */}
@@ -394,7 +413,7 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
                 onPress={onImagePress ? () => onImagePress({ kind: 'section', sectionId: section.id, uri: section.image! }) : undefined}
               />
             ) : null}
-            <Text style={styles.sectionTitle}>{renderInlineText(section.title, `section-title-${section.id}`)}</Text>
+            <Text style={[styles.sectionTitle, isCenterAligned(section.title) && { textAlign: 'center' }]}>{renderInlineText(section.title, `section-title-${section.id}`)}</Text>
             <View style={styles.headlineRule} />
             <View style={styles.simpleBody}>
               {renderBodyLines(sLines, `section-${section.id}`)}
@@ -483,7 +502,7 @@ function CompactStory({
 
   return (
     <View style={[styles.storyColumn, shareMode && styles.shareStoryColumn]}>
-      <Text style={[styles.storyTitle, shareMode && styles.shareStoryTitle]}>{renderInlineText(title, 'compact-title')}</Text>
+      <Text style={[styles.storyTitle, shareMode && styles.shareStoryTitle, isCenterAligned(title) && { textAlign: 'center' }]}>{renderInlineText(title, 'compact-title')}</Text>
       <View style={styles.headlineRule} />
       <AutoImage
         uri={image}

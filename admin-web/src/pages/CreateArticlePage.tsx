@@ -53,7 +53,11 @@ export function CreateArticlePage() {
     setBanner(selectedArticle.banner);
     setImages(selectedArticle.images);
     setAdvertisements(selectedArticle.advertisements);
-    setSections((selectedArticle.sections ?? []).map((section) => ({ ...section, content: articleMarkupToHtml(section.content) })));
+    setSections((selectedArticle.sections ?? []).map((section) => ({
+      ...section,
+      title: articleMarkupToHtml(section.title),
+      content: articleMarkupToHtml(section.content),
+    })));
     setRegistrationDate(dateInputValue(selectedArticle.registrationDate ?? selectedArticle.reviewedAt));
   }, [selectedArticle]);
 
@@ -72,7 +76,9 @@ export function CreateArticlePage() {
     banner,
     images,
     advertisements,
-    sections: sections.filter((section) => section.title.trim() || section.content.trim() || section.image),
+    sections: sections
+      .filter((section) => stripHtml(section.title).trim() || stripHtml(section.content).trim() || section.image)
+      .map((section) => ({ ...section, title: htmlToArticleMarkup(section.title) })),
     status: selectedArticle?.status ?? 'draft',
     reporterId: selectedArticle?.reporterId ?? 'admin',
     reporterName: selectedArticle?.reporterName ?? ADMIN_NAME,
@@ -138,7 +144,11 @@ export function CreateArticlePage() {
     try {
       const createdAt = new Date().toISOString();
       const savedContent = htmlToArticleMarkup(content);
-      const savedSections = previewArticle.sections?.map((section) => ({ ...section, content: htmlToArticleMarkup(section.content) }));
+      const savedSections = previewArticle.sections?.map((section) => ({
+        ...section,
+        title: htmlToArticleMarkup(section.title),
+        content: htmlToArticleMarkup(section.content),
+      }));
       if (selectedArticle) {
         await patchArticle({ id: selectedArticle.id, patch: {
           title: savedTitle,
@@ -230,7 +240,7 @@ export function CreateArticlePage() {
             <div className="section-heading"><div><span className="eyebrow">Additional coverage</span><h2>Story sections</h2></div><Button type="button" variant="secondary" onClick={() => { setArticleMode('two'); addSection(); }}><Plus size={16} /> Add section</Button></div>
             <div className="section-editor-list">{sections.map((section, index) => <div className="section-editor" key={section.id}>
               <div className="section-editor-head"><strong>{index === 0 && articleMode === 'two' ? 'Article 2' : `Section ${index + 1}`}</strong><button type="button" className="icon-button" onClick={() => setSections((current) => current.filter((item) => item.id !== section.id))} aria-label="Remove section"><Trash2 size={16} /></button></div>
-              <label>{index === 0 && articleMode === 'two' ? 'Article 2 headline' : 'Section headline'}<input value={section.title} onChange={(event) => updateSection(section.id, { title: event.target.value })} /></label>
+              <label>{index === 0 && articleMode === 'two' ? 'Article 2 headline' : 'Section headline'}<RichTextEditor value={section.title} onChange={(value) => updateSection(section.id, { title: value })} placeholder={index === 0 && articleMode === 'two' ? 'Enter Article 2 headline' : 'Enter section headline'} minHeight={58} variant="title" /></label>
               <label>{index === 0 ? `Article 2 body (${wordCount(section.content)}/${TWO_NEWS_WORD_LIMIT} words)` : 'Section body'}<RichTextEditor value={section.content} onChange={(value) => updateSection(section.id, { content: value })} minHeight={150} maxWords={index === 0 ? TWO_NEWS_WORD_LIMIT : undefined} /></label>
               <label className="upload-button"><ImagePlus size={16} /> {section.image ? 'Replace image' : 'Add image'}<input type="file" accept="image/*" onChange={(event) => void uploadSectionImage(section.id, event)} /></label>
               {section.image ? <div className="section-thumb"><img src={section.image} alt="" /><button type="button" onClick={() => updateSection(section.id, { image: undefined })}><X size={14} /></button></div> : null}

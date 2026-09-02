@@ -10,6 +10,7 @@ const TOOLBAR_ACTIONS = [
   actions.redo,
   actions.setBold,
   actions.setItalic,
+  actions.alignCenter,
   actions.heading1,
   actions.insertBulletsList,
   actions.blockquote,
@@ -18,6 +19,7 @@ const TOOLBAR_ACTIONS = [
 const TITLE_TOOLBAR_ACTIONS = [
   actions.setBold,
   actions.setItalic,
+  actions.alignCenter,
 ];
 
 const COLOR_FIELD_SIZE = 216;
@@ -42,8 +44,10 @@ const decodeHtml = (value: string) =>
     .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)));
 
 const inlineTextToHtml = (value: string): string => {
-  const tokens = /(\[color=#[0-9a-f]{6}\][\s\S]*?\[\/color\]|\*\*[^*]+\*\*|_[^_]+_)/gi;
+  const tokens = /(\[center\][\s\S]*?\[\/center\]|\[color=#[0-9a-f]{6}\][\s\S]*?\[\/color\]|\*\*[^*]+\*\*|_[^_]+_)/gi;
   return value.split(tokens).filter(Boolean).map((part) => {
+    const centered = part.match(/^\[center\]([\s\S]*)\[\/center\]$/i);
+    if (centered) return inlineTextToHtml(centered[1]);
     const colored = part.match(/^\[color=(#[0-9a-f]{6})\]([\s\S]*)\[\/color\]$/i);
     if (colored) return `<span style="color: ${colored[1]}">${inlineTextToHtml(colored[2])}</span>`;
     if (part.startsWith('**') && part.endsWith('**')) return `<strong>${inlineTextToHtml(part.slice(2, -2))}</strong>`;
@@ -75,7 +79,10 @@ export function articleTextToHtml(value: string) {
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (line.startsWith('- ')) {
+    const isCenter = /^\[center\][\s\S]*\[\/center\]$/i.test(line.trim());
+    const text = isCenter ? line.trim().replace(/^\[center\]([\s\S]*)\[\/center\]$/i, '$1').trim() : line;
+    const alignStyle = isCenter ? ' style="text-align: center;"' : '';
+    if (text.startsWith('- ')) {
       const items: string[] = [];
       while (index < lines.length && lines[index].startsWith('- ')) {
         items.push(`<li>${inlineTextToHtml(lines[index].slice(2))}</li>`);
@@ -83,12 +90,12 @@ export function articleTextToHtml(value: string) {
       }
       index -= 1;
       blocks.push(`<ul>${items.join('')}</ul>`);
-    } else if (line.startsWith('# ')) {
-      blocks.push(`<h1>${inlineTextToHtml(line.slice(2))}</h1>`);
-    } else if (line.startsWith('> ')) {
-      blocks.push(`<blockquote>${inlineTextToHtml(line.slice(2))}</blockquote>`);
+    } else if (text.startsWith('# ')) {
+      blocks.push(`<h1${alignStyle}>${inlineTextToHtml(text.slice(2))}</h1>`);
+    } else if (text.startsWith('> ')) {
+      blocks.push(`<blockquote${alignStyle}>${inlineTextToHtml(text.slice(2))}</blockquote>`);
     } else {
-      blocks.push(`<div>${line ? inlineTextToHtml(line) : '<br>'}</div>`);
+      blocks.push(`<div${alignStyle}>${text ? inlineTextToHtml(text) : '<br>'}</div>`);
     }
   }
 
@@ -97,11 +104,24 @@ export function articleTextToHtml(value: string) {
 
 export function htmlToArticleText(html: string) {
   const blocks = html
-    .replace(/<h[1-6](?:\s[^>]*)?>([\s\S]*?)<\/h[1-6]>/gi, (_, text: string) => `\n# ${inlineHtmlToText(text)}\n`)
-    .replace(/<blockquote(?:\s[^>]*)?>([\s\S]*?)<\/blockquote>/gi, (_, text: string) => `\n> ${inlineHtmlToText(text)}\n`)
+    .replace(/<h[1-6](?:\s[^>]*)?>([\s\S]*?)<\/h[1-6]>/gi, (match: string, text: string) => {
+      const isCenter = /text-align\s*:\s*center/i.test(match) || /align\s*=\s*["']?center["']?/i.test(match);
+      const content = `# ${inlineHtmlToText(text)}`;
+      return isCenter ? `\n[center]${content}[/center]\n` : `\n${content}\n`;
+    })
+    .replace(/<blockquote(?:\s[^>]*)?>([\s\S]*?)<\/blockquote>/gi, (match: string, text: string) => {
+      const isCenter = /text-align\s*:\s*center/i.test(match) || /align\s*=\s*["']?center["']?/i.test(match);
+      const content = `> ${inlineHtmlToText(text)}`;
+      return isCenter ? `\n[center]${content}[/center]\n` : `\n${content}\n`;
+    })
     .replace(/<li(?:\s[^>]*)?>([\s\S]*?)<\/li>/gi, (_, text: string) => `\n- ${inlineHtmlToText(text)}`)
     .replace(/<\/?(?:ul|ol)(?:\s[^>]*)?>/gi, '\n')
-    .replace(/<(?:div|p)(?:\s[^>]*)?>([\s\S]*?)<\/(?:div|p)>/gi, (_, text: string) => `\n${inlineHtmlToText(text)}\n`)
+    .replace(/<center(?:\s[^>]*)?>([\s\S]*?)<\/center>/gi, (_, text: string) => `\n[center]${inlineHtmlToText(text)}[/center]\n`)
+    .replace(/<(?:div|p)(?:\s[^>]*)?>([\s\S]*?)<\/(?:div|p)>/gi, (match: string, text: string) => {
+      const isCenter = /text-align\s*:\s*center/i.test(match) || /align\s*=\s*["']?center["']?/i.test(match);
+      const content = inlineHtmlToText(text);
+      return isCenter ? `\n[center]${content}[/center]\n` : `\n${content}\n`;
+    })
     .replace(/<br\s*\/?>/gi, '\n');
 
   return inlineHtmlToText(blocks)

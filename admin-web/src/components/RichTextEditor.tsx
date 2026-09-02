@@ -1,10 +1,12 @@
 import Color from '@tiptap/extension-color';
 import Link from '@tiptap/extension-link';
+import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Underline from '@tiptap/extension-underline';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import {
+    AlignCenter,
     Bold,
     Heading2,
     Italic,
@@ -41,6 +43,7 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 260, 
       TextStyle,
       Color,
       Underline,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Link.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' }),
     ],
     content: value,
@@ -89,6 +92,19 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 260, 
   const inlineTools = [
     { label: 'Bold', icon: Bold, active: editor.isActive('bold'), disabled: false, action: () => editor.chain().focus().toggleBold().run() },
     { label: 'Italic', icon: Italic, active: editor.isActive('italic'), disabled: false, action: () => editor.chain().focus().toggleItalic().run() },
+    {
+      label: 'Center align',
+      icon: AlignCenter,
+      active: editor.isActive({ textAlign: 'center' }),
+      disabled: false,
+      action: () => {
+        if (editor.isActive({ textAlign: 'center' })) {
+          editor.chain().focus().setTextAlign('left').run();
+        } else {
+          editor.chain().focus().setTextAlign('center').run();
+        }
+      },
+    },
   ];
   const bodyTools = [
     { label: 'Underline', icon: UnderlineIcon, active: editor.isActive('underline'), action: () => editor.chain().focus().toggleUnderline().run() },

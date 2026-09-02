@@ -15,28 +15,6 @@ async function loadImage(source: string) {
   return createImageBitmap(await response.blob());
 }
 
-function wrapText(context: CanvasRenderingContext2D, text: string, maxWidth: number) {
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let line = '';
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (line && context.measureText(candidate).width > maxWidth) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = candidate;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
-function drawLines(context: CanvasRenderingContext2D, lines: string[], x: number, y: number, lineHeight: number) {
-  lines.forEach((line, index) => context.fillText(line, x, y + index * lineHeight));
-  return y + lines.length * lineHeight;
-}
-
 function richTextFont(marks: RichTextMarks, size: number, heading = false, quote = false) {
   const style = marks.italic || quote ? 'italic ' : '';
   const weight = marks.bold || heading ? '800 ' : '';
@@ -90,23 +68,49 @@ function drawRichText(context: CanvasRenderingContext2D, blocks: RichTextBlock[]
 function drawRichTitle(context: CanvasRenderingContext2D, blocks: RichTextBlock[], x: number, y: number, maxWidth: number) {
   const size = px(26);
   const lineHeight = px(32);
-  let cursorX = x;
-  let lineY = y;
+  const isCentered = blocks.some((b) => b.align === 'center');
+
+  type Token = { text: string; marks: RichTextMarks; width: number };
+  const tokens: Token[] = [];
   for (const run of blocks.flatMap((block) => block.runs)) {
-    for (const token of run.text.toUpperCase().match(/\S+\s*/g) ?? []) {
+    for (const tokenText of run.text.toUpperCase().match(/\S+\s*/g) ?? []) {
       context.font = richTextFont(run.marks, size, true);
-      context.fillStyle = run.marks.color ?? '#171717';
-      const tokenWidth = context.measureText(token).width;
-      if (cursorX > x && cursorX + tokenWidth > x + maxWidth) {
-        lineY += lineHeight;
-        cursorX = x;
-      }
-      context.fillText(token, cursorX, lineY);
-      cursorX += tokenWidth;
+      const width = context.measureText(tokenText).width;
+      tokens.push({ text: tokenText, marks: run.marks, width });
     }
   }
+
+  const lines: Token[][] = [];
+  let currentLine: Token[] = [];
+  let currentWidth = 0;
+
+  for (const token of tokens) {
+    if (currentLine.length > 0 && currentWidth + token.width > maxWidth) {
+      lines.push(currentLine);
+      currentLine = [token];
+      currentWidth = token.width;
+    } else {
+      currentLine.push(token);
+      currentWidth += token.width;
+    }
+  }
+  if (currentLine.length > 0) lines.push(currentLine);
+
+  let lineY = y;
+  for (const line of lines) {
+    const lineWidth = line.reduce((sum, t) => sum + t.width, 0);
+    let cursorX = isCentered ? x + Math.max(0, (maxWidth - lineWidth) / 2) : x;
+    for (const token of line) {
+      context.font = richTextFont(token.marks, size, true);
+      context.fillStyle = token.marks.color ?? '#171717';
+      context.fillText(token.text, cursorX, lineY);
+      cursorX += token.width;
+    }
+    lineY += lineHeight;
+  }
+
   context.fillStyle = '#171717';
-  return lineY + lineHeight;
+  return lineY;
 }
 
 function drawContainedImage(context: CanvasRenderingContext2D, image: ImageBitmap, x: number, y: number, width: number, maxHeight: number) {
@@ -176,8 +180,8 @@ export async function exportArticleAsPng(article: Article, publication?: Publica
       const imageWidth = PAGE_WIDTH * .68;
       y += drawContainedImage(context, image, (PAGE_WIDTH - imageWidth) / 2, y, imageWidth, px(460)) + px(8);
     }
-    context.font = `900 ${px(20)}px Arial, sans-serif`;
-    y = drawLines(context, wrapText(context, section.title.toUpperCase(), CONTENT_WIDTH), MARGIN, y, px(26)) + px(8);
+    const sectionBlocks = parseRichText(section.title);
+    y = drawRichTitle(context, sectionBlocks, MARGIN, y, CONTENT_WIDTH) + px(8);
     y = drawRichText(context, parseRichText(section.content), MARGIN, y, CONTENT_WIDTH);
   }
 

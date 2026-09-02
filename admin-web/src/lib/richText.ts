@@ -16,6 +16,20 @@ export interface RichTextBlock {
   type: 'paragraph' | 'heading' | 'quote' | 'bullet' | 'ordered';
   runs: RichTextRun[];
   number?: number;
+  align?: 'left' | 'center' | 'right';
+}
+
+export function isCenterAligned(value: string): boolean {
+  if (!value) return false;
+  return /\[center\][\s\S]*?\[\/center\]/i.test(value)
+    || /<center[\s\S]*?>/i.test(value)
+    || /text-align\s*:\s*center/i.test(value);
+}
+
+export function stripAlignmentTags(value: string): string {
+  return value
+    .replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '$1')
+    .replace(/<\/?center>/gi, '');
 }
 
 function decodePlainText(value: string) {
@@ -28,13 +42,24 @@ export function parseRichText(value: string): RichTextBlock[] {
   if (!value.trim()) return [];
   if (!/<[a-z][\s\S]*>/i.test(value)) {
     return value.split(/\n+/).filter(Boolean).map((source) => {
-      const ordered = source.match(/^(\d+)\.\s+(.*)$/);
-      const type = source.startsWith('# ') ? 'heading'
-        : source.startsWith('> ') ? 'quote'
-          : source.startsWith('- ') ? 'bullet'
+      let isCenter = false;
+      let textLine = source.trim();
+      if (/^\[center\]([\s\S]*)\[\/center\]$/i.test(textLine)) {
+        isCenter = true;
+        textLine = textLine.replace(/^\[center\]([\s\S]*)\[\/center\]$/i, '$1').trim();
+      }
+      const ordered = textLine.match(/^(\d+)\.\s+(.*)$/);
+      const type = textLine.startsWith('# ') ? 'heading'
+        : textLine.startsWith('> ') ? 'quote'
+          : textLine.startsWith('- ') ? 'bullet'
             : ordered ? 'ordered' : 'paragraph';
-      const text = ordered?.[2] ?? source.replace(/^(?:# |> |- )/, '');
-      return { type, runs: parseInlineMarkup(decodePlainText(text)), number: ordered ? Number(ordered[1]) : undefined };
+      const text = ordered?.[2] ?? textLine.replace(/^(?:# |> |- )/, '');
+      return {
+        type,
+        runs: parseInlineMarkup(decodePlainText(text)),
+        number: ordered ? Number(ordered[1]) : undefined,
+        align: isCenter ? 'center' : undefined,
+      };
     });
   }
 
@@ -63,7 +88,13 @@ export function parseRichText(value: string): RichTextBlock[] {
 
   function addBlock(element: HTMLElement, type: RichTextBlock['type'], number?: number) {
     const runs = inlineRuns(element);
-    if (runs.some((run) => run.text.trim())) blocks.push({ type, runs, number });
+    const isCenter = element.style.textAlign === 'center'
+      || element.getAttribute('align') === 'center'
+      || element.tagName.toLowerCase() === 'center'
+      || /text-align\s*:\s*center/i.test(element.getAttribute('style') || '');
+    if (runs.some((run) => run.text.trim())) {
+      blocks.push({ type, runs, number, align: isCenter ? 'center' : undefined });
+    }
   }
 
   for (const node of documentNode.body.childNodes) {
@@ -88,8 +119,10 @@ export function parseRichText(value: string): RichTextBlock[] {
 }
 
 function parseInlineMarkup(value: string, inherited: RichTextMarks = {}): RichTextRun[] {
-  const pattern = /(\[color=#[0-9a-f]{6}\][\s\S]*?\[\/color\]|\*\*[^*]+\*\*|_[^_]+_|~~[^~]+~~|<u>[^<]+<\/u>|\[[^\]]+\]\([^)]+\))/gi;
+  const pattern = /(\[center\][\s\S]*?\[\/center\]|\[color=#[0-9a-f]{6}\][\s\S]*?\[\/color\]|\*\*[^*]+\*\*|_[^_]+_|~~[^~]+~~|<u>[^<]+<\/u>|\[[^\]]+\]\([^)]+\))/gi;
   return value.split(pattern).filter(Boolean).flatMap((text): RichTextRun[] => {
+    const centered = text.match(/^\[center\]([\s\S]*)\[\/center\]$/i);
+    if (centered) return parseInlineMarkup(centered[1], inherited);
     const colored = text.match(/^\[color=(#[0-9a-f]{6})\]([\s\S]*)\[\/color\]$/i);
     if (colored) return parseInlineMarkup(colored[2], { ...inherited, color: colored[1] });
     if (text.startsWith('**')) return parseInlineMarkup(text.slice(2, -2), { ...inherited, bold: true });
@@ -120,6 +153,7 @@ export function htmlToArticleMarkup(value: string) {
         const color = normalizeColor(node.style.color);
         return color ? `[color=${color}]${content}[/color]` : content;
       }
+      case 'center': return `[center]${content}[/center]`;
       case 'br': return '\n';
       default: return content;
     }
@@ -128,11 +162,21 @@ export function htmlToArticleMarkup(value: string) {
   const lines: string[] = [];
   for (const node of documentNode.body.children) {
     const tag = node.tagName.toLowerCase();
+    const isCenter = node instanceof HTMLElement && (
+      node.style.textAlign === 'center'
+      || node.getAttribute('align') === 'center'
+      || tag === 'center'
+      || /text-align\s*:\s*center/i.test(node.getAttribute('style') || '')
+    );
     if (tag === 'ul' || tag === 'ol') {
-      [...node.children].forEach((item, index) => lines.push(`${tag === 'ul' ? '-' : `${index + 1}.`} ${inlineMarkup(item)}`));
+      [...node.children].forEach((item, index) => {
+        const itemMarkup = `${tag === 'ul' ? '-' : `${index + 1}.`} ${inlineMarkup(item)}`;
+        lines.push(isCenter ? `[center]${itemMarkup}[/center]` : itemMarkup);
+      });
     } else {
       const prefix = /^h[1-6]$/.test(tag) ? '# ' : tag === 'blockquote' ? '> ' : '';
-      lines.push(`${prefix}${inlineMarkup(node)}`);
+      const lineMarkup = `${prefix}${inlineMarkup(node)}`;
+      lines.push(isCenter ? `[center]${lineMarkup}[/center]` : lineMarkup);
     }
   }
   return lines.filter((line) => line.trim()).join('\n\n');
@@ -155,16 +199,21 @@ export function articleMarkupToHtml(value: string) {
       if (run.marks.color) text = `<span style="color: ${run.marks.color}">${text}</span>`;
       return text;
     }).join('');
-    if (block.type === 'heading') return `<h2>${content}</h2>`;
-    if (block.type === 'quote') return `<blockquote>${content}</blockquote>`;
-    if (block.type === 'bullet') return `<ul><li>${content}</li></ul>`;
-    if (block.type === 'ordered') return `<ol start="${block.number ?? 1}"><li>${content}</li></ol>`;
-    return `<p>${content}</p>`;
+    const style = block.align === 'center' ? ' style="text-align: center"' : '';
+    if (block.type === 'heading') return `<h2${style}>${content}</h2>`;
+    if (block.type === 'quote') return `<blockquote${style}>${content}</blockquote>`;
+    if (block.type === 'bullet') return `<ul${style}><li>${content}</li></ul>`;
+    if (block.type === 'ordered') return `<ol start="${block.number ?? 1}"${style}><li>${content}</li></ol>`;
+    return `<p${style}>${content}</p>`;
   }).join('');
 }
 
 export function plainRichText(value: string) {
-  return parseRichText(value).flatMap((block) => block.runs.map((run) => run.text)).join(' ').trim();
+  return parseRichText(value)
+    .flatMap((block) => block.runs.map((run) => run.text))
+    .join(' ')
+    .replace(/\[center\]([\s\S]*?)\[\/center\]/gi, '$1')
+    .trim();
 }
 
 function normalizeColor(value: string) {

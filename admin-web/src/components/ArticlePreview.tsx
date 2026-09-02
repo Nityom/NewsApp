@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
 
 import { articleByline } from '../lib/admin';
-import { parseRichText, type RichTextRun } from '../lib/richText';
+import { isCenterAligned, parseRichText, type RichTextRun } from '../lib/richText';
 import { stripHtml } from '../lib/utils';
 import type { Article, PublicationInfo } from '../types';
 
 export function ArticlePreview({ article, publication }: { article: Article; publication?: PublicationInfo | null }) {
   const [firstSection, ...restSections] = article.sections ?? [];
   const byline = articleByline(article);
+  const isMainTitleCenter = isCenterAligned(article.title);
 
   return (
     <article className="newspaper" id="article-preview">
@@ -24,7 +25,7 @@ export function ArticlePreview({ article, publication }: { article: Article; pub
         </div>
       ) : (
         <>
-          <h1><RichTitle value={article.title} /></h1>
+          <h1 style={isMainTitleCenter ? { textAlign: 'center' } : undefined}><RichTitle value={article.title} /></h1>
           <div className="newspaper-rule" />
           <img className="lead-photo" src={article.banner} alt="" />
           <RichTextContent value={article.content} className="story-body" />
@@ -33,7 +34,7 @@ export function ArticlePreview({ article, publication }: { article: Article; pub
       {restSections.map((section) => (
         <section className="newspaper-section" key={section.id}>
           {section.image ? <img src={section.image} alt="" /> : null}
-          <h2>{section.title}</h2>
+          <h2 style={isCenterAligned(section.title) ? { textAlign: 'center' } : undefined}><RichTitle value={section.title} /></h2>
           <RichTextContent value={section.content} />
         </section>
       ))}
@@ -53,10 +54,11 @@ function RichTextContent({ value, className }: { value: string; className?: stri
   const blocks = parseRichText(value);
   return <div className={className}>{blocks.map((block, index) => {
     const content = block.runs.map((run, runIndex) => <RichRun key={runIndex} run={run} />);
-    if (block.type === 'heading') return <h2 key={index}>{content}</h2>;
-    if (block.type === 'quote') return <blockquote key={index}>{content}</blockquote>;
-    if (block.type === 'bullet' || block.type === 'ordered') return <p className="story-list-item" key={index}><span>{block.type === 'bullet' ? '•' : `${block.number}.`}</span>{content}</p>;
-    return <p key={index}>{content}</p>;
+    const alignStyle = block.align === 'center' ? { textAlign: 'center' as const } : undefined;
+    if (block.type === 'heading') return <h2 key={index} style={alignStyle}>{content}</h2>;
+    if (block.type === 'quote') return <blockquote key={index} style={alignStyle}>{content}</blockquote>;
+    if (block.type === 'bullet' || block.type === 'ordered') return <p className="story-list-item" key={index} style={alignStyle}><span>{block.type === 'bullet' ? '•' : `${block.number}.`}</span>{content}</p>;
+    return <p key={index} style={alignStyle}>{content}</p>;
   })}</div>;
 }
 
@@ -76,9 +78,10 @@ function RichTitle({ value }: { value: string }) {
 }
 
 function CompactStory({ title, image, content }: { title: string; image: string; content: string }) {
+  const isTitleCenter = isCenterAligned(title);
   return (
     <section>
-      <h2><RichTitle value={title} /></h2>
+      <h2 style={isTitleCenter ? { textAlign: 'center' } : undefined}><RichTitle value={title} /></h2>
       <img src={image} alt="" />
       <p>{stripHtml(content).slice(0, 900)}</p>
     </section>

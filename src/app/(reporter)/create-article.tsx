@@ -262,84 +262,114 @@ export default function CreateArticleScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        {/* Top Mode Selector: Article 1 vs Article 2 */}
+        {/* Top Mode Selector: 1 Article vs 2 Articles */}
         <View style={styles.modeSelectorWrap}>
           <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginBottom: 8 }]}>
             Article Layout & Word Limit
           </Text>
-          <View
-            style={[
-              styles.modeSelector,
-              { backgroundColor: theme.colors.backgroundSubtle, borderColor: theme.colors.border },
-            ]}>
+          <View style={styles.modeCardsRow}>
             <Pressable
               onPress={() => selectMode('single')}
               style={[
-                styles.modeButton,
-                articleMode === 'single' && [styles.modeButtonActive, { backgroundColor: theme.colors.primary }],
+                styles.modeCard,
+                {
+                  borderColor: articleMode === 'single' ? theme.colors.primary : theme.colors.border,
+                  backgroundColor: articleMode === 'single' ? (theme.mode === 'dark' ? '#3A2E05' : '#FEF9E7') : theme.colors.backgroundSubtle,
+                  borderWidth: articleMode === 'single' ? 2 : 1,
+                },
+                articleMode === 'single' && styles.modeCardActive,
               ]}
               accessibilityRole="button"
               accessibilityLabel="1 Article Layout">
-              <Icon
-                name="document-text"
-                size={16}
-                color={articleMode === 'single' ? '#FFFFFF' : theme.colors.textSecondary}
-              />
-              <Text
-                style={[
-                  styles.modeButtonText,
-                  { color: articleMode === 'single' ? '#FFFFFF' : theme.colors.textSecondary },
-                ]}>
-                Article 1 (Single)
-              </Text>
-              <View
-                style={[
-                  styles.modeBadge,
-                  { backgroundColor: articleMode === 'single' ? 'rgba(255,255,255,0.25)' : theme.colors.border },
-                ]}>
-                <Text
+              <View style={styles.modeCardTop}>
+                <View
                   style={[
-                    styles.modeBadgeText,
-                    { color: articleMode === 'single' ? '#FFFFFF' : theme.colors.textMuted },
+                    styles.modeIconCircle,
+                    { backgroundColor: articleMode === 'single' ? theme.colors.primary : theme.colors.border },
                   ]}>
-                  {MAX_SINGLE_ARTICLE_WORDS}w
-                </Text>
+                  <Icon
+                    name="document-text"
+                    size={16}
+                    color={articleMode === 'single' ? '#FFFFFF' : theme.colors.textSecondary}
+                  />
+                </View>
+                <View
+                  style={[
+                    styles.modeBadge,
+                    { backgroundColor: articleMode === 'single' ? theme.colors.primary : theme.colors.border },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.modeBadgeText,
+                      { color: articleMode === 'single' ? '#FFFFFF' : theme.colors.textMuted },
+                    ]}>
+                    {MAX_SINGLE_ARTICLE_WORDS}w max
+                  </Text>
+                </View>
               </View>
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.modeCardTitle,
+                  { color: articleMode === 'single' ? theme.colors.text : theme.colors.textSecondary },
+                ]}>
+                1 Article
+              </Text>
+              <Text numberOfLines={1} style={[styles.modeCardSub, { color: theme.colors.textMuted }]}>
+                Single Story
+              </Text>
             </Pressable>
 
             <Pressable
               onPress={() => selectMode('two')}
               style={[
-                styles.modeButton,
-                articleMode === 'two' && [styles.modeButtonActive, { backgroundColor: theme.colors.primary }],
+                styles.modeCard,
+                {
+                  borderColor: articleMode === 'two' ? theme.colors.primary : theme.colors.border,
+                  backgroundColor: articleMode === 'two' ? (theme.mode === 'dark' ? '#3A2E05' : '#FEF9E7') : theme.colors.backgroundSubtle,
+                  borderWidth: articleMode === 'two' ? 2 : 1,
+                },
+                articleMode === 'two' && styles.modeCardActive,
               ]}
               accessibilityRole="button"
               accessibilityLabel="2 Articles Layout">
-              <Icon
-                name="newspaper"
-                size={16}
-                color={articleMode === 'two' ? '#FFFFFF' : theme.colors.textSecondary}
-              />
-              <Text
-                style={[
-                  styles.modeButtonText,
-                  { color: articleMode === 'two' ? '#FFFFFF' : theme.colors.textSecondary },
-                ]}>
-                Article 2 (Two News)
-              </Text>
-              <View
-                style={[
-                  styles.modeBadge,
-                  { backgroundColor: articleMode === 'two' ? 'rgba(255,255,255,0.25)' : theme.colors.border },
-                ]}>
-                <Text
+              <View style={styles.modeCardTop}>
+                <View
                   style={[
-                    styles.modeBadgeText,
-                    { color: articleMode === 'two' ? '#FFFFFF' : theme.colors.textMuted },
+                    styles.modeIconCircle,
+                    { backgroundColor: articleMode === 'two' ? theme.colors.primary : theme.colors.border },
                   ]}>
-                  {MAX_TWO_NEWS_BODY_WORDS}w ea
-                </Text>
+                  <Icon
+                    name="newspaper"
+                    size={16}
+                    color={articleMode === 'two' ? '#FFFFFF' : theme.colors.textSecondary}
+                  />
+                </View>
+                <View
+                  style={[
+                    styles.modeBadge,
+                    { backgroundColor: articleMode === 'two' ? theme.colors.primary : theme.colors.border },
+                  ]}>
+                  <Text
+                    style={[
+                      styles.modeBadgeText,
+                      { color: articleMode === 'two' ? '#FFFFFF' : theme.colors.textMuted },
+                    ]}>
+                    {MAX_TWO_NEWS_BODY_WORDS}w ea
+                  </Text>
+                </View>
               </View>
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.modeCardTitle,
+                  { color: articleMode === 'two' ? theme.colors.text : theme.colors.textSecondary },
+                ]}>
+                2 Articles
+              </Text>
+              <Text numberOfLines={1} style={[styles.modeCardSub, { color: theme.colors.textMuted }]}>
+                Two Stories
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -598,41 +628,51 @@ const styles = StyleSheet.create({
   modeSelectorWrap: {
     marginBottom: 10,
   },
-  modeSelector: {
+  modeCardsRow: {
     flexDirection: 'row',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 4,
-    gap: 6,
+    gap: 10,
   },
-  modeButton: {
+  modeCard: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-    gap: 6,
+    borderRadius: 12,
+    padding: 12,
   },
-  modeButtonActive: {
+  modeCardActive: {
     shadowColor: '#000000',
-    shadowOpacity: 0.12,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  modeButtonText: {
-    fontSize: 12.5,
+  modeCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  modeIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeCardTitle: {
+    fontSize: 14,
     fontWeight: '700',
+    marginBottom: 2,
+  },
+  modeCardSub: {
+    fontSize: 11.5,
+    fontWeight: '500',
   },
   modeBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 6,
   },
   modeBadgeText: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '700',
   },
   sectionLabel: {

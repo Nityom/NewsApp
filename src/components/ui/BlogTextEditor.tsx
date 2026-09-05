@@ -246,9 +246,17 @@ interface BlogTextEditorProps {
   onCursorPosition?: (offsetY: number) => void;
   maxWords?: number;
   variant?: 'body' | 'title';
+  toolbarPosition?: 'bottom' | 'top';
 }
 
-export function BlogTextEditor({ initialValue, onChange, onCursorPosition, maxWords, variant = 'body' }: BlogTextEditorProps) {
+export function BlogTextEditor({
+  initialValue,
+  onChange,
+  onCursorPosition,
+  maxWords,
+  variant = 'body',
+  toolbarPosition = 'bottom',
+}: BlogTextEditorProps) {
   const theme = useAppTheme();
   const editorRef = useRef<RichEditor>(null);
   const initialHtml = articleTextToHtml(initialValue);
@@ -256,29 +264,35 @@ export function BlogTextEditor({ initialValue, onChange, onCursorPosition, maxWo
   const [colorPickerVisible, setColorPickerVisible] = useState(false);
   const [chosenColor, setChosenColor] = useState('#bd3029');
 
+  const renderToolbar = () => (
+    <View style={[styles.toolbarContainer, { backgroundColor: theme.colors.backgroundSubtle }]}>
+      <RichToolbar
+        getEditor={() => editorRef.current as RichEditor}
+        actions={isTitle ? TITLE_TOOLBAR_ACTIONS : TOOLBAR_ACTIONS}
+        style={[styles.toolbar, { backgroundColor: theme.colors.backgroundSubtle }]}
+        selectedIconTint={theme.colors.primary}
+        iconTint={theme.colors.textSecondary}
+        disabledIconTint={theme.colors.textMuted}
+        iconSize={18}
+        iconGap={10}
+      />
+      <View style={styles.colorActions}>
+        <Pressable
+          onPress={() => setColorPickerVisible(true)}
+          style={[styles.colorPickerButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
+          accessibilityRole="button"
+          accessibilityLabel="Choose text color">
+          <View style={[styles.colorSwatch, { backgroundColor: chosenColor }]} />
+          <Text style={[styles.colorPickerText, { color: theme.colors.text }]}>Color</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+
   return (
     <View style={[styles.container, { borderColor: theme.colors.border, borderRadius: theme.radius.md }]}>
-      <View style={[styles.toolbarContainer, { backgroundColor: theme.colors.backgroundSubtle }]}>
-        <RichToolbar
-          getEditor={() => editorRef.current as RichEditor}
-          actions={isTitle ? TITLE_TOOLBAR_ACTIONS : TOOLBAR_ACTIONS}
-          style={[styles.toolbar, { backgroundColor: theme.colors.backgroundSubtle }]}
-          selectedIconTint={theme.colors.primary}
-          iconTint={theme.colors.textSecondary}
-          disabledIconTint={theme.colors.textMuted}
-        />
-        <View style={styles.colorActions}>
-          <Pressable
-            onPress={() => setColorPickerVisible(true)}
-            style={[styles.colorPickerButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.background }]}
-            accessibilityRole="button"
-            accessibilityLabel="Choose text color">
-            <View style={[styles.colorSwatch, { backgroundColor: chosenColor }]} />
-            <Text style={[styles.colorPickerText, { color: theme.colors.text }]}>Color</Text>
-          </Pressable>
-        </View>
-      </View>
-      <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+      {toolbarPosition === 'top' && renderToolbar()}
+      {toolbarPosition === 'top' && <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />}
       <RichEditor
         ref={editorRef}
         initialContentHTML={initialHtml}
@@ -306,6 +320,8 @@ export function BlogTextEditor({ initialValue, onChange, onCursorPosition, maxWo
           cssText: `h1 { font-size: 24px; line-height: 1.25; margin: 12px 0 8px; } blockquote { border-left: 3px solid ${theme.colors.primary}; margin: 10px 0; padding-left: 12px; color: ${theme.colors.textSecondary}; } ul { padding-left: 24px; }`,
         }}
       />
+      {toolbarPosition === 'bottom' && <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />}
+      {toolbarPosition === 'bottom' && renderToolbar()}
       <ColorPicker
         visible={colorPickerVisible}
         color={chosenColor}

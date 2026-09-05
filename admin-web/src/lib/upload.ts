@@ -11,8 +11,12 @@ export async function uploadImage(file: File, folder = 'education-news/advertise
     method: 'POST',
     body,
   });
-  if (!response.ok) throw new Error('Image upload failed. Please try again.');
-  const result = await response.json() as { secure_url?: string };
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const errorMsg = (result as { error?: { message?: string } })?.error?.message || response.statusText || 'Image upload failed';
+    console.error('Cloudinary upload error:', result);
+    throw new Error(`Image upload failed: ${errorMsg}`);
+  }
   if (!result.secure_url) throw new Error('Cloudinary did not return an image URL.');
   return result.secure_url;
 }

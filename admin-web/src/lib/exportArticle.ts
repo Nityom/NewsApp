@@ -132,12 +132,14 @@ export async function exportArticleAsPng(article: Article, publication?: Publica
   const masthead = await loadImage('/logoBanner.jpeg');
   const banner = await bitmapOrNull(article.banner);
   const sectionImages = await Promise.all((article.sections ?? []).map((section) => bitmapOrNull(section.image)));
+  const page2Banner = await bitmapOrNull(article.page2?.banner);
+  const page2SectionImages = await Promise.all((article.page2?.sections ?? []).map((section) => bitmapOrNull(section.image)));
   const gallery = await Promise.all(article.images.map(bitmapOrNull));
   const advertisements = await Promise.all(article.advertisements.map(bitmapOrNull));
 
   const canvas = document.createElement('canvas');
   canvas.width = PAGE_WIDTH;
-  canvas.height = 10000;
+  canvas.height = article.page2 ? 20000 : 10000;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Canvas export is not supported in this browser.');
   context.fillStyle = '#ffffff';
@@ -154,7 +156,7 @@ export async function exportArticleAsPng(article: Article, publication?: Publica
   context.fillStyle = '#171717';
   context.font = `700 ${px(13)}px Arial, sans-serif`;
   context.textAlign = 'center';
-  const pageCount = Math.max(1, article.sections?.length ?? 0);
+  const pageCount = article.page2 ? '1 / 2' : Math.max(1, article.sections?.length ?? 0);
   context.fillText(`वर्ष : ${publication?.year ?? '—'}  |  अंक : ${publication?.issueNumber ?? '—'}  |  पृष्ठ : ${pageCount}  |  दिनांक ${article.registrationDate ?? '—'}  |  मूल्य : ${publication?.price ?? '—'}`, PAGE_WIDTH / 2, y + px(10));
   context.textAlign = 'left';
   y += px(44);
@@ -219,6 +221,80 @@ export async function exportArticleAsPng(article: Article, publication?: Publica
   context.fillStyle = '#171717';
   context.fillText(`${byline.name}${byline.phone ? ` : ${byline.phone}` : ''}`, PAGE_WIDTH / 2, y);
   y += px(29);
+
+  // PAGE 2 (if present)
+  if (article.page2) {
+    y += px(24);
+    // Draw page break line & badge
+    context.fillStyle = '#171717';
+    context.fillRect(MARGIN, y + px(12), CONTENT_WIDTH, px(2));
+    context.fillStyle = '#ffe600';
+    const badgeW = px(120);
+    const badgeH = px(28);
+    const badgeX = (PAGE_WIDTH - badgeW) / 2;
+    context.fillRect(badgeX, y, badgeW, badgeH);
+    context.strokeStyle = '#171717';
+    context.strokeRect(badgeX, y, badgeW, badgeH);
+    context.fillStyle = '#171717';
+    context.font = `800 ${px(14)}px Arial, sans-serif`;
+    context.textAlign = 'center';
+    context.fillText('पृष्ठ २', PAGE_WIDTH / 2, y + px(6));
+    context.textAlign = 'left';
+    y += px(44);
+
+    // Page 2 Masthead
+    y += drawContainedImage(context, masthead, 0, y, PAGE_WIDTH, PAGE_WIDTH * (451 / 2564)) + px(4);
+    context.fillStyle = '#ffe600';
+    context.fillRect(MARGIN, y, CONTENT_WIDTH, px(36));
+    context.strokeStyle = '#171717';
+    context.strokeRect(MARGIN, y, CONTENT_WIDTH, 44);
+    context.fillStyle = '#171717';
+    context.font = `700 ${px(13)}px Arial, sans-serif`;
+    context.textAlign = 'center';
+    context.fillText(`वर्ष : ${publication?.year ?? '—'}  |  अंक : ${publication?.issueNumber ?? '—'}  |  पृष्ठ : 2 / 2  |  दिनांक ${article.registrationDate ?? '—'}  |  मूल्य : ${publication?.price ?? '—'}`, PAGE_WIDTH / 2, y + px(10));
+    context.textAlign = 'left';
+    y += px(44);
+
+    y = drawRichTitle(context, parseRichText(article.page2.title), MARGIN, y, CONTENT_WIDTH) + px(8);
+    context.fillRect(MARGIN, y, CONTENT_WIDTH, 1);
+    y += px(8);
+
+    if (page2Banner) {
+      const imageWidth = PAGE_WIDTH * .68;
+      y += drawContainedImage(context, page2Banner, (PAGE_WIDTH - imageWidth) / 2, y, imageWidth, px(500)) + px(10);
+    }
+    y = drawRichText(context, parseRichText(article.page2.content), MARGIN, y, CONTENT_WIDTH);
+
+    const p2Sections = article.page2.sections ?? [];
+    for (let index = 0; index < p2Sections.length; index += 1) {
+      const section = p2Sections[index];
+      y += px(6);
+      context.fillRect(0, y, PAGE_WIDTH, px(2));
+      y += px(12);
+      const image = page2SectionImages[index];
+      if (image) {
+        const imageWidth = PAGE_WIDTH * .68;
+        y += drawContainedImage(context, image, (PAGE_WIDTH - imageWidth) / 2, y, imageWidth, px(460)) + px(8);
+      }
+      const sectionBlocks = parseRichText(section.title);
+      y = drawRichTitle(context, sectionBlocks, MARGIN, y, CONTENT_WIDTH) + px(8);
+      y = drawRichText(context, parseRichText(section.content), MARGIN, y, CONTENT_WIDTH);
+    }
+
+    y += px(16);
+    context.fillStyle = '#171717';
+    context.fillRect(footerMargin, y, PAGE_WIDTH - footerMargin * 2, px(2));
+    y += px(14);
+    context.textAlign = 'center';
+    context.font = `700 ${px(12)}px Arial, sans-serif`;
+    context.fillStyle = '#606060';
+    context.fillText('NEWS REPORTER', PAGE_WIDTH / 2, y);
+    y += px(20);
+    context.font = `800 ${px(17)}px Arial, sans-serif`;
+    context.fillStyle = '#171717';
+    context.fillText(`${byline.name}${byline.phone ? ` : ${byline.phone}` : ''}`, PAGE_WIDTH / 2, y);
+    y += px(29);
+  }
 
   const output = document.createElement('canvas');
   output.width = PAGE_WIDTH;

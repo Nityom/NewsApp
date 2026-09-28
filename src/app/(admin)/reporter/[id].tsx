@@ -19,6 +19,7 @@ import { useArticles } from '@/context/ArticlesContext';
 import { useNotifications } from '@/context/NotificationsContext';
 import { usePayments } from '@/context/PaymentsContext';
 import { useReporters } from '@/context/ReportersContext';
+import { formatValidityDate } from '@/lib/validity';
 import { useAppTheme } from '@/theme';
 
 export default function ReporterDetailsScreen() {
@@ -91,7 +92,7 @@ export default function ReporterDetailsScreen() {
           type: 'system',
           audience: 'reporter',
           title: 'Joining Fee Requested',
-          message: `${reporter.name}, please pay the ₹${amount} joining fee to complete your registration. A 2.3% convenience fee will be added at Cashfree checkout.`,
+          message: `${reporter.name}, please pay the ₹${amount} joining fee to complete your registration. A 2.3% convenience fee will be added at Razorpay checkout.`,
           reporterId: reporter.id,
         });
         Alert.alert('Payment Request Sent', `${reporter.name}'s status is now Awaiting Payment.`);
@@ -191,6 +192,11 @@ export default function ReporterDetailsScreen() {
           {reporter.reporterCode ? (
             <Text style={[styles.city, { color: theme.colors.textMuted }]}>ID: {reporter.reporterCode}</Text>
           ) : null}
+          {reporter.requestStatus === 'approved' || reporter.validUntil ? (
+            <Text style={[styles.city, { color: theme.colors.textMuted }]}>
+              Valid Thru: {formatValidityDate(reporter.validUntil, reporter.joinedAt)}
+            </Text>
+          ) : null}
           <View style={styles.badgesRow}>
             <Badge label={reporter.isActive ? 'Active' : 'Inactive'} tone={reporter.isActive ? 'success' : 'neutral'} />
             <Badge label={`★ ${reporter.rating}`} tone="warning" />
@@ -275,7 +281,7 @@ export default function ReporterDetailsScreen() {
           <>
             <View style={{ height: 16 }} />
             <Text style={[styles.bio, { color: theme.colors.textSecondary }]}>
-              Waiting for {reporter.name} to complete the ₹{reporter.joinFeeAmount} Cashfree payment. Approval is automatic after confirmation.
+              Waiting for {reporter.name} to complete the ₹{reporter.joinFeeAmount} Razorpay payment. Approval is automatic after confirmation.
             </Text>
             <Button label="Reject" variant="danger" icon="close" onPress={() => setRejectVisible(true)} fullWidth />
           </>
@@ -285,7 +291,7 @@ export default function ReporterDetailsScreen() {
           <>
             <View style={{ height: 16 }} />
             <Text style={[styles.bio, { color: theme.colors.textSecondary }]}>
-              This is a legacy payment submission. Send a new Cashfree payment request to use automatic confirmation.
+              This is a legacy payment submission. Send a new Razorpay payment request to use automatic confirmation.
             </Text>
             <Button label="Reject" variant="danger" icon="close" onPress={() => setRejectVisible(true)} fullWidth />
           </>
@@ -365,7 +371,7 @@ export default function ReporterDetailsScreen() {
       <Dialog
         visible={feeVisible}
         title="Set Joining Fee"
-        message={`Enter the base amount to charge ${reporter.name}. A 2.3% convenience fee will be added at Cashfree checkout.`}
+        message={`Enter the base amount to charge ${reporter.name}. A 2.3% convenience fee will be added at Razorpay checkout.`}
         onRequestClose={() => setFeeVisible(false)}
         actions={[
           { label: 'Cancel', variant: 'outline', onPress: () => setFeeVisible(false) },

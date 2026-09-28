@@ -301,16 +301,19 @@ function AdvertisementGrid({
 
 function PublicationInfoBar({
   pageCount,
+  pageNumber,
   registrationLabel,
   shareMode = false,
 }: {
   pageCount: number;
+  pageNumber?: number;
   registrationLabel?: string;
   shareMode?: boolean;
 }) {
   const { info } = usePublicationInfo();
   const period = getCurrentPeriodLabel();
   const registrationDate = registrationLabel ?? '—';
+  const pageLabel = pageNumber ? `पृष्ठ : ${pageNumber} / ${pageCount}` : `पृष्ठ : ${pageCount}`;
 
   return (
     <View style={[styles.infoBar, shareMode && styles.shareInfoBar]}>
@@ -319,7 +322,7 @@ function PublicationInfoBar({
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={shareMode ? 0.85 : undefined}>
-        वर्ष : {info.year}  |  अंक : {info.issueNumber}  |  {period}  (पृष्ठ : {pageCount})  |  दिनांक {registrationDate}  |  मूल्य : {info.price}
+        वर्ष : {info.year}  |  अंक : {info.issueNumber}  |  {period}  ({pageLabel})  |  दिनांक {registrationDate}  |  मूल्य : {info.price}
       </Text>
     </View>
   );
@@ -340,16 +343,17 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
     || reporterPhone?.trim()
     || (article.reporterId === 'admin' ? ADMIN_PHONE : undefined);
   const [firstSection, ...restSections] = article.sections ?? [];
-  // Extra sections beyond the first stack as additional pages; the first shares the lead page.
-  const pageCount = 1 + restSections.length;
-  // registrationDate is a pre-formatted display string set/edited by admin; fall back to the approval date.
+  const hasPage2 = !!(article.page2 && article.page2.title.trim());
+  const pageCount = hasPage2 ? 2 : (1 + restSections.length);
   const registrationLabel = article.registrationDate ?? (article.reviewedAt ? formatRegistrationDate(article.reviewedAt) : undefined);
+
+  const [page2FirstSection] = article.page2?.sections ?? [];
 
   return (
     <View style={[styles.paper, shareMode && styles.sharePaper]}>
-      {/* Masthead */}
+      {/* PAGE 1 */}
       <Image source={logoBanner} style={styles.logoBanner} contentFit="contain" />
-      <PublicationInfoBar pageCount={pageCount} registrationLabel={registrationLabel} shareMode={shareMode} />
+      <PublicationInfoBar pageCount={pageCount} pageNumber={hasPage2 ? 1 : undefined} registrationLabel={registrationLabel} shareMode={shareMode} />
       <View style={styles.mastRule} />
 
       {firstSection ? (
@@ -422,44 +426,148 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
         );
       })}
 
-      {/* Gallery */}
-      {article.images.length > 0 ? (
-        <View style={styles.gallery}>
-          {article.images.map((uri, i) => (
-            <View key={`${uri}-${i}`} style={styles.galleryItem}>
-              <AutoImage
-                uri={uri}
-                style={styles.galleryImage}
-                radius={theme.radius.sm}
-                onPress={onImagePress ? () => onImagePress({ kind: 'gallery', index: i, uri }) : undefined}
-              />
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      {/* Advertisement */}
-      {article.advertisements.length > 0 ? (
+      {/* If no page 2, render gallery, ads, and footer on page 1 */}
+      {!hasPage2 ? (
         <>
-          <View style={[styles.sectionDividerRule, shareMode && styles.shareSectionDividerRule]} />
-          <View style={[styles.adSection, shareMode && styles.shareAdSection]}>
-            <AdvertisementGrid
-              uris={article.advertisements}
-              radius={theme.radius.sm}
-              onImagePress={onImagePress}
-            />
+          {/* Gallery */}
+          {article.images.length > 0 ? (
+            <View style={styles.gallery}>
+              {article.images.map((uri, i) => (
+                <View key={`${uri}-${i}`} style={styles.galleryItem}>
+                  <AutoImage
+                    uri={uri}
+                    style={styles.galleryImage}
+                    radius={theme.radius.sm}
+                    onPress={onImagePress ? () => onImagePress({ kind: 'gallery', index: i, uri }) : undefined}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Advertisement */}
+          {article.advertisements.length > 0 ? (
+            <>
+              <View style={[styles.sectionDividerRule, shareMode && styles.shareSectionDividerRule]} />
+              <View style={[styles.adSection, shareMode && styles.shareAdSection]}>
+                <AdvertisementGrid
+                  uris={article.advertisements}
+                  radius={theme.radius.sm}
+                  onImagePress={onImagePress}
+                />
+              </View>
+            </>
+          ) : null}
+
+          {/* Footer */}
+          <View style={[styles.footer, shareMode && styles.shareFooter]}>
+            <Text style={[styles.reporterLabel, shareMode && styles.shareReporterLabel]}>News Reporter</Text>
+            <Text style={[styles.reporterName, shareMode && styles.shareReporterName]}>
+              {article.reporterName}
+              {phone ? ` : ${phone}` : ''}
+            </Text>
           </View>
         </>
       ) : null}
 
-      {/* Footer */}
-      <View style={[styles.footer, shareMode && styles.shareFooter]}>
-        <Text style={[styles.reporterLabel, shareMode && styles.shareReporterLabel]}>News Reporter</Text>
-        <Text style={[styles.reporterName, shareMode && styles.shareReporterName]}>
-          {article.reporterName}
-          {phone ? ` : ${phone}` : ''}
-        </Text>
-      </View>
+      {/* PAGE 2 */}
+      {hasPage2 && article.page2 ? (
+        <>
+          <View style={[styles.pageBreak, shareMode && styles.sharePageBreak]}>
+            <View style={styles.pageBreakRule} />
+            <View style={styles.pageBadge}>
+              <Text style={styles.pageBadgeText}>पृष्ठ २</Text>
+            </View>
+            <View style={styles.pageBreakRule} />
+          </View>
+
+          {/* Page 2 Masthead */}
+          <Image source={logoBanner} style={styles.logoBanner} contentFit="contain" />
+          <PublicationInfoBar pageCount={2} pageNumber={2} registrationLabel={registrationLabel} shareMode={shareMode} />
+          <View style={styles.mastRule} />
+
+          {page2FirstSection ? (
+            <View style={[styles.twoUpRow, shareMode && styles.shareTwoUpRow]}>
+              <CompactStory
+                title={article.page2.title}
+                image={article.page2.banner}
+                content={article.page2.content}
+                maxBodyWords={MAX_TWO_NEWS_BODY_WORDS}
+                shareMode={shareMode}
+                onImagePress={onImagePress ? () => onImagePress({ kind: 'banner', uri: article.page2!.banner }) : undefined}
+              />
+              <View style={styles.colDivider} />
+              <CompactStory
+                title={page2FirstSection.title}
+                image={page2FirstSection.image ?? article.page2.banner}
+                content={page2FirstSection.content}
+                maxBodyWords={MAX_TWO_NEWS_BODY_WORDS}
+                shareMode={shareMode}
+                onImagePress={onImagePress ? () => onImagePress(page2FirstSection.image
+                  ? { kind: 'section', sectionId: page2FirstSection.id, uri: page2FirstSection.image }
+                  : { kind: 'banner', uri: article.page2!.banner }) : undefined}
+              />
+            </View>
+          ) : (
+            <>
+              <Text style={[styles.title, isCenterAligned(article.page2.title) && { textAlign: 'center' }]}>
+                {renderInlineText(article.page2.title, 'p2-title')}
+              </Text>
+              <View style={styles.headlineRule} />
+              <View style={styles.fullImageWrap}>
+                <AutoImage
+                  uri={article.page2.banner}
+                  style={styles.fullImage}
+                  radius={theme.radius.sm}
+                  onPress={onImagePress ? () => onImagePress({ kind: 'banner', uri: article.page2!.banner }) : undefined}
+                />
+              </View>
+              <View style={styles.simpleBody}>
+                {renderBodyLines(article.page2.content.split(/\n+/).filter(Boolean), 'p2-body')}
+              </View>
+            </>
+          )}
+
+          {/* Page 2 Gallery */}
+          {article.images.length > 0 ? (
+            <View style={styles.gallery}>
+              {article.images.map((uri, i) => (
+                <View key={`p2-${uri}-${i}`} style={styles.galleryItem}>
+                  <AutoImage
+                    uri={uri}
+                    style={styles.galleryImage}
+                    radius={theme.radius.sm}
+                    onPress={onImagePress ? () => onImagePress({ kind: 'gallery', index: i, uri }) : undefined}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {/* Page 2 Advertisements */}
+          {article.advertisements.length > 0 ? (
+            <>
+              <View style={[styles.sectionDividerRule, shareMode && styles.shareSectionDividerRule]} />
+              <View style={[styles.adSection, shareMode && styles.shareAdSection]}>
+                <AdvertisementGrid
+                  uris={article.advertisements}
+                  radius={theme.radius.sm}
+                  onImagePress={onImagePress}
+                />
+              </View>
+            </>
+          ) : null}
+
+          {/* Page 2 Footer */}
+          <View style={[styles.footer, shareMode && styles.shareFooter]}>
+            <Text style={[styles.reporterLabel, shareMode && styles.shareReporterLabel]}>News Reporter</Text>
+            <Text style={[styles.reporterName, shareMode && styles.shareReporterName]}>
+              {article.reporterName}
+              {phone ? ` : ${phone}` : ''}
+            </Text>
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -585,6 +693,35 @@ const styles = StyleSheet.create({
   },
   sharePaper: {
     paddingBottom: 12,
+  },
+  pageBreak: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 18,
+    marginHorizontal: 12,
+  },
+  sharePageBreak: {
+    marginVertical: 12,
+  },
+  pageBreakRule: {
+    flex: 1,
+    height: 1.5,
+    backgroundColor: '#D7D7D7',
+  },
+  pageBadge: {
+    backgroundColor: '#FFE600',
+    borderWidth: 1.5,
+    borderColor: INK,
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginHorizontal: 8,
+  },
+  pageBadgeText: {
+    color: INK,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   editableImage: {
     width: '100%',

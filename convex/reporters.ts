@@ -4,7 +4,7 @@ import { mutation, query } from './_generated/server';
 import { getAuthEmail, getReporterForEmail, isAdminEmail, requireAdmin } from './authUtils';
 import { cleanData, findByExternalId } from './helpers';
 
-const PROTECTED_FIELDS = ['email', 'requestStatus', 'joinFeeAmount', 'isActive', 'isVerified', 'totalEarnings'];
+const PROTECTED_FIELDS = ['email', 'requestStatus', 'joinFeeAmount', 'isActive', 'isVerified', 'totalEarnings', 'validUntil'];
 
 export const list = query({
   args: {},
@@ -51,6 +51,13 @@ export const getPublicCard = query({
     }
     if (!reporter) return null;
     const data = reporter.data || reporter;
+    const joinedAt = data.joinedAt || new Date().toISOString();
+    let validUntil = data.validUntil;
+    if (!validUntil && (data.requestStatus === 'approved' || data.isActive)) {
+      const d = new Date(joinedAt);
+      d.setFullYear(d.getFullYear() + 1);
+      validUntil = d.toISOString();
+    }
     return {
       id: data.id || reporter.id,
       name: data.name || 'Reporter',
@@ -62,7 +69,8 @@ export const getPublicCard = query({
       village: data.village || '',
       designation: data.designation || 'News Reporter',
       reporterCode: data.reporterCode || data.id || reporter.id,
-      joinedAt: data.joinedAt || new Date().toISOString(),
+      joinedAt,
+      validUntil,
       isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
       isVerified: Boolean(data.isVerified),
       requestStatus: data.requestStatus || 'approved',

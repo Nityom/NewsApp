@@ -6,7 +6,7 @@ import { useParams } from 'react-router-dom';
 import { LoadingState } from '../components/ui';
 import { api } from '../lib/api';
 import { downloadReporterIdCard } from '../lib/exportIdCard';
-import { formatDate } from '../lib/utils';
+import { formatDate, formatValidityDate } from '../lib/utils';
 import type { Reporter } from '../types';
 
 export function PublicReporterCardPage() {
@@ -132,9 +132,15 @@ export function PublicReporterCardPage() {
                 <h2>{reporter.name}</h2>
                 <span className="press-id-designation-badge">{designation}</span>
               </div>
-              <div className="press-id-number">
-                <span>Reporter ID</span>
-                <strong>{reporter.reporterCode || reporter.id}</strong>
+              <div className="press-id-meta-grid">
+                <div className="press-id-meta-box">
+                  <span>Reporter ID</span>
+                  <strong>{reporter.reporterCode || reporter.id}</strong>
+                </div>
+                <div className="press-id-meta-box">
+                  <span>Valid Thru</span>
+                  <strong>{formatValidityDate(reporter.validUntil, reporter.joinedAt)}</strong>
+                </div>
               </div>
               <div className="contact-list">
                 {reporter.email ? (
@@ -219,6 +225,10 @@ export function PublicReporterCardPage() {
                 <dd className={isActive ? 'text-success' : 'text-danger'}>
                   <strong>{isActive ? 'Active Accredited Reporter' : 'Inactive / Under Review'}</strong>
                 </dd>
+              </div>
+              <div>
+                <dt>Valid Through</dt>
+                <dd><strong>{formatValidityDate(reporter.validUntil, reporter.joinedAt)}</strong></dd>
               </div>
               <div>
                 <dt>Member Since</dt>

@@ -28,7 +28,7 @@ export interface Reporter {
   designation?: string;
   /**
    * Admin approval state for the join request:
-    * pending -> admin sets a joining fee -> awaiting_payment -> Cashfree confirms payment -> approved.
+    * pending -> admin sets a joining fee -> awaiting_payment -> Razorpay confirms payment -> approved.
     * payment_submitted is retained only for records created by the previous manual flow.
    */
   requestStatus: 'pending' | 'awaiting_payment' | 'payment_submitted' | 'approved' | 'rejected';
@@ -37,6 +37,8 @@ export interface Reporter {
   joinFeeAmount?: number;
   /** Random, year-stamped ID card number assigned at join request time, e.g. "RPT-2026-483920". */
   reporterCode?: string;
+  /** Expiration date of the reporter credential, defaults to 1 year from joining fee payment. */
+  validUntil?: string;
 }
 
 export interface ArticleSection {
@@ -44,6 +46,14 @@ export interface ArticleSection {
   title: string;
   content: string;
   image?: string;
+}
+
+export interface ArticlePage {
+  mode: 'single' | 'two';
+  title: string;
+  content: string;
+  banner: string;
+  sections?: ArticleSection[];
 }
 
 export interface Article {
@@ -55,6 +65,7 @@ export interface Article {
   images: string[];
   advertisements: string[];
   sections?: ArticleSection[];
+  page2?: ArticlePage;
   status: ArticleStatus;
   reporterId: string;
   reporterName: string;

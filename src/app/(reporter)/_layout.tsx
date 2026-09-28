@@ -1,17 +1,16 @@
-import { CFEnvironment, CFSession } from 'cashfree-pg-api-contract';
 import { useAction, useMutation } from 'convex/react';
 import { router, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { CFPaymentGatewayService } from 'react-native-cashfree-pg-sdk';
+import RazorpayCheckout from 'react-native-razorpay';
 
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useAuth } from '@/context/AuthContext';
 import { useReporters } from '@/context/ReportersContext';
-import { createJoiningFeeOrder, verifyJoiningFeeOrder } from '@/lib/cashfree';
 import { clearJustSubmittedReporterId, getJustSubmittedReporterId } from '@/lib/joinRequestFlag';
+import { createJoiningFeeOrder, verifyJoiningFeeOrder } from '@/lib/razorpay';
 import { isGooglePlayReviewEmail } from '@/lib/reviewAccount';
 import { useAppTheme } from '@/theme';
 import type { Reporter } from '@/types/models';
@@ -48,64 +47,69 @@ function PaymentScreen({ reporter }: { reporter: Reporter }) {
   const theme = useAppTheme();
   const { logout } = useAuth();
   const [submitting, setSubmitting] = useState(false);
-  const [requestingHelp, setRequestingHelp] = useState(false);
-  const createOrder = useAction(api.cashfree.createJoiningFeeOrder);
-  const verifyOrder = useAction(api.cashfree.verifyJoiningFeeOrder);
-  const requestPaymentAssistance = useMutation(api.notifications.requestPaymentAssistance);
+  const createOrder = useAction(api.razorpay.createJoiningFeeOrder);
+  const verifyOrder = useAction(api.razorpay.verifyJoiningFeeOrder);
   const baseAmount = roundCurrency(reporter.joinFeeAmount ?? 0);
   const convenienceFee = roundCurrency(baseAmount * CONVENIENCE_FEE_RATE);
   const totalAmount = roundCurrency(baseAmount + convenienceFee);
-
-  useEffect(() => {
-    CFPaymentGatewayService.setCallback({
-      onVerify: async (orderId) => {
-        setSubmitting(true);
-        try {
-          await verifyJoiningFeeOrder(verifyOrder, orderId);
-          Alert.alert('Payment Confirmed', 'Your reporter account is active. Welcome to your dashboard.');
-          router.replace('/(reporter)/(tabs)');
-        } catch (error) {
-          Alert.alert('Verification Pending', error instanceof Error ? error.message : 'Please try again shortly.');
-        } finally {
-          setSubmitting(false);
-        }
-      },
-      onError: (error) => {
-        setSubmitting(false);
-        Alert.alert('Payment Not Completed', error.getMessage());
-      },
-    });
-    return () => CFPaymentGatewayService.removeCallback();
-  }, [verifyOrder]);
 
   const startPayment = async () => {
     if (submitting) return;
     setSubmitting(true);
     try {
       const order = await createJoiningFeeOrder(createOrder, reporter.id);
-      const session = new CFSession(order.paymentSessionId, order.orderId, CFEnvironment.SANDBOX);
-      CFPaymentGatewayService.doWebPayment(session);
-    } catch (error) {
-      setSubmitting(false);
-      Alert.alert('Could Not Start Payment', error instanceof Error ? error.message : 'Please try again.');
-    }
-  };
+      const phoneDigits = String(reporter.phone || '').replace(/\D/g, '').slice(-10);
 
-  const sendRequestToAdmin = async () => {
-    if (requestingHelp) return;
-    setRequestingHelp(true);
-    try {
-      const result = await requestPaymentAssistance({});
-      Alert.alert(
-        result.created ? 'Request Sent' : 'Request Already Sent',
-        result.created
-          ? 'The admin has been notified that you need help completing your payment.'
-          : 'Your previous payment-assistance request is still waiting for the admin.',
-      );
+      const options = {
+        description: 'Education News reporter joining fee',
+        currency: 'INR',
+        key: order.keyId,
+        amount: Math.round(order.totalAmount * 100),
+        name: 'Education News',
+        order_id: order.orderId,
+        prefill: {
+          email: reporter.email,
+          contact: phoneDigits ? `+91${phoneDigits}` : undefined,
+          name: reporter.name,
+        },
+        theme: { color: theme.colors.primary },
+        retry: {
+          enabled: true,
+          max_count: 3,
+        },
+      };
+
+      let checkoutResult;
+      try {
+        checkoutResult = await RazorpayCheckout.open(options);
+      } catch (checkoutError: any) {
+        if (checkoutError?.code === 0 || checkoutError?.description?.toLowerCase()?.includes('cancelled')) {
+          Alert.alert('Payment Cancelled', 'You cancelled the payment process.');
+        } else {
+          Alert.alert(
+            'Payment Incomplete',
+            checkoutError?.description || checkoutError?.message || 'Payment could not be completed. Please try again.',
+          );
+        }
+        setSubmitting(false);
+        return;
+      }
+
+      try {
+        await verifyJoiningFeeOrder(verifyOrder, {
+          orderId: checkoutResult.razorpay_order_id,
+          razorpayPaymentId: checkoutResult.razorpay_payment_id,
+          razorpaySignature: checkoutResult.razorpay_signature,
+        });
+        Alert.alert('Payment Confirmed', 'Your reporter account is active. Welcome to your dashboard.');
+        router.replace('/(reporter)/(tabs)');
+      } catch (verifyError) {
+        Alert.alert('Verification Pending', verifyError instanceof Error ? verifyError.message : 'Please try again shortly.');
+      }
     } catch (error) {
-      Alert.alert('Could Not Send Request', error instanceof Error ? error.message : 'Please try again.');
+      Alert.alert('Could Not Start Payment', error instanceof Error ? error.message : 'Please try again.');
     } finally {
-      setRequestingHelp(false);
+      setSubmitting(false);
     }
   };
 
@@ -124,6 +128,10 @@ function PaymentScreen({ reporter }: { reporter: Reporter }) {
             <Text style={[styles.feeLineAmount, { color: theme.colors.text }]}>₹{baseAmount.toLocaleString('en-IN')}</Text>
           </View>
           <View style={styles.feeRow}>
+            <Text style={[styles.feeLabel, { color: theme.colors.textSecondary }]}>Credential validity</Text>
+            <Text style={[styles.feeLineAmount, { color: theme.colors.text }]}>1 Year</Text>
+          </View>
+          <View style={styles.feeRow}>
             <Text style={[styles.feeLabel, { color: theme.colors.textSecondary }]}>Convenience fee (2.3%)</Text>
             <Text style={[styles.feeLineAmount, { color: theme.colors.text }]}>₹{convenienceFee.toLocaleString('en-IN')}</Text>
           </View>
@@ -134,16 +142,9 @@ function PaymentScreen({ reporter }: { reporter: Reporter }) {
           </View>
         </View>
         <Text style={[styles.pendingText, { color: theme.colors.textSecondary }]}>
-          Pay securely with Cashfree. Your account will be approved automatically after payment confirmation.
+          Pay securely with Razorpay. Your reporter account and 1-year press credential ID will be approved automatically after payment confirmation.
         </Text>
         <Button label={`Pay ₹${totalAmount.toLocaleString('en-IN')}`} onPress={startPayment} loading={submitting} fullWidth size="lg" />
-        <Button
-          label="Send Request to Admin"
-          variant="outline"
-          onPress={sendRequestToAdmin}
-          loading={requestingHelp}
-          fullWidth
-        />
         <Button label="Log Out" variant="outline" onPress={logout} fullWidth />
       </ScrollView>
     </ScreenContainer>
@@ -159,7 +160,7 @@ function AwaitingConfirmationScreen({ reporter }: { reporter: Reporter }) {
         <Icon name="time-outline" size={48} color={theme.colors.primary} />
         <Text style={[styles.pendingTitle, { color: theme.colors.text }]}>Previous Payment Submission</Text>
         <Text style={[styles.pendingText, { color: theme.colors.textSecondary }]}>
-          This payment was submitted through the previous process. Please contact the admin for a new Cashfree payment request.
+          This payment was submitted through the previous process. Please contact the admin for a new Razorpay payment request.
         </Text>
         <Button label="Log Out" variant="outline" onPress={logout} />
       </View>

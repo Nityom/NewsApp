@@ -31,8 +31,9 @@ export default function ArticleDetailScreen() {
   const viewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
   const [sharing, setSharing] = useState(false);
   const [articleHeight, setArticleHeight] = useState(0);
-
-  const captureHeight = windowWidth * SHARE_ASPECT;
+  const hasPage2 = !!(article?.page2 && article.page2.title.trim());
+  const pageMultiplier = hasPage2 ? 2 : 1;
+  const captureHeight = windowWidth * SHARE_ASPECT * pageMultiplier;
   const captureScaleY = articleHeight > 0 ? Math.min(1, captureHeight / articleHeight) : 1;
 
   const handleArticleLayout = (event: LayoutChangeEvent) => {
@@ -102,7 +103,7 @@ export default function ArticleDetailScreen() {
         <ViewShot
           ref={viewShotRef}
           style={[styles.articleCapture, { width: windowWidth, height: captureHeight }]}
-          options={{ format: 'png', quality: 1, width: SHARE_WIDTH, height: SHARE_HEIGHT }}>
+          options={{ format: 'png', quality: 1, width: SHARE_WIDTH, height: SHARE_HEIGHT * pageMultiplier }}>
           <View
             style={[
               styles.captureContent,

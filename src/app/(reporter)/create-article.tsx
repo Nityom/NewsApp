@@ -18,7 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useReporters } from '@/context/ReportersContext';
 import { ADMIN_PHONE } from '@/lib/adminProfile';
 import { useAppTheme } from '@/theme';
-import type { Article, ArticleSection } from '@/types/models';
+import type { Article, ArticlePage, ArticleSection } from '@/types/models';
 
 export default function CreateArticleScreen() {
   const theme = useAppTheme();
@@ -41,6 +41,7 @@ export default function CreateArticleScreen() {
     || user?.phone?.trim()
     || (isAdmin ? ADMIN_PHONE : undefined);
 
+  // Page 1 State
   const [articleMode, setArticleMode] = useState<'single' | 'two'>(
     editingDraft?.sections && editingDraft.sections.length > 0 ? 'two' : 'single',
   );
@@ -50,12 +51,26 @@ export default function CreateArticleScreen() {
   const [images, setImages] = useState<string[]>(editingDraft?.images ?? []);
   const [advertisements, setAdvertisements] = useState<string[]>(editingDraft?.advertisements ?? []);
   const [sections, setSections] = useState<ArticleSection[]>(editingDraft?.sections ?? []);
+
+  // Multi-page State
+  const [hasPage2, setHasPage2] = useState<boolean>(!!editingDraft?.page2);
+  const [activePage, setActivePage] = useState<1 | 2>(1);
+
+  // Page 2 State
+  const [page2Mode, setPage2Mode] = useState<'single' | 'two'>(
+    editingDraft?.page2?.mode ?? (editingDraft?.page2?.sections && editingDraft.page2.sections.length > 0 ? 'two' : 'single'),
+  );
+  const [page2Banner, setPage2Banner] = useState<string | undefined>(editingDraft?.page2?.banner);
+  const [page2Title, setPage2Title] = useState(editingDraft?.page2?.title ?? '');
+  const [page2Content, setPage2Content] = useState(editingDraft?.page2?.content ?? '');
+  const [page2Sections, setPage2Sections] = useState<ArticleSection[]>(editingDraft?.page2?.sections ?? []);
+
   const [submitting, setSubmitting] = useState<'draft' | 'submit' | 'save' | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
   const authorPhone = resolvedAuthorPhone;
   const authorName = editingDraft?.reporterName ?? user?.name ?? 'Unknown Reporter';
 
-  const pickImage = async (mode: 'banner' | 'gallery' | 'ad') => {
+  const pickImage = async (mode: 'banner' | 'page2Banner' | 'gallery' | 'ad') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission required', 'Please allow photo library access to upload images.');
@@ -73,6 +88,8 @@ export default function CreateArticleScreen() {
 
     if (mode === 'banner') {
       setBanner(asset.uri);
+    } else if (mode === 'page2Banner') {
+      setPage2Banner(asset.uri);
     } else if (mode === 'gallery') {
       setImages((prev) => [...prev, asset.uri]);
     } else {
@@ -81,6 +98,7 @@ export default function CreateArticleScreen() {
   };
 
   const isTwoNews = articleMode === 'two';
+  const isPage2TwoNews = page2Mode === 'two';
   const limitSingleNewsBody = (value: string) => limitArticleWords(value, MAX_SINGLE_ARTICLE_WORDS);
   const limitTwoNewsBody = (value: string) => limitArticleWords(value, MAX_TWO_NEWS_BODY_WORDS);
 
@@ -120,7 +138,44 @@ export default function CreateArticleScreen() {
     setSections((prev) => prev.filter((s) => s.id !== id));
   };
 
-  const pickSectionImage = async (id: string) => {
+  // Page 2 Actions
+  const selectPage2Mode = (mode: 'single' | 'two') => {
+    setPage2Mode(mode);
+    if (mode === 'single') {
+      setPage2Content((current) => limitSingleNewsBody(current));
+      setPage2Sections([]);
+    } else {
+      setPage2Content((current) => limitTwoNewsBody(current));
+      setPage2Sections((prev) => {
+        if (prev.length === 0) {
+          return [{ id: `sec-p2-${Date.now()}`, title: '', content: '' }];
+        }
+        return prev.map((s, index) => (index === 0 ? { ...s, content: limitTwoNewsBody(s.content) } : s));
+      });
+    }
+  };
+
+  const addPage2Section = () => {
+    setPage2Mode('two');
+    setPage2Content((current) => limitTwoNewsBody(current));
+    setPage2Sections((prev) => [...prev, { id: `sec-p2-${Date.now()}`, title: '', content: '' }]);
+  };
+
+  const updatePage2Section = (id: string, patch: Partial<ArticleSection>) => {
+    setPage2Sections((prev) => prev.map((s, index) => {
+      if (s.id !== id) return s;
+      const next = { ...s, ...patch };
+      return index === 0 && patch.content !== undefined
+        ? { ...next, content: limitTwoNewsBody(patch.content) }
+        : next;
+    }));
+  };
+
+  const removePage2Section = (id: string) => {
+    setPage2Sections((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const pickSectionImage = async (id: string, isPage2 = false) => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission required', 'Please allow photo library access to upload images.');
@@ -135,18 +190,76 @@ export default function CreateArticleScreen() {
     if (result.canceled) return;
     const asset = result.assets[0];
     if (!asset) return;
-    updateSection(id, { image: asset.uri });
+    if (isPage2) {
+      updatePage2Section(id, { image: asset.uri });
+    } else {
+      updateSection(id, { image: asset.uri });
+    }
+  };
+
+  const handleAddPage2 = () => {
+    setHasPage2(true);
+    setActivePage(2);
+  };
+
+  const handleRemovePage2 = () => {
+    Alert.alert(
+      'Remove Page 2?',
+      'Are you sure you want to remove Page 2 and its content?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            setHasPage2(false);
+            setActivePage(1);
+          },
+        },
+      ],
+    );
+  };
+
+  const buildPage2Payload = (): ArticlePage | undefined => {
+    if (!hasPage2) return undefined;
+    return {
+      mode: page2Mode,
+      title: page2Title.trim(),
+      content: page2Content,
+      banner: page2Banner || '',
+      sections: page2Sections.filter((s) => s.title.trim() || s.content.trim() || s.image),
+    };
+  };
+
+  const validateArticle = (): boolean => {
+    if (!title.trim()) {
+      Alert.alert('Page 1 Title required', 'Please enter an article title for Page 1.');
+      setActivePage(1);
+      return false;
+    }
+    if (!banner) {
+      Alert.alert('Page 1 Banner required', 'Please upload a news photo for Page 1.');
+      setActivePage(1);
+      return false;
+    }
+    if (hasPage2) {
+      if (!page2Title.trim()) {
+        Alert.alert('Page 2 Title required', 'Please enter an article title for Page 2 or remove Page 2.');
+        setActivePage(2);
+        return false;
+      }
+      if (!page2Banner) {
+        Alert.alert('Page 2 Banner required', 'Please upload a news photo for Page 2 or remove Page 2.');
+        setActivePage(2);
+        return false;
+      }
+    }
+    return true;
   };
 
   const handleSave = async (kind: 'draft' | 'submit' | 'save') => {
-    if (!title.trim()) {
-      Alert.alert('Title required', 'Please enter an article title before continuing.');
-      return;
-    }
-    if (!banner) {
-      Alert.alert('Banner required', 'Please upload a news photo before continuing.');
-      return;
-    }
+    if (!validateArticle()) return;
+
     setSubmitting(kind);
     const now = new Date().toISOString();
     const status = kind === 'draft'
@@ -155,6 +268,7 @@ export default function CreateArticleScreen() {
         ? (isAdmin ? 'approved' : 'pending')
         : editingDraft?.status ?? (isAdmin ? 'approved' : 'pending');
     const cleanSections = sections.filter((s) => s.title.trim() || s.content.trim() || s.image);
+    const page2Data = buildPage2Payload();
 
     try {
       if (editingDraft) {
@@ -166,6 +280,7 @@ export default function CreateArticleScreen() {
           images,
           advertisements,
           sections: cleanSections,
+          page2: page2Data,
           reporterPhone: authorPhone,
           status,
           updatedAt: now,
@@ -178,10 +293,11 @@ export default function CreateArticleScreen() {
           title,
           summary: content.slice(0, 140),
           content,
-          banner,
+          banner: banner ?? '',
           images,
           advertisements,
           sections: cleanSections,
+          page2: page2Data,
           status,
           reporterId: user?.id ?? 'unknown',
           reporterName: user?.name ?? 'Unknown Reporter',
@@ -216,14 +332,7 @@ export default function CreateArticleScreen() {
   };
 
   const requestSubmit = () => {
-    if (!title.trim()) {
-      Alert.alert('Title required', 'Please enter an article title before continuing.');
-      return;
-    }
-    if (!banner) {
-      Alert.alert('Banner required', 'Please upload a news photo before continuing.');
-      return;
-    }
+    if (!validateArticle()) return;
     setPreviewVisible(true);
   };
 
@@ -237,6 +346,7 @@ export default function CreateArticleScreen() {
       images,
       advertisements,
       sections: sections.filter((s) => s.title.trim() || s.content.trim() || s.image),
+      page2: buildPage2Payload(),
       status: editingDraft?.status ?? (isAdmin ? 'approved' : 'pending'),
       reporterId: editingDraft?.reporterId ?? user?.id ?? 'unknown',
       reporterName: authorName,
@@ -248,7 +358,25 @@ export default function CreateArticleScreen() {
       likes: editingDraft?.likes ?? 0,
       readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
     }),
-    [editingDraft, title, content, banner, images, advertisements, sections, user, isAdmin, authorPhone, authorName],
+    [
+      editingDraft,
+      title,
+      content,
+      banner,
+      images,
+      advertisements,
+      sections,
+      hasPage2,
+      page2Mode,
+      page2Title,
+      page2Content,
+      page2Banner,
+      page2Sections,
+      user,
+      isAdmin,
+      authorPhone,
+      authorName,
+    ],
   );
 
   return (
@@ -262,254 +390,520 @@ export default function CreateArticleScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        {/* Top Mode Selector: 1 Article vs 2 Articles */}
-        <View style={styles.modeSelectorWrap}>
-          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginBottom: 8 }]}>
-            Article Layout & Word Limit
-          </Text>
-          <View style={styles.modeCardsRow}>
+        {/* Page Switcher Bar */}
+        <View style={[styles.pageBarContainer, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <View style={styles.pageTabsRow}>
             <Pressable
-              onPress={() => selectMode('single')}
+              onPress={() => setActivePage(1)}
               style={[
-                styles.modeCard,
-                {
-                  borderColor: articleMode === 'single' ? theme.colors.primary : theme.colors.border,
-                  backgroundColor: articleMode === 'single' ? (theme.mode === 'dark' ? '#3A2E05' : '#FEF9E7') : theme.colors.backgroundSubtle,
-                  borderWidth: articleMode === 'single' ? 2 : 1,
-                },
-                articleMode === 'single' && styles.modeCardActive,
+                styles.pageTab,
+                activePage === 1 && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
               ]}
               accessibilityRole="button"
-              accessibilityLabel="1 Article Layout">
-              <View style={styles.modeCardTop}>
-                <View
-                  style={[
-                    styles.modeIconCircle,
-                    { backgroundColor: articleMode === 'single' ? theme.colors.primary : theme.colors.border },
-                  ]}>
-                  <Icon
-                    name="document-text"
-                    size={16}
-                    color={articleMode === 'single' ? '#FFFFFF' : theme.colors.textSecondary}
-                  />
-                </View>
-                <View
-                  style={[
-                    styles.modeBadge,
-                    { backgroundColor: articleMode === 'single' ? theme.colors.primary : theme.colors.border },
-                  ]}>
-                  <Text
-                    style={[
-                      styles.modeBadgeText,
-                      { color: articleMode === 'single' ? '#FFFFFF' : theme.colors.textMuted },
-                    ]}>
-                    {MAX_SINGLE_ARTICLE_WORDS}w max
-                  </Text>
-                </View>
-              </View>
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.modeCardTitle,
-                  { color: articleMode === 'single' ? theme.colors.text : theme.colors.textSecondary },
-                ]}>
-                1 Article
-              </Text>
-              <Text numberOfLines={1} style={[styles.modeCardSub, { color: theme.colors.textMuted }]}>
-                Single Story
+              accessibilityLabel="Go to Page 1">
+              <Icon name="document-text" size={15} color={activePage === 1 ? '#FFFFFF' : theme.colors.textSecondary} />
+              <Text style={[styles.pageTabText, { color: activePage === 1 ? '#FFFFFF' : theme.colors.text }]}>
+                Page 1
               </Text>
             </Pressable>
 
-            <Pressable
-              onPress={() => selectMode('two')}
-              style={[
-                styles.modeCard,
-                {
-                  borderColor: articleMode === 'two' ? theme.colors.primary : theme.colors.border,
-                  backgroundColor: articleMode === 'two' ? (theme.mode === 'dark' ? '#3A2E05' : '#FEF9E7') : theme.colors.backgroundSubtle,
-                  borderWidth: articleMode === 'two' ? 2 : 1,
-                },
-                articleMode === 'two' && styles.modeCardActive,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="2 Articles Layout">
-              <View style={styles.modeCardTop}>
-                <View
-                  style={[
-                    styles.modeIconCircle,
-                    { backgroundColor: articleMode === 'two' ? theme.colors.primary : theme.colors.border },
-                  ]}>
-                  <Icon
-                    name="newspaper"
-                    size={16}
-                    color={articleMode === 'two' ? '#FFFFFF' : theme.colors.textSecondary}
-                  />
-                </View>
-                <View
-                  style={[
-                    styles.modeBadge,
-                    { backgroundColor: articleMode === 'two' ? theme.colors.primary : theme.colors.border },
-                  ]}>
-                  <Text
-                    style={[
-                      styles.modeBadgeText,
-                      { color: articleMode === 'two' ? '#FFFFFF' : theme.colors.textMuted },
-                    ]}>
-                    {MAX_TWO_NEWS_BODY_WORDS}w ea
-                  </Text>
-                </View>
-              </View>
-              <Text
-                numberOfLines={1}
+            {hasPage2 ? (
+              <Pressable
+                onPress={() => setActivePage(2)}
                 style={[
-                  styles.modeCardTitle,
-                  { color: articleMode === 'two' ? theme.colors.text : theme.colors.textSecondary },
-                ]}>
-                2 Articles
-              </Text>
-              <Text numberOfLines={1} style={[styles.modeCardSub, { color: theme.colors.textMuted }]}>
-                Two Stories
-              </Text>
-            </Pressable>
+                  styles.pageTab,
+                  activePage === 2 && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Go to Page 2">
+                <Icon name="document-text" size={15} color={activePage === 2 ? '#FFFFFF' : theme.colors.textSecondary} />
+                <Text style={[styles.pageTabText, { color: activePage === 2 ? '#FFFFFF' : theme.colors.text }]}>
+                  Page 2
+                </Text>
+              </Pressable>
+            ) : null}
           </View>
-        </View>
 
-        <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 14 }]}>
-          {isTwoNews ? 'Article 1 Photo' : 'News Photo'}
-        </Text>
-        <View
-          style={[
-            styles.bannerWrap,
-            {
-              backgroundColor: theme.colors.backgroundSubtle,
-              borderColor: theme.colors.border,
-              borderRadius: theme.radius.lg,
-            },
-          ]}
-          onTouchEnd={() => pickImage('banner')}>
-          {banner ? (
-            <Image source={{ uri: banner }} style={styles.bannerImage} contentFit="cover" />
+          {!hasPage2 ? (
+            <Pressable
+              onPress={handleAddPage2}
+              style={[
+                styles.addPageButton,
+                {
+                  borderColor: theme.colors.primary,
+                  backgroundColor: theme.mode === 'dark' ? '#3A2E05' : '#FEF9E7',
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Add Page 2">
+              <Icon name="add" size={16} color={theme.colors.primary} />
+              <Text style={[styles.addPageButtonText, { color: theme.colors.primary }]}>+ Add Page</Text>
+            </Pressable>
           ) : (
-            <View style={styles.bannerPlaceholder}>
-              <Icon name="image-outline" size={28} color={theme.colors.textMuted} />
-              <Text style={[styles.bannerText, { color: theme.colors.textMuted }]}>Tap to upload banner</Text>
-            </View>
+            <Pressable
+              onPress={handleRemovePage2}
+              style={styles.removePageButton}
+              accessibilityRole="button"
+              accessibilityLabel="Remove Page 2">
+              <Icon name="trash-outline" size={14} color="#EF4444" />
+              <Text style={styles.removePageButtonText}>Remove Page 2</Text>
+            </Pressable>
           )}
         </View>
 
-        <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
-          {isTwoNews ? 'Article 1 Title' : 'Title'}
-        </Text>
-        <BlogTextEditor initialValue={title} onChange={setTitle} variant="title" />
-
-        <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
-          {isTwoNews
-            ? `Article 1 Body (${countArticleWords(content)}/${MAX_TWO_NEWS_BODY_WORDS} words)`
-            : `Article Body (${countArticleWords(content)}/${MAX_SINGLE_ARTICLE_WORDS} words)`}
-        </Text>
-        <BlogTextEditor
-          initialValue={content}
-          onChange={setContent}
-          maxWords={isTwoNews ? MAX_TWO_NEWS_BODY_WORDS : MAX_SINGLE_ARTICLE_WORDS}
-        />
-
-        <View style={styles.imagesHeader}>
-          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
-            Add Photo ({images.length})
-          </Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
-          <View
-            style={[
-              styles.addImageTile,
-              { borderColor: theme.colors.border, backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md },
-            ]}
-            onTouchEnd={() => pickImage('gallery')}>
-            <Icon name="add" size={24} color={theme.colors.textMuted} />
-          </View>
-          {images.map((uri, i) => (
-            <View key={`${uri}-${i}`} style={styles.imageTile}>
-              <Image source={{ uri }} style={styles.imageThumb} contentFit="cover" />
-              <View style={styles.removeBadge} onTouchEnd={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}>
-                <Icon name="close" size={12} color="#fff" />
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-
-        <View style={[styles.imagesHeader, { marginTop: 20 }]}>
-          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
-            Add Advertisement Photo ({advertisements.length})
-          </Text>
-        </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
-          <View
-            style={[
-              styles.addImageTile,
-              { borderColor: theme.colors.border, backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md },
-            ]}
-            onTouchEnd={() => pickImage('ad')}>
-            <Icon name="add" size={24} color={theme.colors.textMuted} />
-          </View>
-          {advertisements.map((uri, i) => (
-            <View key={`${uri}-${i}`} style={styles.imageTile}>
-              <Image source={{ uri }} style={styles.imageThumb} contentFit="cover" />
-              <View
-                style={styles.removeBadge}
-                onTouchEnd={() => setAdvertisements((prev) => prev.filter((_, idx) => idx !== i))}>
-                <Icon name="close" size={12} color="#fff" />
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-
-        <View style={[styles.imagesHeader, { marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-          <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
-            {isTwoNews ? `Additional Articles (${sections.length})` : `Additional Articles (${sections.length})`}
-          </Text>
-          <IconButton icon="add-circle-outline" size={22} onPress={addSection} />
-        </View>
-        {sections.map((section, i) => (
-          <View
-            key={section.id}
-            style={[
-              styles.sectionCard,
-              { backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md, borderColor: theme.colors.border },
-            ]}>
-            <View style={styles.sectionCardHeader}>
-              <Text style={[styles.sectionCardLabel, { color: theme.colors.textMuted }]}>
-                Article {i + 2} ({countArticleWords(section.content)}/{MAX_TWO_NEWS_BODY_WORDS} words)
+        {activePage === 1 ? (
+          <>
+            {/* Page 1 Mode Selector: 1 Article vs 2 Articles */}
+            <View style={styles.modeSelectorWrap}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginBottom: 8 }]}>
+                Page 1 Layout & Word Limit
               </Text>
-              <IconButton icon="trash-outline" size={18} onPress={() => removeSection(section.id)} />
+              <View style={styles.modeCardsRow}>
+                <Pressable
+                  onPress={() => selectMode('single')}
+                  style={[
+                    styles.modeCard,
+                    {
+                      borderColor: articleMode === 'single' ? theme.colors.primary : theme.colors.border,
+                      backgroundColor: articleMode === 'single' ? (theme.mode === 'dark' ? '#3A2E05' : '#FEF9E7') : theme.colors.backgroundSubtle,
+                      borderWidth: articleMode === 'single' ? 2 : 1,
+                    },
+                    articleMode === 'single' && styles.modeCardActive,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Page 1 - 1 Article Layout">
+                  <View style={styles.modeCardTop}>
+                    <View
+                      style={[
+                        styles.modeIconCircle,
+                        { backgroundColor: articleMode === 'single' ? theme.colors.primary : theme.colors.border },
+                      ]}>
+                      <Icon
+                        name="document-text"
+                        size={16}
+                        color={articleMode === 'single' ? '#FFFFFF' : theme.colors.textSecondary}
+                      />
+                    </View>
+                    <View
+                      style={[
+                        styles.modeBadge,
+                        { backgroundColor: articleMode === 'single' ? theme.colors.primary : theme.colors.border },
+                      ]}>
+                      <Text
+                        style={[
+                          styles.modeBadgeText,
+                          { color: articleMode === 'single' ? '#FFFFFF' : theme.colors.textMuted },
+                        ]}>
+                        {MAX_SINGLE_ARTICLE_WORDS}w max
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.modeCardTitle,
+                      { color: articleMode === 'single' ? theme.colors.text : theme.colors.textSecondary },
+                    ]}>
+                    1 Article
+                  </Text>
+                  <Text numberOfLines={1} style={[styles.modeCardSub, { color: theme.colors.textMuted }]}>
+                    Single Story
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => selectMode('two')}
+                  style={[
+                    styles.modeCard,
+                    {
+                      borderColor: articleMode === 'two' ? theme.colors.primary : theme.colors.border,
+                      backgroundColor: articleMode === 'two' ? (theme.mode === 'dark' ? '#3A2E05' : '#FEF9E7') : theme.colors.backgroundSubtle,
+                      borderWidth: articleMode === 'two' ? 2 : 1,
+                    },
+                    articleMode === 'two' && styles.modeCardActive,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Page 1 - 2 Articles Layout">
+                  <View style={styles.modeCardTop}>
+                    <View
+                      style={[
+                        styles.modeIconCircle,
+                        { backgroundColor: articleMode === 'two' ? theme.colors.primary : theme.colors.border },
+                      ]}>
+                      <Icon
+                        name="newspaper"
+                        size={16}
+                        color={articleMode === 'two' ? '#FFFFFF' : theme.colors.textSecondary}
+                      />
+                    </View>
+                    <View
+                      style={[
+                        styles.modeBadge,
+                        { backgroundColor: articleMode === 'two' ? theme.colors.primary : theme.colors.border },
+                      ]}>
+                      <Text
+                        style={[
+                          styles.modeBadgeText,
+                          { color: articleMode === 'two' ? '#FFFFFF' : theme.colors.textMuted },
+                        ]}>
+                        {MAX_TWO_NEWS_BODY_WORDS}w ea
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.modeCardTitle,
+                      { color: articleMode === 'two' ? theme.colors.text : theme.colors.textSecondary },
+                    ]}>
+                    2 Articles
+                  </Text>
+                  <Text numberOfLines={1} style={[styles.modeCardSub, { color: theme.colors.textMuted }]}>
+                    Two Stories
+                  </Text>
+                </Pressable>
+              </View>
             </View>
+
+            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 14 }]}>
+              {isTwoNews ? 'Page 1 Article 1 Photo' : 'News Photo'}
+            </Text>
             <View
-              style={[styles.sectionImageWrap, { borderColor: theme.colors.border, borderRadius: theme.radius.md }]}
-              onTouchEnd={() => pickSectionImage(section.id)}>
-              {section.image ? (
-                <Image source={{ uri: section.image }} style={styles.sectionImagePreview} contentFit="cover" />
+              style={[
+                styles.bannerWrap,
+                {
+                  backgroundColor: theme.colors.backgroundSubtle,
+                  borderColor: theme.colors.border,
+                  borderRadius: theme.radius.lg,
+                },
+              ]}
+              onTouchEnd={() => pickImage('banner')}>
+              {banner ? (
+                <Image source={{ uri: banner }} style={styles.bannerImage} contentFit="cover" />
               ) : (
                 <View style={styles.bannerPlaceholder}>
-                  <Icon name="image-outline" size={22} color={theme.colors.textMuted} />
-                  <Text style={[styles.bannerText, { color: theme.colors.textMuted }]}>Tap to add photo (optional)</Text>
+                  <Icon name="image-outline" size={28} color={theme.colors.textMuted} />
+                  <Text style={[styles.bannerText, { color: theme.colors.textMuted }]}>Tap to upload banner</Text>
                 </View>
               )}
             </View>
-            <View style={styles.sectionTitleEditor}>
-              <BlogTextEditor
-                initialValue={section.title}
-                onChange={(sTitle) => updateSection(section.id, { title: sTitle })}
-                variant="title"
-              />
+
+            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
+              {isTwoNews ? 'Page 1 Article 1 Title' : 'Title'}
+            </Text>
+            <BlogTextEditor initialValue={title} onChange={setTitle} variant="title" />
+
+            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
+              {isTwoNews
+                ? `Page 1 Article 1 Body (${countArticleWords(content)}/${MAX_TWO_NEWS_BODY_WORDS} words)`
+                : `Article Body (${countArticleWords(content)}/${MAX_SINGLE_ARTICLE_WORDS} words)`}
+            </Text>
+            <BlogTextEditor
+              initialValue={content}
+              onChange={setContent}
+              maxWords={isTwoNews ? MAX_TWO_NEWS_BODY_WORDS : MAX_SINGLE_ARTICLE_WORDS}
+            />
+
+            <View style={styles.imagesHeader}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
+                Add Photo ({images.length})
+              </Text>
             </View>
-            <View style={styles.sectionBodyEditor}>
-              <BlogTextEditor
-                initialValue={section.content}
-                onChange={(sContent) => updateSection(section.id, { content: sContent })}
-                maxWords={MAX_TWO_NEWS_BODY_WORDS}
-              />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+              <View
+                style={[
+                  styles.addImageTile,
+                  { borderColor: theme.colors.border, backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md },
+                ]}
+                onTouchEnd={() => pickImage('gallery')}>
+                <Icon name="add" size={24} color={theme.colors.textMuted} />
+              </View>
+              {images.map((uri, i) => (
+                <View key={`${uri}-${i}`} style={styles.imageTile}>
+                  <Image source={{ uri }} style={styles.imageThumb} contentFit="cover" />
+                  <View style={styles.removeBadge} onTouchEnd={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}>
+                    <Icon name="close" size={12} color="#fff" />
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={[styles.imagesHeader, { marginTop: 20 }]}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
+                Add Advertisement Photo ({advertisements.length})
+              </Text>
             </View>
-          </View>
-        ))}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+              <View
+                style={[
+                  styles.addImageTile,
+                  { borderColor: theme.colors.border, backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md },
+                ]}
+                onTouchEnd={() => pickImage('ad')}>
+                <Icon name="add" size={24} color={theme.colors.textMuted} />
+              </View>
+              {advertisements.map((uri, i) => (
+                <View key={`${uri}-${i}`} style={styles.imageTile}>
+                  <Image source={{ uri }} style={styles.imageThumb} contentFit="cover" />
+                  <View
+                    style={styles.removeBadge}
+                    onTouchEnd={() => setAdvertisements((prev) => prev.filter((_, idx) => idx !== i))}>
+                    <Icon name="close" size={12} color="#fff" />
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={[styles.imagesHeader, { marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
+                {isTwoNews ? `Page 1 Additional Articles (${sections.length})` : `Additional Articles (${sections.length})`}
+              </Text>
+              <IconButton icon="add-circle-outline" size={22} onPress={addSection} />
+            </View>
+            {sections.map((section, i) => (
+              <View
+                key={section.id}
+                style={[
+                  styles.sectionCard,
+                  { backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md, borderColor: theme.colors.border },
+                ]}>
+                <View style={styles.sectionCardHeader}>
+                  <Text style={[styles.sectionCardLabel, { color: theme.colors.textMuted }]}>
+                    Article {i + 2} ({countArticleWords(section.content)}/{MAX_TWO_NEWS_BODY_WORDS} words)
+                  </Text>
+                  <IconButton icon="trash-outline" size={18} onPress={() => removeSection(section.id)} />
+                </View>
+                <View
+                  style={[styles.sectionImageWrap, { borderColor: theme.colors.border, borderRadius: theme.radius.md }]}
+                  onTouchEnd={() => pickSectionImage(section.id, false)}>
+                  {section.image ? (
+                    <Image source={{ uri: section.image }} style={styles.sectionImagePreview} contentFit="cover" />
+                  ) : (
+                    <View style={styles.bannerPlaceholder}>
+                      <Icon name="image-outline" size={22} color={theme.colors.textMuted} />
+                      <Text style={[styles.bannerText, { color: theme.colors.textMuted }]}>Tap to add photo (optional)</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.sectionTitleEditor}>
+                  <BlogTextEditor
+                    initialValue={section.title}
+                    onChange={(sTitle) => updateSection(section.id, { title: sTitle })}
+                    variant="title"
+                  />
+                </View>
+                <View style={styles.sectionBodyEditor}>
+                  <BlogTextEditor
+                    initialValue={section.content}
+                    onChange={(sContent) => updateSection(section.id, { content: sContent })}
+                    maxWords={MAX_TWO_NEWS_BODY_WORDS}
+                  />
+                </View>
+              </View>
+            ))}
+          </>
+        ) : (
+          <>
+            {/* Page 2 Mode Selector: 1 Article vs 2 Articles */}
+            <View style={styles.modeSelectorWrap}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginBottom: 8 }]}>
+                Page 2 Layout & Word Limit
+              </Text>
+              <View style={styles.modeCardsRow}>
+                <Pressable
+                  onPress={() => selectPage2Mode('single')}
+                  style={[
+                    styles.modeCard,
+                    {
+                      borderColor: page2Mode === 'single' ? theme.colors.primary : theme.colors.border,
+                      backgroundColor: page2Mode === 'single' ? (theme.mode === 'dark' ? '#3A2E05' : '#FEF9E7') : theme.colors.backgroundSubtle,
+                      borderWidth: page2Mode === 'single' ? 2 : 1,
+                    },
+                    page2Mode === 'single' && styles.modeCardActive,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Page 2 - 1 Article Layout">
+                  <View style={styles.modeCardTop}>
+                    <View
+                      style={[
+                        styles.modeIconCircle,
+                        { backgroundColor: page2Mode === 'single' ? theme.colors.primary : theme.colors.border },
+                      ]}>
+                      <Icon
+                        name="document-text"
+                        size={16}
+                        color={page2Mode === 'single' ? '#FFFFFF' : theme.colors.textSecondary}
+                      />
+                    </View>
+                    <View
+                      style={[
+                        styles.modeBadge,
+                        { backgroundColor: page2Mode === 'single' ? theme.colors.primary : theme.colors.border },
+                      ]}>
+                      <Text
+                        style={[
+                          styles.modeBadgeText,
+                          { color: page2Mode === 'single' ? '#FFFFFF' : theme.colors.textMuted },
+                        ]}>
+                        {MAX_SINGLE_ARTICLE_WORDS}w max
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.modeCardTitle,
+                      { color: page2Mode === 'single' ? theme.colors.text : theme.colors.textSecondary },
+                    ]}>
+                    1 Article
+                  </Text>
+                  <Text numberOfLines={1} style={[styles.modeCardSub, { color: theme.colors.textMuted }]}>
+                    Single Story
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => selectPage2Mode('two')}
+                  style={[
+                    styles.modeCard,
+                    {
+                      borderColor: page2Mode === 'two' ? theme.colors.primary : theme.colors.border,
+                      backgroundColor: page2Mode === 'two' ? (theme.mode === 'dark' ? '#3A2E05' : '#FEF9E7') : theme.colors.backgroundSubtle,
+                      borderWidth: page2Mode === 'two' ? 2 : 1,
+                    },
+                    page2Mode === 'two' && styles.modeCardActive,
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Page 2 - 2 Articles Layout">
+                  <View style={styles.modeCardTop}>
+                    <View
+                      style={[
+                        styles.modeIconCircle,
+                        { backgroundColor: page2Mode === 'two' ? theme.colors.primary : theme.colors.border },
+                      ]}>
+                      <Icon
+                        name="newspaper"
+                        size={16}
+                        color={page2Mode === 'two' ? '#FFFFFF' : theme.colors.textSecondary}
+                      />
+                    </View>
+                    <View
+                      style={[
+                        styles.modeBadge,
+                        { backgroundColor: page2Mode === 'two' ? theme.colors.primary : theme.colors.border },
+                      ]}>
+                      <Text
+                        style={[
+                          styles.modeBadgeText,
+                          { color: page2Mode === 'two' ? '#FFFFFF' : theme.colors.textMuted },
+                        ]}>
+                        {MAX_TWO_NEWS_BODY_WORDS}w ea
+                      </Text>
+                    </View>
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.modeCardTitle,
+                      { color: page2Mode === 'two' ? theme.colors.text : theme.colors.textSecondary },
+                    ]}>
+                    2 Articles
+                  </Text>
+                  <Text numberOfLines={1} style={[styles.modeCardSub, { color: theme.colors.textMuted }]}>
+                    Two Stories
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 14 }]}>
+              {isPage2TwoNews ? 'Page 2 Article 1 Photo' : 'Page 2 News Photo'}
+            </Text>
+            <View
+              style={[
+                styles.bannerWrap,
+                {
+                  backgroundColor: theme.colors.backgroundSubtle,
+                  borderColor: theme.colors.border,
+                  borderRadius: theme.radius.lg,
+                },
+              ]}
+              onTouchEnd={() => pickImage('page2Banner')}>
+              {page2Banner ? (
+                <Image source={{ uri: page2Banner }} style={styles.bannerImage} contentFit="cover" />
+              ) : (
+                <View style={styles.bannerPlaceholder}>
+                  <Icon name="image-outline" size={28} color={theme.colors.textMuted} />
+                  <Text style={[styles.bannerText, { color: theme.colors.textMuted }]}>Tap to upload Page 2 photo</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
+              {isPage2TwoNews ? 'Page 2 Article 1 Title' : 'Page 2 Title'}
+            </Text>
+            <BlogTextEditor initialValue={page2Title} onChange={setPage2Title} variant="title" />
+
+            <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
+              {isPage2TwoNews
+                ? `Page 2 Article 1 Body (${countArticleWords(page2Content)}/${MAX_TWO_NEWS_BODY_WORDS} words)`
+                : `Page 2 Article Body (${countArticleWords(page2Content)}/${MAX_SINGLE_ARTICLE_WORDS} words)`}
+            </Text>
+            <BlogTextEditor
+              initialValue={page2Content}
+              onChange={setPage2Content}
+              maxWords={isPage2TwoNews ? MAX_TWO_NEWS_BODY_WORDS : MAX_SINGLE_ARTICLE_WORDS}
+            />
+
+            <View style={[styles.imagesHeader, { marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
+                {isPage2TwoNews ? `Page 2 Additional Articles (${page2Sections.length})` : `Page 2 Additional Articles (${page2Sections.length})`}
+              </Text>
+              <IconButton icon="add-circle-outline" size={22} onPress={addPage2Section} />
+            </View>
+            {page2Sections.map((section, i) => (
+              <View
+                key={section.id}
+                style={[
+                  styles.sectionCard,
+                  { backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md, borderColor: theme.colors.border },
+                ]}>
+                <View style={styles.sectionCardHeader}>
+                  <Text style={[styles.sectionCardLabel, { color: theme.colors.textMuted }]}>
+                    Page 2 Article {i + 2} ({countArticleWords(section.content)}/{MAX_TWO_NEWS_BODY_WORDS} words)
+                  </Text>
+                  <IconButton icon="trash-outline" size={18} onPress={() => removePage2Section(section.id)} />
+                </View>
+                <View
+                  style={[styles.sectionImageWrap, { borderColor: theme.colors.border, borderRadius: theme.radius.md }]}
+                  onTouchEnd={() => pickSectionImage(section.id, true)}>
+                  {section.image ? (
+                    <Image source={{ uri: section.image }} style={styles.sectionImagePreview} contentFit="cover" />
+                  ) : (
+                    <View style={styles.bannerPlaceholder}>
+                      <Icon name="image-outline" size={22} color={theme.colors.textMuted} />
+                      <Text style={[styles.bannerText, { color: theme.colors.textMuted }]}>Tap to add photo (optional)</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.sectionTitleEditor}>
+                  <BlogTextEditor
+                    initialValue={section.title}
+                    onChange={(sTitle) => updatePage2Section(section.id, { title: sTitle })}
+                    variant="title"
+                  />
+                </View>
+                <View style={styles.sectionBodyEditor}>
+                  <BlogTextEditor
+                    initialValue={section.content}
+                    onChange={(sContent) => updatePage2Section(section.id, { content: sContent })}
+                    maxWords={MAX_TWO_NEWS_BODY_WORDS}
+                  />
+                </View>
+              </View>
+            ))}
+          </>
+        )}
 
         {user ? (
           <View
@@ -594,6 +988,60 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  pageBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  pageTabsRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  pageTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  pageTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  addPageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1.5,
+  },
+  addPageButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  removePageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#FEE2E2',
+  },
+  removePageButtonText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#EF4444',
   },
   previewHeader: {
     flexDirection: 'row',

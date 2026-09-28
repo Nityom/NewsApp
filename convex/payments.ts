@@ -52,8 +52,18 @@ export const updateJoiningFeeStatus = mutation({
 
     const reporter = await findByExternalId(ctx.db, 'reporters', payment.reporterId);
     if (!reporter) throw new Error('Reporter not found.');
+    const validUntilDate = new Date();
+    validUntilDate.setFullYear(validUntilDate.getFullYear() + 1);
+    const defaultValidUntil = validUntilDate.toISOString();
+
     const reporterData = status === 'paid'
-      ? { ...reporter.data, requestStatus: 'approved', isActive: true, isVerified: true }
+      ? {
+          ...reporter.data,
+          requestStatus: 'approved',
+          isActive: true,
+          isVerified: true,
+          validUntil: reporter.data.validUntil || defaultValidUntil,
+        }
       : { ...reporter.data, requestStatus: 'awaiting_payment' };
     await ctx.db.patch(reporter._id, { data: reporterData });
   },

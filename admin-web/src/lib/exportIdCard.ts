@@ -1,4 +1,5 @@
 import type { Reporter } from '../types';
+import { formatValidityDate } from './utils';
 
 const CARD_WIDTH = 640;
 const CARD_HEIGHT = 920;
@@ -265,13 +266,17 @@ export async function exportReporterIdCardAsPng(reporter: Reporter): Promise<str
   ctx.fillText(designation, CARD_WIDTH / 2, desigY + 8);
   ctx.letterSpacing = '0px';
 
-  // 7. Reporter Code Box (Executive clean badge)
-  const codeY = desigY + 46;
-  const codeBoxW = 500;
-  const codeBoxX = (CARD_WIDTH - codeBoxW) / 2;
-  const codeBoxH = 46;
+  // 7. Reporter ID & Credential Validity Boxes (Executive clean dual badges)
+  const metaY = desigY + 44;
+  const gap = 14;
+  const totalW = 504;
+  const boxW = (totalW - gap) / 2;
+  const boxH = 50;
+  const box1X = (CARD_WIDTH - totalW) / 2;
+  const box2X = box1X + boxW + gap;
 
-  roundRect(ctx, codeBoxX, codeY, codeBoxW, codeBoxH, 8);
+  // Box 1: Reporter ID
+  roundRect(ctx, box1X, metaY, boxW, boxH, 8);
   ctx.fillStyle = '#f5f3ec';
   ctx.fill();
   ctx.strokeStyle = '#e3dfd5';
@@ -279,19 +284,41 @@ export async function exportReporterIdCardAsPng(reporter: Reporter): Promise<str
   ctx.stroke();
 
   ctx.fillStyle = '#64748b';
-  ctx.font = '800 16px system-ui, -apple-system, sans-serif';
+  ctx.font = '800 13px system-ui, -apple-system, sans-serif';
   ctx.textAlign = 'left';
-  ctx.letterSpacing = '1.2px';
-  ctx.fillText('REPORTER ID', codeBoxX + 18, codeY + 14);
+  ctx.letterSpacing = '1px';
+  ctx.fillText('REPORTER ID', box1X + 14, metaY + 16);
   ctx.letterSpacing = '0px';
 
   ctx.fillStyle = '#0f172a';
-  ctx.font = '800 22px monospace, Courier, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(reporter.reporterCode || reporter.id, codeBoxX + codeBoxW - 18, codeY + 12);
+  ctx.font = '800 17px monospace, Courier, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(reporter.reporterCode || reporter.id, box1X + 14, metaY + 36);
+
+  // Box 2: Valid Thru
+  roundRect(ctx, box2X, metaY, boxW, boxH, 8);
+  ctx.fillStyle = '#f5f3ec';
+  ctx.fill();
+  ctx.strokeStyle = '#e3dfd5';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  const validText = formatValidityDate(reporter.validUntil, reporter.joinedAt);
+
+  ctx.fillStyle = '#64748b';
+  ctx.font = '800 13px system-ui, -apple-system, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.letterSpacing = '1px';
+  ctx.fillText('VALID THRU', box2X + 14, metaY + 16);
+  ctx.letterSpacing = '0px';
+
+  ctx.fillStyle = '#0f172a';
+  ctx.font = '800 17px monospace, Courier, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(validText, box2X + 14, metaY + 36);
 
   // 8. Divider Line
-  const dividerY = codeY + codeBoxH + 18;
+  const dividerY = metaY + boxH + 18;
   const dividerMargin = 36;
   ctx.strokeStyle = '#dcdad3';
   ctx.lineWidth = 1.5;

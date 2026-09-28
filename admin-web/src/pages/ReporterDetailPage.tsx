@@ -25,8 +25,7 @@ import { Button, Dialog, EmptyState, LoadingState, PageHeader, StatusBadge } fro
 import { api } from '../lib/api';
 import { downloadReporterIdCard } from '../lib/exportIdCard';
 import { plainRichText } from '../lib/richText';
-import { currency, dedupeReporters, errorMessage, formatDate } from '../lib/utils';
-import type { Payment } from '../types';
+import { currency, dateInputValue, dedupeReporters, errorMessage, formatDate, formatValidityDate, getReporterValidUntil } from '../lib/utils';
 
 export function ReporterDetailPage() {
   const { id = '' } = useParams();
@@ -36,7 +35,6 @@ export function ReporterDetailPage() {
   const payments = useQuery(api.payments.list, {});
   const patchReporter = useMutation(api.reporters.patch);
   const removeReporter = useMutation(api.reporters.remove);
-  const updateJoiningFee = useMutation(api.payments.updateJoiningFeeStatus);
   const addNotification = useMutation(api.notifications.add);
   const reporter = dedupeReporters(reporterData ?? []).find((item) => item.id === id)!;
 
@@ -45,6 +43,8 @@ export function ReporterDetailPage() {
   const [rejectDialog, setRejectDialog] = useState(false);
   const [designationDialog, setDesignationDialog] = useState(false);
   const [designationInput, setDesignationInput] = useState('');
+  const [validityDialog, setValidityDialog] = useState(false);
+  const [validityInput, setValidityInput] = useState('');
   const [photoPreview, setPhotoPreview] = useState(false);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState('');
@@ -160,6 +160,19 @@ export function ReporterDetailPage() {
     });
   }
 
+  function saveValidity() {
+    if (!validityInput) return;
+    return run('validity', async () => {
+      const validUntilIso = new Date(`${validityInput}T23:59:59.999Z`).toISOString();
+      await patchReporter({
+        id: reporter.id,
+        patch: { validUntil: validUntilIso },
+      });
+      await notify('Credential Validity Updated', `Your press credential validity has been updated to: ${formatDate(validUntilIso)}`);
+      setValidityDialog(false);
+    });
+  }
+
   function handleDownloadIdCard() {
     return run('download-id', async () => {
       await downloadReporterIdCard(reporter);
@@ -187,21 +200,6 @@ export function ReporterDetailPage() {
     setShareDropdown(false);
   }
 
-  function syntheticPayment(): Payment {
-    return {
-      id: `join-${reporter.id}`,
-      reporterId: reporter.id,
-      reporterName: reporter.name,
-      reporterAvatar: reporter.avatar,
-      amount: reporter.joinFeeAmount ?? 0,
-      status: 'pending',
-      method: 'admin confirmation',
-      articlesCount: 0,
-      period: 'Joining fee',
-      createdAt: new Date().toISOString(),
-      purpose: 'joining_fee',
-    };
-  }
 
   function downloadReporterPhoto() {
     const photo = photoSource || reporter.photo || reporter.avatar;
@@ -277,9 +275,15 @@ export function ReporterDetailPage() {
             </button>
           </div>
         </div>
-        <div className="press-id-number">
-          <span>Reporter ID</span>
-          <strong>{reporter.reporterCode || reporter.id}</strong>
+        <div className="press-id-meta-grid">
+          <div className="press-id-meta-box">
+            <span>Reporter ID</span>
+            <strong>{reporter.reporterCode || reporter.id}</strong>
+          </div>
+          <div className="press-id-meta-box">
+            <span>Valid Thru</span>
+            <strong>{formatValidityDate(reporter.validUntil, reporter.joinedAt)}</strong>
+          </div>
         </div>
         <div className="contact-list">
           {reporter.email ? (
@@ -404,6 +408,18 @@ export function ReporterDetailPage() {
             >
               <Edit3 size={15} /> Set Designation
             </Button>
+
+            {/* Quick Validity Edit Button */}
+            <Button
+              variant="secondary"
+              className="w-full flex-center gap-2"
+              onClick={() => {
+                setValidityInput(dateInputValue(getReporterValidUntil(reporter)));
+                setValidityDialog(true);
+              }}
+            >
+              <Edit3 size={15} /> Set Validity
+            </Button>
           </div>
 
           <section className="panel reporter-summary">
@@ -415,6 +431,25 @@ export function ReporterDetailPage() {
               <div>
                 <dt>Joined</dt>
                 <dd>{formatDate(reporter.joinedAt)}</dd>
+              </div>
+              <div>
+                <dt>Valid Thru</dt>
+                <dd>
+                  <strong>{formatValidityDate(reporter.validUntil, reporter.joinedAt)}</strong>
+                  <button
+                    type="button"
+                    className="icon-mini-btn"
+                    style={{ marginLeft: 6 }}
+                    onClick={() => {
+                      setValidityInput(dateInputValue(getReporterValidUntil(reporter)));
+                      setValidityDialog(true);
+                    }}
+                    title="Change Validity Expiration Date"
+                    aria-label="Change Validity Expiration Date"
+                  >
+                    <Edit3 size={11} />
+                  </button>
+                </dd>
               </div>
               <div>
                 <dt>Aadhar</dt>
@@ -462,25 +497,24 @@ export function ReporterDetailPage() {
                 </Button>
               ) : null}
               {['awaiting_payment', 'payment_submitted'].includes(reporter.requestStatus) ? (
-                <Button
-                  onClick={() =>
-                    void run('confirm', async () => {
-                      await updateJoiningFee({
-                        payment:
-                          reporterPayments.find((payment) => payment.purpose === 'joining_fee') ??
-                          syntheticPayment(),
-                        status: 'paid',
-                      });
-                      await notify(
-                        'Account Approved',
-                        'Your joining fee is confirmed and your reporter account is active.',
-                      );
-                    })
-                  }
-                  loading={busy === 'confirm'}
-                >
-                  <Check size={17} /> Confirm payment
-                </Button>
+                <>
+                  <div
+                    style={{
+                      gridColumn: '1 / -1',
+                      padding: '12px 16px',
+                      background: 'var(--panel-subtle, #f5f6f8)',
+                      border: '1px solid var(--border-color, #e5e7eb)',
+                      borderRadius: 8,
+                      fontSize: 14,
+                      color: 'var(--text-secondary, #4b5563)',
+                    }}
+                  >
+                    <strong>Razorpay payment pending:</strong> Waiting for {reporter.name} to complete the {currency.format(reporter.joinFeeAmount ?? 0)} joining fee. Approval is automatic after Razorpay confirmation.
+                  </div>
+                  <Button variant="secondary" onClick={() => setRejectDialog(true)}>
+                    <X size={17} /> Reject request
+                  </Button>
+                </>
               ) : null}
               {reporter.requestStatus === 'approved' ? (
                 <Button
@@ -590,6 +624,47 @@ export function ReporterDetailPage() {
                 onClick={() => void saveDesignation()}
               >
                 Save Designation
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      ) : null}
+
+      {/* Credential Validity Modal */}
+      {validityDialog ? (
+        <Dialog title="Set Credential Validity" onClose={() => setValidityDialog(false)}>
+          <div className="dialog-body">
+            <p className="dialog-subtext">
+              Set or extend the official press credential expiration date for <strong>{reporter.name}</strong>. By default, 1 year validity is granted when joining fee is paid.
+            </p>
+
+            <label className="mt-3">
+              Valid Until Date
+              <input
+                type="date"
+                value={validityInput}
+                onChange={(e) => setValidityInput(e.target.value)}
+              />
+            </label>
+
+            <div className="dialog-actions">
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={() => {
+                  const d = new Date();
+                  d.setFullYear(d.getFullYear() + 1);
+                  setValidityInput(d.toISOString().slice(0, 10));
+                }}
+              >
+                +1 Year From Today
+              </Button>
+              <Button
+                disabled={!validityInput}
+                loading={busy === 'validity'}
+                onClick={() => void saveValidity()}
+              >
+                Save Validity
               </Button>
             </div>
           </div>

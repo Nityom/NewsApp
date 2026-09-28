@@ -175,6 +175,9 @@ textarea { resize: vertical; }
 .newspaper footer { margin: 20px 15px 0; border-top: 2px solid #171717; padding-top: 10px; text-align: center; display: flex; flex-direction: column; font-family: Arial, sans-serif; }
 .newspaper footer span { color: #666; text-transform: uppercase; font-size: 9px; font-weight: 700; letter-spacing: .12em; }
 .newspaper footer strong { font-size: 13px; }
+.newspaper-page-break { display: flex; align-items: center; justify-content: center; margin: 32px 12px 24px; position: relative; }
+.newspaper-page-break::before { content: ''; position: absolute; left: 0; right: 0; height: 2px; background: #171717; }
+.newspaper-page-badge { position: relative; background: #ffe600; border: 1.5px solid #171717; padding: 4px 16px; font: 800 12px Arial, sans-serif; text-transform: uppercase; }
 .composer-mode-selector { display: flex; gap: 8px; margin-bottom: 12px; }
 .composer-mode-btn { flex: 1; padding: 9px 12px; border: 1px solid var(--line); border-radius: 4px; background: white; color: var(--muted); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: all .15s ease; }
 .composer-mode-btn.active { background: var(--ink); color: white; border-color: var(--ink); }
@@ -258,6 +261,10 @@ textarea { resize: vertical; }
 .press-id-number { width: 100%; margin: 14px auto 0; padding: 8px 14px; border-radius: 8px; background: #f5f3ec; border: 1px solid #e3dfd5; display: flex; align-items: center; justify-content: space-between; }
 .press-id-number span { color: #64748b; font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .press-id-number strong { font-size: 13.5px; font-family: monospace; font-weight: 800; color: #0f172a; overflow-wrap: anywhere; }
+.press-id-meta-grid { width: 100%; margin: 14px auto 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.press-id-meta-box { padding: 8px 10px; border-radius: 8px; background: #f5f3ec; border: 1px solid #e3dfd5; display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.press-id-meta-box span { color: #64748b; font-size: 8.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
+.press-id-meta-box strong { font-size: 12px; font-family: monospace; font-weight: 800; color: #0f172a; overflow-wrap: anywhere; }
 .contact-list { text-align: left; display: grid; gap: 9px; margin: 14px 0 0; padding-top: 14px; border-top: 1px dashed #dcdad3; }
 .contact-list a, .contact-list p { min-width: 0; display: flex; align-items: center; gap: 10px; margin: 0; color: #1e293b; font-size: 12.5px; font-weight: 600; text-decoration: none; overflow-wrap: anywhere; }
 .contact-icon-wrap { width: 26px; height: 26px; border-radius: 50%; background: #fee2e2; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }

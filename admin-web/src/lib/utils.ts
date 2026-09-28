@@ -18,6 +18,26 @@ export function formatDate(value?: string, includeTime = false) {
   }).format(date);
 }
 
+export function getReporterValidUntil(reporter?: { validUntil?: string; joinedAt?: string }): string {
+  if (!reporter) return '';
+  if (reporter.validUntil) return reporter.validUntil;
+  if (reporter.joinedAt) {
+    const d = new Date(reporter.joinedAt);
+    if (!Number.isNaN(d.getTime())) {
+      d.setFullYear(d.getFullYear() + 1);
+      return d.toISOString();
+    }
+  }
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString();
+}
+
+export function formatValidityDate(value?: string, joinedAt?: string) {
+  const resolved = value || getReporterValidUntil({ validUntil: value, joinedAt });
+  return formatDate(resolved);
+}
+
 export function dateInputValue(value?: string) {
   if (!value) return '';
   const parsed = new Date(value);

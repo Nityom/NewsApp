@@ -156,24 +156,8 @@ export default function AdminPaymentsScreen() {
               <Text style={[styles.amount, { color: theme.colors.text }]}>₹{item.amount.toLocaleString('en-IN')}</Text>
               <PaymentStatusBadge status={item.status} size="sm" />
             </View>
-            {item.status === 'pending' && item.purpose !== 'joining_fee' ? (
-              <View style={styles.actions}>
-                <Button
-                  label="Reject"
-                  variant="outline"
-                  size="sm"
-                  onPress={() => setPaymentStatus(item, 'failed')}
-                  disabled={updatingId === item.id}
-                />
-                <Button
-                  label="Confirm"
-                  size="sm"
-                  onPress={() => setPaymentStatus(item, 'paid')}
-                  loading={updatingId === item.id}
-                />
-              </View>
-            ) : item.status === 'pending' ? (
-              <Text style={[styles.autoConfirmation, { color: theme.colors.textMuted }]}>Cashfree confirmation pending</Text>
+            {item.status === 'pending' ? (
+              <Text style={[styles.autoConfirmation, { color: theme.colors.textMuted }]}>Razorpay confirmation pending</Text>
             ) : null}
           </Card>
         )}

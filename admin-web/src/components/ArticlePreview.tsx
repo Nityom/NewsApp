@@ -7,15 +7,17 @@ import type { Article, PublicationInfo } from '../types';
 
 export function ArticlePreview({ article, publication }: { article: Article; publication?: PublicationInfo | null }) {
   const [firstSection, ...restSections] = article.sections ?? [];
+  const [page2FirstSection, ...page2RestSections] = article.page2?.sections ?? [];
   const byline = articleByline(article);
   const isMainTitleCenter = isCenterAligned(article.title);
 
   return (
     <article className="newspaper" id="article-preview">
+      {/* PAGE 1 */}
       <img className="newspaper-masthead" src="/logoBanner.jpeg" alt="Education News" />
       <div className="publication-strip">
         वर्ष : {publication?.year ?? '—'} &nbsp;|&nbsp; अंक : {publication?.issueNumber ?? '—'} &nbsp;|&nbsp;
-        पृष्ठ : {1 + restSections.length} &nbsp;|&nbsp; दिनांक {article.registrationDate ?? '—'} &nbsp;|&nbsp;
+        पृष्ठ : {article.page2 ? '1 / 2' : (1 + restSections.length)} &nbsp;|&nbsp; दिनांक {article.registrationDate ?? '—'} &nbsp;|&nbsp;
         मूल्य : {publication?.price ?? '—'}
       </div>
       {firstSection ? (
@@ -46,6 +48,42 @@ export function ArticlePreview({ article, publication }: { article: Article; pub
         </>
       ) : null}
       <footer><span>News Reporter</span><strong>{byline.name}{byline.phone ? ` : ${byline.phone}` : ''}</strong></footer>
+
+      {/* PAGE 2 (if present) */}
+      {article.page2 ? (
+        <>
+          <div className="newspaper-page-break">
+            <span className="newspaper-page-badge">पृष्ठ २</span>
+          </div>
+          <img className="newspaper-masthead" src="/logoBanner.jpeg" alt="Education News" />
+          <div className="publication-strip">
+            वर्ष : {publication?.year ?? '—'} &nbsp;|&nbsp; अंक : {publication?.issueNumber ?? '—'} &nbsp;|&nbsp;
+            पृष्ठ : 2 / 2 &nbsp;|&nbsp; दिनांक {article.registrationDate ?? '—'} &nbsp;|&nbsp;
+            मूल्य : {publication?.price ?? '—'}
+          </div>
+          {page2FirstSection ? (
+            <div className="newspaper-columns">
+              <CompactStory title={article.page2.title} image={article.page2.banner} content={article.page2.content} />
+              <CompactStory title={page2FirstSection.title} image={page2FirstSection.image ?? article.page2.banner} content={page2FirstSection.content} />
+            </div>
+          ) : (
+            <>
+              <h1 style={isCenterAligned(article.page2.title) ? { textAlign: 'center' } : undefined}><RichTitle value={article.page2.title} /></h1>
+              <div className="newspaper-rule" />
+              <img className="lead-photo" src={article.page2.banner} alt="" />
+              <RichTextContent value={article.page2.content} className="story-body" />
+            </>
+          )}
+          {page2RestSections.map((section) => (
+            <section className="newspaper-section" key={section.id}>
+              {section.image ? <img src={section.image} alt="" /> : null}
+              <h2 style={isCenterAligned(section.title) ? { textAlign: 'center' } : undefined}><RichTitle value={section.title} /></h2>
+              <RichTextContent value={section.content} />
+            </section>
+          ))}
+          <footer><span>News Reporter</span><strong>{byline.name}{byline.phone ? ` : ${byline.phone}` : ''}</strong></footer>
+        </>
+      ) : null}
     </article>
   );
 }

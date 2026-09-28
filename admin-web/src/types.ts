@@ -7,6 +7,14 @@ export interface ArticleSection {
   image?: string;
 }
 
+export interface ArticlePage {
+  mode: 'single' | 'two';
+  title: string;
+  content: string;
+  banner: string;
+  sections?: ArticleSection[];
+}
+
 export interface Article {
   id: string;
   title: string;
@@ -16,6 +24,7 @@ export interface Article {
   images: string[];
   advertisements: string[];
   sections?: ArticleSection[];
+  page2?: ArticlePage;
   status: ArticleStatus;
   reporterId: string;
   reporterName: string;
@@ -60,9 +69,10 @@ export interface Reporter {
   requestRejectionReason?: string;
   joinFeeAmount?: number;
   reporterCode?: string;
+  validUntil?: string;
 }
 
-export type PublicReporterCard = Pick<Reporter, 'id' | 'name' | 'email' | 'phone' | 'avatar' | 'photo' | 'city' | 'village' | 'designation' | 'reporterCode' | 'joinedAt' | 'isActive' | 'isVerified' | 'requestStatus'>;
+export type PublicReporterCard = Pick<Reporter, 'id' | 'name' | 'email' | 'phone' | 'avatar' | 'photo' | 'city' | 'village' | 'designation' | 'reporterCode' | 'joinedAt' | 'validUntil' | 'isActive' | 'isVerified' | 'requestStatus'>;
 
 export type PaymentStatus = 'paid' | 'pending' | 'failed';
 

@@ -1,5 +1,6 @@
 import { v } from 'convex/values';
 
+import { internal } from './_generated/api';
 import { mutation, query } from './_generated/server';
 import { getAuthEmail, getReporterForEmail, isAdminEmail, requireAdmin } from './authUtils';
 import { cleanData, findByExternalId } from './helpers';
@@ -121,5 +122,56 @@ export const remove = mutation({
     await requireAdmin(ctx);
     const existing = await findByExternalId(ctx.db, 'reporters', id);
     if (existing) await ctx.db.delete(existing._id);
+  },
+});
+
+export const setRenewalFee = mutation({
+  args: { reporterId: v.string(), amount: v.number() },
+  handler: async (ctx, { reporterId, amount }) => {
+    await requireAdmin(ctx);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new Error('Please enter a valid renewal amount (minimum ₹1).');
+    }
+    const reporter = await findByExternalId(ctx.db, 'reporters', reporterId);
+    if (!reporter) throw new Error('Reporter not found.');
+
+    const data = cleanData({
+      ...reporter.data,
+      joinFeeAmount: amount,
+      requestStatus: 'awaiting_payment',
+    });
+    await ctx.db.patch(reporter._id, { data });
+
+    // Mark previous membership_expired notifications as read
+    const existingNotifications = await ctx.db.query('notifications')
+      .withIndex('by_reporter', (q) => q.eq('reporterId', reporterId))
+      .collect();
+    for (const notif of existingNotifications) {
+      if (notif.audience === 'admin' && notif.data?.type === 'membership_expired' && !notif.data?.isRead) {
+        await ctx.db.patch(notif._id, { data: { ...notif.data, isRead: true } });
+      }
+    }
+
+    // Send notification to reporter
+    const notificationId = `ntf-renewal-${reporterId}-${Date.now()}`;
+    const ntfData = {
+      id: notificationId,
+      type: 'system',
+      audience: 'reporter',
+      title: 'Membership Renewal Fee Set',
+      message: `Admin has set your membership renewal fee to ₹${amount.toLocaleString('en-IN')}. Please complete the payment to renew your 1-year press credentials.`,
+      reporterId,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      pushStatus: 'pending',
+    };
+    await ctx.db.insert('notifications', {
+      id: notificationId,
+      audience: 'reporter',
+      reporterId,
+      data: ntfData,
+    });
+    await ctx.scheduler.runAfter(0, internal.notificationActions.deliver, { notificationId });
+    return { success: true };
   },
 });

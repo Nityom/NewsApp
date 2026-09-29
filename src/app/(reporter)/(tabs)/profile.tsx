@@ -10,7 +10,7 @@ import { ScreenContainer } from '@/components/ui/ScreenContainer';
 import { useArticles } from '@/context/ArticlesContext';
 import { useAuth } from '@/context/AuthContext';
 import { useReporters } from '@/context/ReportersContext';
-import { formatValidityDate } from '@/lib/validity';
+import { formatValidityDate, isMembershipExpired } from '@/lib/validity';
 import { useAppTheme } from '@/theme';
 
 function MenuRow({ icon, label, onPress, danger }: { icon: IconName; label: string; onPress: () => void; danger?: boolean }) {
@@ -69,13 +69,22 @@ export default function ReporterProfileScreen() {
           {reporterRecord?.reporterCode ? (
             <Text style={[styles.email, { color: theme.colors.textMuted }]}>ID: {reporterRecord.reporterCode}</Text>
           ) : null}
-          {reporterRecord?.requestStatus === 'approved' || reporterRecord?.isActive ? (
-            <View style={[styles.validityPill, { backgroundColor: theme.colors.primaryMuted }]}>
-              <Icon name="shield-checkmark" size={13} color={theme.colors.primary} />
-              <Text style={[styles.validityPillText, { color: theme.colors.primary }]}>
-                Valid Thru: {formatValidityDate(reporterRecord?.validUntil, reporterRecord?.joinedAt)}
-              </Text>
-            </View>
+          {reporterRecord ? (
+            isMembershipExpired(reporterRecord.validUntil, reporterRecord.joinedAt) ? (
+              <View style={[styles.validityPill, { backgroundColor: theme.colors.dangerMuted }]}>
+                <Icon name="alert-circle" size={13} color={theme.colors.danger} />
+                <Text style={[styles.validityPillText, { color: theme.colors.danger }]}>
+                  Expired on: {formatValidityDate(reporterRecord.validUntil, reporterRecord.joinedAt)}
+                </Text>
+              </View>
+            ) : reporterRecord.requestStatus === 'approved' || reporterRecord.isActive ? (
+              <View style={[styles.validityPill, { backgroundColor: theme.colors.primaryMuted }]}>
+                <Icon name="shield-checkmark" size={13} color={theme.colors.primary} />
+                <Text style={[styles.validityPillText, { color: theme.colors.primary }]}>
+                  Valid Thru: {formatValidityDate(reporterRecord.validUntil, reporterRecord.joinedAt)}
+                </Text>
+              </View>
+            ) : null
           ) : null}
           <View style={styles.statsRow}>
             {stats.map((s) => (

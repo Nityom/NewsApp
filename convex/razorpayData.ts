@@ -48,9 +48,12 @@ export const approvePaidOrder = internalMutation({
     const reporter = await findByExternalId(ctx.db, 'reporters', payment.reporterId);
     if (!reporter) throw new Error('Reporter record not found.');
     const updatedAt = new Date().toISOString();
-    const validUntilDate = new Date();
-    validUntilDate.setFullYear(validUntilDate.getFullYear() + 1);
-    const validUntil = validUntilDate.toISOString();
+    const currentValidUntil = reporter.data.validUntil ? new Date(reporter.data.validUntil).getTime() : 0;
+    const now = Date.now();
+    const baseDate = currentValidUntil > now ? new Date(currentValidUntil) : new Date(now);
+    baseDate.setFullYear(baseDate.getFullYear() + 1);
+    const validUntil = baseDate.toISOString();
+    const wasRenewal = (reporter.data.validUntil && currentValidUntil <= now) || Boolean(reporter.data.joinedAt && (now - new Date(reporter.data.joinedAt).getTime() > 30 * 24 * 60 * 60 * 1000));
 
     await ctx.db.patch(payment._id, {
       data: {
@@ -81,8 +84,10 @@ export const approvePaidOrder = internalMutation({
         id: notificationId,
         type: 'payment',
         audience: 'reporter',
-        title: 'Payment Confirmed',
-        message: isJoining
+        title: wasRenewal ? 'Membership Renewed' : isJoining ? 'Payment Confirmed' : 'Payment Confirmed',
+        message: wasRenewal
+          ? `Your membership renewal payment of ₹${args.orderAmount.toLocaleString('en-IN')} is confirmed. Your 1-year press credential is now active until ${new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }).format(baseDate)}.`
+          : isJoining
           ? `Your payment of ₹${args.orderAmount.toLocaleString('en-IN')} is confirmed. Your reporter account and 1-year press credential are now active.`
           : `Your payment of ₹${args.orderAmount.toLocaleString('en-IN')} to the admin has been confirmed via Razorpay.`,
         reporterId: payment.reporterId,
@@ -110,8 +115,10 @@ export const approvePaidOrder = internalMutation({
           id: adminNotificationId,
           type: 'payment',
           audience: 'admin',
-          title: 'Payment Received',
-          message: `${reporter.data.name} paid ₹${args.orderAmount.toLocaleString('en-IN')} via Razorpay.`,
+          title: wasRenewal ? 'Membership Renewed' : 'Payment Received',
+          message: wasRenewal
+            ? `${reporter.data.name} renewed their membership with a payment of ₹${args.orderAmount.toLocaleString('en-IN')} via Razorpay.`
+            : `${reporter.data.name} paid ₹${args.orderAmount.toLocaleString('en-IN')} via Razorpay.`,
           reporterId: payment.reporterId,
           createdAt: updatedAt,
           isRead: false,

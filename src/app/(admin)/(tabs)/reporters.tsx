@@ -11,6 +11,7 @@ import { SearchBar } from '@/components/ui/SearchBar';
 import { EmptyState } from '@/components/ui/StateViews';
 import { useArticles } from '@/context/ArticlesContext';
 import { useReporters } from '@/context/ReportersContext';
+import { isMembershipExpired } from '@/lib/validity';
 import { useAppTheme } from '@/theme';
 
 export default function AdminReportersScreen() {
@@ -21,9 +22,12 @@ export default function AdminReportersScreen() {
 
   const filtered = useMemo(() => {
     const matches = reporters.filter((r) => r.name.toLowerCase().includes(query.toLowerCase()));
-    // Join requests still in progress surface first so admins see them immediately.
+    // Join requests still in progress or expired memberships surface first so admins see them immediately.
     const inProgress = new Set(['pending', 'awaiting_payment', 'payment_submitted']);
     return [...matches].sort((a, b) => {
+      const aExpired = isMembershipExpired(a.validUntil, a.joinedAt) ? 0 : 1;
+      const bExpired = isMembershipExpired(b.validUntil, b.joinedAt) ? 0 : 1;
+      if (aExpired !== bExpired) return aExpired - bExpired;
       const aPending = inProgress.has(a.requestStatus) ? 0 : 1;
       const bPending = inProgress.has(b.requestStatus) ? 0 : 1;
       return aPending - bPending;
@@ -56,10 +60,13 @@ export default function AdminReportersScreen() {
                 </View>
                 <Text style={[styles.city, { color: theme.colors.textMuted }]}>{item.city}</Text>
                 <View style={styles.metaRow}>
+                  {isMembershipExpired(item.validUntil, item.joinedAt) ? (
+                    <Badge label="Expired" tone="danger" size="sm" />
+                  ) : null}
                   {item.requestStatus === 'pending' ? (
                     <Badge label="Pending Approval" tone="warning" size="sm" />
                   ) : item.requestStatus === 'awaiting_payment' ? (
-                    <Badge label={`Awaiting Payment ₹${item.joinFeeAmount}`} tone="warning" size="sm" />
+                    <Badge label={`${isMembershipExpired(item.validUntil, item.joinedAt) ? 'Renewal' : 'Awaiting'} Payment ₹${item.joinFeeAmount}`} tone="warning" size="sm" />
                   ) : item.requestStatus === 'payment_submitted' ? (
                     <Badge label="Payment Submitted" tone="info" size="sm" />
                   ) : item.requestStatus === 'rejected' ? (

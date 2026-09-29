@@ -200,6 +200,10 @@ export default function CreateArticleScreen() {
   const handleAddPage2 = () => {
     setHasPage2(true);
     setActivePage(2);
+    setPage2Title('');
+    setPage2Content('');
+    setPage2Banner(undefined);
+    setPage2Sections([]);
   };
 
   const handleRemovePage2 = () => {
@@ -214,6 +218,10 @@ export default function CreateArticleScreen() {
           onPress: () => {
             setHasPage2(false);
             setActivePage(1);
+            setPage2Title('');
+            setPage2Content('');
+            setPage2Banner(undefined);
+            setPage2Sections([]);
           },
         },
       ],
@@ -244,12 +252,54 @@ export default function CreateArticleScreen() {
     }
     if (hasPage2) {
       if (!page2Title.trim()) {
-        Alert.alert('Page 2 Title required', 'Please enter an article title for Page 2 or remove Page 2.');
+        Alert.alert(
+          'Page 2 Title Required',
+          'Page 2 was added but has no article title. Please enter an article title for Page 2 or remove Page 2 to publish a 1-page article.',
+          [
+            {
+              text: 'Remove Page 2',
+              style: 'destructive',
+              onPress: () => {
+                setHasPage2(false);
+                setActivePage(1);
+                setPage2Title('');
+                setPage2Content('');
+                setPage2Banner(undefined);
+                setPage2Sections([]);
+              },
+            },
+            {
+              text: 'Fill Page 2',
+              onPress: () => setActivePage(2),
+            },
+          ],
+        );
         setActivePage(2);
         return false;
       }
       if (!page2Banner) {
-        Alert.alert('Page 2 Banner required', 'Please upload a news photo for Page 2 or remove Page 2.');
+        Alert.alert(
+          'Page 2 Banner Required',
+          'Please upload a news photo for Page 2 or remove Page 2 to publish a 1-page article.',
+          [
+            {
+              text: 'Remove Page 2',
+              style: 'destructive',
+              onPress: () => {
+                setHasPage2(false);
+                setActivePage(1);
+                setPage2Title('');
+                setPage2Content('');
+                setPage2Banner(undefined);
+                setPage2Sections([]);
+              },
+            },
+            {
+              text: 'Upload Photo',
+              onPress: () => setActivePage(2),
+            },
+          ],
+        );
         setActivePage(2);
         return false;
       }
@@ -452,7 +502,7 @@ export default function CreateArticleScreen() {
         </View>
 
         {activePage === 1 ? (
-          <>
+          <View key="page-1-wrapper">
             {/* Page 1 Mode Selector: 1 Article vs 2 Articles */}
             <View style={styles.modeSelectorWrap}>
               <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginBottom: 8 }]}>
@@ -591,7 +641,7 @@ export default function CreateArticleScreen() {
             <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
               {isTwoNews ? 'Page 1 Article 1 Title' : 'Title'}
             </Text>
-            <BlogTextEditor initialValue={title} onChange={setTitle} variant="title" />
+            <BlogTextEditor key="page1-main-title" initialValue={title} onChange={setTitle} variant="title" />
 
             <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
               {isTwoNews
@@ -599,6 +649,7 @@ export default function CreateArticleScreen() {
                 : `Article Body (${countArticleWords(content)}/${MAX_SINGLE_ARTICLE_WORDS} words)`}
             </Text>
             <BlogTextEditor
+              key="page1-main-body"
               initialValue={content}
               onChange={setContent}
               maxWords={isTwoNews ? MAX_TWO_NEWS_BODY_WORDS : MAX_SINGLE_ARTICLE_WORDS}
@@ -687,6 +738,7 @@ export default function CreateArticleScreen() {
                 </View>
                 <View style={styles.sectionTitleEditor}>
                   <BlogTextEditor
+                    key={`p1-sec-title-${section.id}`}
                     initialValue={section.title}
                     onChange={(sTitle) => updateSection(section.id, { title: sTitle })}
                     variant="title"
@@ -694,6 +746,7 @@ export default function CreateArticleScreen() {
                 </View>
                 <View style={styles.sectionBodyEditor}>
                   <BlogTextEditor
+                    key={`p1-sec-body-${section.id}`}
                     initialValue={section.content}
                     onChange={(sContent) => updateSection(section.id, { content: sContent })}
                     maxWords={MAX_TWO_NEWS_BODY_WORDS}
@@ -701,9 +754,9 @@ export default function CreateArticleScreen() {
                 </View>
               </View>
             ))}
-          </>
+          </View>
         ) : (
-          <>
+          <View key="page-2-wrapper">
             {/* Page 2 Mode Selector: 1 Article vs 2 Articles */}
             <View style={styles.modeSelectorWrap}>
               <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginBottom: 8 }]}>
@@ -842,7 +895,12 @@ export default function CreateArticleScreen() {
             <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
               {isPage2TwoNews ? 'Page 2 Article 1 Title' : 'Page 2 Title'}
             </Text>
-            <BlogTextEditor initialValue={page2Title} onChange={setPage2Title} variant="title" />
+            <BlogTextEditor
+              key="page2-main-title"
+              initialValue={page2Title}
+              onChange={setPage2Title}
+              variant="title"
+            />
 
             <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary, marginTop: 20 }]}>
               {isPage2TwoNews
@@ -850,6 +908,7 @@ export default function CreateArticleScreen() {
                 : `Page 2 Article Body (${countArticleWords(page2Content)}/${MAX_SINGLE_ARTICLE_WORDS} words)`}
             </Text>
             <BlogTextEditor
+              key="page2-main-body"
               initialValue={page2Content}
               onChange={setPage2Content}
               maxWords={isPage2TwoNews ? MAX_TWO_NEWS_BODY_WORDS : MAX_SINGLE_ARTICLE_WORDS}
@@ -888,6 +947,7 @@ export default function CreateArticleScreen() {
                 </View>
                 <View style={styles.sectionTitleEditor}>
                   <BlogTextEditor
+                    key={`p2-sec-title-${section.id}`}
                     initialValue={section.title}
                     onChange={(sTitle) => updatePage2Section(section.id, { title: sTitle })}
                     variant="title"
@@ -895,6 +955,7 @@ export default function CreateArticleScreen() {
                 </View>
                 <View style={styles.sectionBodyEditor}>
                   <BlogTextEditor
+                    key={`p2-sec-body-${section.id}`}
                     initialValue={section.content}
                     onChange={(sContent) => updatePage2Section(section.id, { content: sContent })}
                     maxWords={MAX_TWO_NEWS_BODY_WORDS}
@@ -902,7 +963,7 @@ export default function CreateArticleScreen() {
                 </View>
               </View>
             ))}
-          </>
+          </View>
         )}
 
         {user ? (

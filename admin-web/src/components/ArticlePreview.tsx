@@ -81,6 +81,12 @@ export function ArticlePreview({ article, publication }: { article: Article; pub
               <RichTextContent value={section.content} />
             </section>
           ))}
+          {article.advertisements.length ? (
+            <>
+              <div className="newspaper-divider-rule" />
+              <div className="newspaper-ads">{article.advertisements.map((image) => <img key={image} src={image} alt="Advertisement" />)}</div>
+            </>
+          ) : null}
           <footer><span>News Reporter</span><strong>{byline.name}{byline.phone ? ` : ${byline.phone}` : ''}</strong></footer>
         </>
       ) : null}

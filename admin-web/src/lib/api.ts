@@ -20,6 +20,7 @@ export const api = {
     getPublicCard: query<{ id: string }, Reporter | null>('reporters:getPublicCard'),
     patch: mutation<{ id: string; patch: Partial<Reporter> }, Partial<Reporter>>('reporters:patch'),
     remove: mutation<{ id: string }>('reporters:remove'),
+    setRenewalFee: mutation<{ reporterId: string; amount: number }>('reporters:setRenewalFee'),
   },
   payments: {
     list: query<Record<string, never>, Payment[]>('payments:list'),
@@ -29,6 +30,7 @@ export const api = {
   notifications: {
     list: query<Record<string, never>, AppNotification[]>('notifications:list'),
     add: mutation<{ notification: Omit<AppNotification, 'id' | 'createdAt' | 'isRead'> }>('notifications:add'),
+    notifyMembershipExpired: mutation<{ reporterId: string }>('notifications:notifyMembershipExpired'),
     markRead: mutation<{ id: string }>('notifications:markRead'),
     markAllRead: mutation<{ ids: string[] }>('notifications:markAllRead'),
   },

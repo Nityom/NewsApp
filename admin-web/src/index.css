@@ -82,7 +82,7 @@ textarea { resize: vertical; }
 .status { display: inline-flex; align-items: center; width: fit-content; padding: 6px 10px; border-radius: 99px; color: #57544e; background: #e8e5df; font-size: 12px; line-height: 1; font-weight: 800; text-transform: uppercase; white-space: nowrap; }
 .status-approved, .status-paid, .status-active { color: #145d37; background: #dff2e8; }
 .status-pending, .status-awaiting_payment, .status-payment_submitted { color: #775800; background: #f9edbd; }
-.status-rejected, .status-failed, .status-trashed, .status-suspended { color: #8d201c; background: #f6dfdc; }
+.status-rejected, .status-failed, .status-trashed, .status-suspended, .status-expired { color: #8d201c; background: #f6dfdc; }
 .panel, .data-panel { background: var(--paper); border: 1px solid var(--line); border-radius: 4px; }
 .panel { padding: 22px; }
 .panel > header h2, .settings-section h2 { font: 700 23px/1.1 'Newsreader', serif; margin-bottom: 0; }

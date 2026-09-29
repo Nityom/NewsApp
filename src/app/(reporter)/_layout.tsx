@@ -12,6 +12,7 @@ import { useReporters } from '@/context/ReportersContext';
 import { clearJustSubmittedReporterId, getJustSubmittedReporterId } from '@/lib/joinRequestFlag';
 import { createJoiningFeeOrder, verifyJoiningFeeOrder } from '@/lib/razorpay';
 import { isGooglePlayReviewEmail } from '@/lib/reviewAccount';
+import { formatValidityDate, isMembershipExpired } from '@/lib/validity';
 import { useAppTheme } from '@/theme';
 import type { Reporter } from '@/types/models';
 import { api } from '@convex/_generated/api';
@@ -43,7 +44,59 @@ function PendingApprovalScreen({ reason }: { reason?: string }) {
   );
 }
 
-function PaymentScreen({ reporter }: { reporter: Reporter }) {
+function ExpiredMembershipScreen({ reporter }: { reporter: Reporter }) {
+  const theme = useAppTheme();
+  const { logout } = useAuth();
+  const notifyExpired = useMutation(api.notifications.notifyMembershipExpired);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    if (reporter?.id) {
+      notifyExpired({ reporterId: reporter.id }).catch(() => {});
+    }
+  }, [reporter?.id, notifyExpired]);
+
+  const handleCheck = async () => {
+    setChecking(true);
+    try {
+      await notifyExpired({ reporterId: reporter.id });
+      Alert.alert('Status Checked', 'Admin has been notified to set your renewal fee. Please check back shortly.');
+    } catch {
+      Alert.alert('Status Checked', 'Waiting for admin to set the renewal fee.');
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const expiryDate = formatValidityDate(reporter.validUntil, reporter.joinedAt);
+
+  return (
+    <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
+      <View style={styles.pendingWrap}>
+        <View style={[styles.iconCircle, { backgroundColor: theme.colors.dangerMuted }]}>
+          <Icon name="time-outline" size={42} color={theme.colors.danger} />
+        </View>
+        <Text style={[styles.pendingTitle, { color: theme.colors.text }]}>Membership Expired</Text>
+        <View style={[styles.expiredBadge, { backgroundColor: theme.colors.dangerMuted, borderColor: theme.colors.danger }]}>
+          <Text style={[styles.expiredBadgeText, { color: theme.colors.danger }]}>
+            Validity ended: {expiryDate}
+          </Text>
+        </View>
+        <Text style={[styles.pendingText, { color: theme.colors.textSecondary, textAlign: 'center' }]}>
+          Your 1-year press credential has expired.
+          {'\n\n'}
+          The admin has been notified that your membership has ended. Once the admin sets the renewal fee, you will be able to complete payment here and renew your credentials.
+        </Text>
+        <View style={{ width: '100%', gap: 10, marginTop: 14 }}>
+          <Button label={checking ? 'Checking...' : 'Check Status'} icon="refresh" onPress={handleCheck} loading={checking} fullWidth />
+          <Button label="Log Out" variant="outline" onPress={logout} fullWidth />
+        </View>
+      </View>
+    </ScreenContainer>
+  );
+}
+
+function PaymentScreen({ reporter, isRenewal = false }: { reporter: Reporter; isRenewal?: boolean }) {
   const theme = useAppTheme();
   const { logout } = useAuth();
   const [submitting, setSubmitting] = useState(false);
@@ -61,7 +114,7 @@ function PaymentScreen({ reporter }: { reporter: Reporter }) {
       const phoneDigits = String(reporter.phone || '').replace(/\D/g, '').slice(-10);
 
       const options = {
-        description: 'Education News reporter joining fee',
+        description: isRenewal ? 'Education News membership renewal fee' : 'Education News reporter joining fee',
         currency: 'INR',
         key: order.keyId,
         amount: Math.round(order.totalAmount * 100),
@@ -101,7 +154,12 @@ function PaymentScreen({ reporter }: { reporter: Reporter }) {
           razorpayPaymentId: checkoutResult.razorpay_payment_id,
           razorpaySignature: checkoutResult.razorpay_signature,
         });
-        Alert.alert('Payment Confirmed', 'Your reporter account is active. Welcome to your dashboard.');
+        Alert.alert(
+          isRenewal ? 'Membership Renewed' : 'Payment Confirmed',
+          isRenewal
+            ? 'Your 1-year membership has been renewed successfully. Welcome back to your dashboard!'
+            : 'Your reporter account is active. Welcome to your dashboard.',
+        );
         router.replace('/(reporter)/(tabs)');
       } catch (verifyError) {
         Alert.alert('Verification Pending', verifyError instanceof Error ? verifyError.message : 'Please try again shortly.');
@@ -117,19 +175,23 @@ function PaymentScreen({ reporter }: { reporter: Reporter }) {
     <ScreenContainer edges={['top', 'left', 'right', 'bottom']}>
       <ScrollView contentContainerStyle={styles.paymentScroll}>
         <Icon name="cash-outline" size={44} color={theme.colors.primary} />
-        <Text style={[styles.pendingTitle, { color: theme.colors.text }]}>Joining Fee Required</Text>
+        <Text style={[styles.pendingTitle, { color: theme.colors.text }]}>
+          {isRenewal ? 'Renew Your Membership' : 'Joining Fee Required'}
+        </Text>
         <View
           style={[
             styles.feeHighlight,
             { backgroundColor: theme.colors.primaryMuted, borderColor: theme.colors.primary },
           ]}>
           <View style={styles.feeRow}>
-            <Text style={[styles.feeLabel, { color: theme.colors.textSecondary }]}>Joining fee</Text>
+            <Text style={[styles.feeLabel, { color: theme.colors.textSecondary }]}>
+              {isRenewal ? 'Renewal fee' : 'Joining fee'}
+            </Text>
             <Text style={[styles.feeLineAmount, { color: theme.colors.text }]}>₹{baseAmount.toLocaleString('en-IN')}</Text>
           </View>
           <View style={styles.feeRow}>
             <Text style={[styles.feeLabel, { color: theme.colors.textSecondary }]}>Credential validity</Text>
-            <Text style={[styles.feeLineAmount, { color: theme.colors.text }]}>1 Year</Text>
+            <Text style={[styles.feeLineAmount, { color: theme.colors.text }]}>+1 Year</Text>
           </View>
           <View style={styles.feeRow}>
             <Text style={[styles.feeLabel, { color: theme.colors.textSecondary }]}>Convenience fee (2.3%)</Text>
@@ -142,9 +204,17 @@ function PaymentScreen({ reporter }: { reporter: Reporter }) {
           </View>
         </View>
         <Text style={[styles.pendingText, { color: theme.colors.textSecondary }]}>
-          Pay securely with Razorpay. Your reporter account and 1-year press credential ID will be approved automatically after payment confirmation.
+          {isRenewal
+            ? 'Pay securely with Razorpay. Your reporter account and 1-year press credential ID will be renewed automatically after payment confirmation.'
+            : 'Pay securely with Razorpay. Your reporter account and 1-year press credential ID will be approved automatically after payment confirmation.'}
         </Text>
-        <Button label={`Pay ₹${totalAmount.toLocaleString('en-IN')}`} onPress={startPayment} loading={submitting} fullWidth size="lg" />
+        <Button
+          label={`${isRenewal ? 'Renew Membership' : 'Pay'} ₹${totalAmount.toLocaleString('en-IN')}`}
+          onPress={startPayment}
+          loading={submitting}
+          fullWidth
+          size="lg"
+        />
         <Button label="Log Out" variant="outline" onPress={logout} fullWidth />
       </ScrollView>
     </ScreenContainer>
@@ -215,13 +285,20 @@ export default function ReporterLayout() {
   // listener has delivered the record; otherwise use the request's real status.
   if (justSubmitted) return <PendingApprovalScreen />;
 
+  const isExpired = reporterRecord ? isMembershipExpired(reporterRecord.validUntil, reporterRecord.joinedAt) : false;
+
   if (!isGooglePlayReviewer && !isLoading && reporterRecord) {
     if (reporterRecord.requestStatus === 'pending') return <PendingApprovalScreen />;
-    if (reporterRecord.requestStatus === 'awaiting_payment') return <PaymentScreen reporter={reporterRecord} />;
+    if (reporterRecord.requestStatus === 'awaiting_payment') {
+      return <PaymentScreen reporter={reporterRecord} isRenewal={isExpired} />;
+    }
     if (reporterRecord.requestStatus === 'payment_submitted') return <AwaitingConfirmationScreen reporter={reporterRecord} />;
     if (reporterRecord.requestStatus === 'rejected') return <PendingApprovalScreen reason={reporterRecord.requestRejectionReason} />;
     if (reporterRecord.requestStatus === 'approved' && !reporterRecord.isActive) {
       return <PendingApprovalScreen reason="Your account has been suspended by the admin." />;
+    }
+    if (isExpired) {
+      return <ExpiredMembershipScreen reporter={reporterRecord} />;
     }
   }
 
@@ -300,5 +377,25 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 20,
     textAlign: 'center',
+  },
+  iconCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  expiredBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: -2,
+    marginBottom: 4,
+  },
+  expiredBadgeText: {
+    fontSize: 12.5,
+    fontWeight: '700',
   },
 });

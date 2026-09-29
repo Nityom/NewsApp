@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from 'convex/react';
 import {
+  AlertCircle,
   ArrowLeft,
   Ban,
   Check,
@@ -25,7 +26,7 @@ import { Button, Dialog, EmptyState, LoadingState, PageHeader, StatusBadge } fro
 import { api } from '../lib/api';
 import { downloadReporterIdCard } from '../lib/exportIdCard';
 import { plainRichText } from '../lib/richText';
-import { currency, dateInputValue, dedupeReporters, errorMessage, formatDate, formatValidityDate, getReporterValidUntil } from '../lib/utils';
+import { currency, dateInputValue, dedupeReporters, errorMessage, formatDate, formatValidityDate, getReporterValidUntil, isMembershipExpired } from '../lib/utils';
 
 export function ReporterDetailPage() {
   const { id = '' } = useParams();
@@ -35,11 +36,14 @@ export function ReporterDetailPage() {
   const payments = useQuery(api.payments.list, {});
   const patchReporter = useMutation(api.reporters.patch);
   const removeReporter = useMutation(api.reporters.remove);
+  const setRenewalFee = useMutation(api.reporters.setRenewalFee);
   const addNotification = useMutation(api.notifications.add);
   const reporter = dedupeReporters(reporterData ?? []).find((item) => item.id === id)!;
 
   const [feeDialog, setFeeDialog] = useState(false);
   const [fee, setFee] = useState('');
+  const [renewalDialog, setRenewalDialog] = useState(false);
+  const [renewalFee, setRenewalFeeInput] = useState('');
   const [rejectDialog, setRejectDialog] = useState(false);
   const [designationDialog, setDesignationDialog] = useState(false);
   const [designationInput, setDesignationInput] = useState('');
@@ -53,6 +57,8 @@ export function ReporterDetailPage() {
   const [shareDropdown, setShareDropdown] = useState(false);
   const [copied, setCopied] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
+
+  const isExpired = reporter ? isMembershipExpired(reporter) : false;
 
   useEffect(() => {
     setPhotoSource(reporter?.photo || reporter?.avatar || '');
@@ -133,6 +139,19 @@ export function ReporterDetailPage() {
         `Your joining fee is ${currency.format(amount)}. Complete payment in the app to continue.`,
       );
       setFeeDialog(false);
+    });
+  }
+
+  function requestRenewal() {
+    const amount = Number(renewalFee);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    return run('renewal', async () => {
+      await setRenewalFee({
+        reporterId: reporter.id,
+        amount,
+      });
+      setRenewalDialog(false);
+      setRenewalFeeInput('');
     });
   }
 
@@ -324,6 +343,7 @@ export function ReporterDetailPage() {
         description={reporter.reporterCode || reporter.email}
         actions={
           <>
+            {isExpired ? <span className="status status-rejected">Membership Expired</span> : null}
             <StatusBadge value={reporter.requestStatus} />
             <StatusBadge value={reporter.isActive ? 'active' : 'suspended'} />
           </>
@@ -474,6 +494,45 @@ export function ReporterDetailPage() {
               <h2>Administrative controls</h2>
             </header>
             <div className="action-grid">
+              {isExpired ? (
+                <div
+                  style={{
+                    gridColumn: '1 / -1',
+                    padding: '14px 18px',
+                    background: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: 8,
+                    fontSize: 14,
+                    color: '#991b1b',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <AlertCircle size={18} />
+                    <strong>Membership Expired:</strong>
+                    <span>Press credential validity ended on {formatValidityDate(reporter.validUntil, reporter.joinedAt)}.</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 13, color: '#7f1d1d' }}>
+                    {reporter.requestStatus === 'awaiting_payment'
+                      ? `Waiting for ${reporter.name} to complete the renewal payment of ${currency.format(reporter.joinFeeAmount ?? 0)} via Razorpay.`
+                      : 'Set the renewal fee to prompt this reporter to renew their membership.'}
+                  </p>
+                  <div>
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        setRenewalFeeInput(reporter.joinFeeAmount ? String(reporter.joinFeeAmount) : '');
+                        setRenewalDialog(true);
+                      }}
+                    >
+                      <RotateCcw size={15} /> {reporter.requestStatus === 'awaiting_payment' ? 'Update renewal fee' : 'Set renewal fee & notify'}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
               {reporter.requestStatus === 'pending' ? (
                 <>
                   <Button onClick={() => setFeeDialog(true)}>
@@ -690,6 +749,35 @@ export function ReporterDetailPage() {
               </Button>
               <Button disabled={Number(fee) <= 0} loading={busy === 'fee'} onClick={() => void requestFee()}>
                 Send fee request
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      ) : null}
+
+      {renewalDialog ? (
+        <Dialog title="Set Membership Renewal Fee" onClose={() => setRenewalDialog(false)}>
+          <div className="dialog-body">
+            <p style={{ margin: '0 0 12px', fontSize: 14, color: 'var(--text-secondary, #4b5563)' }}>
+              Enter the renewal amount to charge <strong>{reporter.name}</strong>. A 2.3% convenience fee will be added at Razorpay checkout.
+            </p>
+            <label>
+              Renewal amount in rupees
+              <input
+                type="number"
+                min="1"
+                value={renewalFee}
+                onChange={(event) => setRenewalFeeInput(event.target.value)}
+                placeholder="500"
+                autoFocus
+              />
+            </label>
+            <div className="dialog-actions">
+              <Button variant="secondary" onClick={() => setRenewalDialog(false)}>
+                Cancel
+              </Button>
+              <Button disabled={Number(renewalFee) <= 0} loading={busy === 'renewal'} onClick={() => void requestRenewal()}>
+                Send renewal request
               </Button>
             </div>
           </div>

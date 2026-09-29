@@ -291,6 +291,10 @@ export function CreateArticlePage({ editing = false }: { editing?: boolean }) {
                 variant="secondary"
                 onClick={() => {
                   setHasPage2(true);
+                  setPage2Title('');
+                  setPage2Content('');
+                  setPage2Banner('');
+                  setPage2Sections([]);
                   setActivePage(2);
                 }}>
                 <Plus size={16} /> Add Page 2
@@ -303,6 +307,10 @@ export function CreateArticlePage({ editing = false }: { editing?: boolean }) {
                 onClick={() => {
                   if (confirm('Remove Page 2 and its content from this article?')) {
                     setHasPage2(false);
+                    setPage2Title('');
+                    setPage2Content('');
+                    setPage2Banner('');
+                    setPage2Sections([]);
                     setActivePage(1);
                   }
                 }}>

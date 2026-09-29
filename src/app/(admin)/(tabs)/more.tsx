@@ -58,6 +58,7 @@ export default function AdminMoreScreen() {
       </View>
 
       <Card style={styles.menuCard} padded={false}>
+        <MenuRow icon="videocam-outline" label="Video Studio (News & Reels)" onPress={() => router.push('/(admin)/video-studio')} />
         <MenuRow icon="bar-chart-outline" label="Analytics Dashboard" onPress={() => router.push('/(admin)/analytics')} />
         <MenuRow
           icon="notifications-outline"

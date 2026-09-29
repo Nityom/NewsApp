@@ -15,6 +15,7 @@ export default function AdminLayout() {
       <Stack.Screen name="reporter/[id]" />
       <Stack.Screen name="article/[id]" />
       <Stack.Screen name="analytics" />
+      <Stack.Screen name="video-studio" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="help-support" />

@@ -281,6 +281,13 @@ export async function exportArticleAsPng(article: Article, publication?: Publica
       y = drawRichText(context, parseRichText(section.content), MARGIN, y, CONTENT_WIDTH);
     }
 
+    if (adImages.length) {
+      y += px(12);
+      context.fillRect(MARGIN, y, CONTENT_WIDTH, px(2));
+      y += px(14);
+      for (const image of adImages) y += drawContainedImage(context, image, MARGIN + 10, y, CONTENT_WIDTH - 20, 560) + 14;
+    }
+
     y += px(16);
     context.fillStyle = '#171717';
     context.fillRect(footerMargin, y, PAGE_WIDTH - footerMargin * 2, px(2));

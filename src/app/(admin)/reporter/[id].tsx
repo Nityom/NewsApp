@@ -19,7 +19,7 @@ import { useArticles } from '@/context/ArticlesContext';
 import { useNotifications } from '@/context/NotificationsContext';
 import { usePayments } from '@/context/PaymentsContext';
 import { useReporters } from '@/context/ReportersContext';
-import { formatValidityDate } from '@/lib/validity';
+import { formatValidityDate, isMembershipExpired } from '@/lib/validity';
 import { useAppTheme } from '@/theme';
 
 export default function ReporterDetailsScreen() {
@@ -40,8 +40,13 @@ export default function ReporterDetailsScreen() {
   const [feeVisible, setFeeVisible] = useState(false);
   const [feeAmount, setFeeAmount] = useState('');
   const [sendingFee, setSendingFee] = useState(false);
+  const [renewalFeeVisible, setRenewalFeeVisible] = useState(false);
+  const [renewalAmount, setRenewalAmount] = useState('');
+  const [sendingRenewal, setSendingRenewal] = useState(false);
   const [photoVisible, setPhotoVisible] = useState(false);
   const [downloadingPhoto, setDownloadingPhoto] = useState(false);
+
+  const isExpired = reporter ? isMembershipExpired(reporter.validUntil, reporter.joinedAt) : false;
 
   if (reportersLoading || (!reporter && !lookupFinished)) {
     return (
@@ -103,6 +108,39 @@ export default function ReporterDetailsScreen() {
       Alert.alert('Could Not Send Request', 'The reporter status was not updated. Please try again.');
     } finally {
       setSendingFee(false);
+    }
+  };
+
+  const sendRenewalRequest = async () => {
+    const amount = Number(renewalAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid positive renewal amount.');
+      return;
+    }
+    setSendingRenewal(true);
+    try {
+      await updateReporter(reporter.id, {
+        requestStatus: 'awaiting_payment',
+        joinFeeAmount: amount,
+      });
+      setRenewalFeeVisible(false);
+      setRenewalAmount('');
+      try {
+        await addNotification({
+          type: 'system',
+          audience: 'reporter',
+          title: 'Membership Renewal Fee Set',
+          message: `${reporter.name}, your membership renewal fee is ₹${amount}. A 2.3% convenience fee will be added at Razorpay checkout. Please complete payment in the app to renew.`,
+          reporterId: reporter.id,
+        });
+        Alert.alert('Renewal Request Sent', `${reporter.name} has been notified to pay ₹${amount} to renew membership.`);
+      } catch {
+        Alert.alert('Status Updated', 'The renewal fee was set, but the notification could not be sent.');
+      }
+    } catch {
+      Alert.alert('Could Not Send Request', 'The reporter renewal status could not be updated. Please try again.');
+    } finally {
+      setSendingRenewal(false);
     }
   };
 
@@ -198,10 +236,16 @@ export default function ReporterDetailsScreen() {
             </Text>
           ) : null}
           <View style={styles.badgesRow}>
-            <Badge label={reporter.isActive ? 'Active' : 'Inactive'} tone={reporter.isActive ? 'success' : 'neutral'} />
+            {isExpired ? (
+              <Badge label="Membership Expired" tone="danger" />
+            ) : (
+              <Badge label={reporter.isActive ? 'Active' : 'Inactive'} tone={reporter.isActive ? 'success' : 'neutral'} />
+            )}
             <Badge label={`★ ${reporter.rating}`} tone="warning" />
             {reporter.requestStatus === 'pending' ? <Badge label="Pending Approval" tone="warning" /> : null}
-            {reporter.requestStatus === 'awaiting_payment' ? <Badge label={`Awaiting Payment (₹${reporter.joinFeeAmount})`} tone="warning" /> : null}
+            {reporter.requestStatus === 'awaiting_payment' ? (
+              <Badge label={`${isExpired ? 'Renewal' : 'Awaiting'} Payment (₹${reporter.joinFeeAmount})`} tone="warning" />
+            ) : null}
             {reporter.requestStatus === 'payment_submitted' ? <Badge label="Payment Submitted" tone="info" /> : null}
             {reporter.requestStatus === 'rejected' ? <Badge label="Rejected" tone="danger" /> : null}
           </View>
@@ -260,6 +304,33 @@ export default function ReporterDetailsScreen() {
                 <Text style={[styles.contactText, { color: theme.colors.text }]}>Aadhar: {reporter.aadharNumber}</Text>
               </View>
             ) : null}
+          </Card>
+        ) : null}
+
+        {isExpired ? (
+          <Card style={[styles.expiredCard, { borderColor: theme.colors.danger, backgroundColor: theme.colors.dangerMuted }]}>
+            <View style={styles.expiredCardHeader}>
+              <Icon name="alert-circle" size={20} color={theme.colors.danger} />
+              <Text style={[styles.expiredCardTitle, { color: theme.colors.danger }]}>
+                Membership Expired
+              </Text>
+            </View>
+            <Text style={[styles.expiredCardText, { color: theme.colors.textSecondary }]}>
+              {reporter.name}'s press credential validity ended on {formatValidityDate(reporter.validUntil, reporter.joinedAt)}.
+              {reporter.requestStatus === 'awaiting_payment'
+                ? ` Currently awaiting renewal payment of ₹${reporter.joinFeeAmount} from reporter.`
+                : ' Set the renewal amount to prompt the reporter to renew.'}
+            </Text>
+            <View style={{ height: 10 }} />
+            <Button
+              label={reporter.requestStatus === 'awaiting_payment' ? 'Update Renewal Fee' : 'Set Renewal Fee & Notify'}
+              icon="cash-outline"
+              onPress={() => {
+                setRenewalAmount(reporter.joinFeeAmount ? String(reporter.joinFeeAmount) : '');
+                setRenewalFeeVisible(true);
+              }}
+              fullWidth
+            />
           </Card>
         ) : null}
 
@@ -386,6 +457,25 @@ export default function ReporterDetailsScreen() {
           />
         </View>
       </Dialog>
+
+      <Dialog
+        visible={renewalFeeVisible}
+        title="Set Renewal Fee"
+        message={`Enter the renewal amount to charge ${reporter.name}. A 2.3% convenience fee will be added at Razorpay checkout.`}
+        onRequestClose={() => setRenewalFeeVisible(false)}
+        actions={[
+          { label: 'Cancel', variant: 'outline', onPress: () => setRenewalFeeVisible(false) },
+          { label: sendingRenewal ? 'Sending...' : 'Send Renewal Request', onPress: sendRenewalRequest },
+        ]}>
+        <View style={{ marginBottom: 6 }}>
+          <Input
+            placeholder="Renewal amount in ₹"
+            keyboardType="number-pad"
+            value={renewalAmount}
+            onChangeText={setRenewalAmount}
+          />
+        </View>
+      </Dialog>
     </ScreenContainer>
   );
 }
@@ -493,5 +583,25 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
+  },
+  expiredCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 16,
+    gap: 6,
+  },
+  expiredCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  expiredCardTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  expiredCardText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

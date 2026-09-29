@@ -38,6 +38,13 @@ export function formatValidityDate(value?: string, joinedAt?: string) {
   return formatDate(resolved);
 }
 
+export function isMembershipExpired(reporter?: { validUntil?: string; joinedAt?: string }): boolean {
+  if (!reporter || (!reporter.validUntil && !reporter.joinedAt)) return false;
+  const validUntilStr = getReporterValidUntil(reporter);
+  const d = new Date(validUntilStr);
+  return !Number.isNaN(d.getTime()) && d.getTime() < Date.now();
+}
+
 export function dateInputValue(value?: string) {
   if (!value) return '';
   const parsed = new Date(value);

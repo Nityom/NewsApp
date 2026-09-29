@@ -19,6 +19,7 @@ const PaymentsPage = lazy(() => import('./pages/PaymentsPage').then((module) => 
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage').then((module) => ({ default: module.NotificationsPage })));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })));
+const VideoStudioPage = lazy(() => import('./pages/VideoStudioPage').then((module) => ({ default: module.VideoStudioPage })));
 
 function AdminProtectedLayout({ user }: { user: User | null }) {
   if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL) {
@@ -52,6 +53,7 @@ function App() {
           <Route path="articles/new" element={<CreateArticlePage />} />
           <Route path="articles/:id/edit" element={<CreateArticlePage />} />
           <Route path="articles/:id" element={<ArticleDetailPage />} />
+          <Route path="video-studio" element={<VideoStudioPage />} />
           <Route path="reporters" element={<ReportersPage />} />
           <Route path="reporters/:id" element={<ReporterDetailPage />} />
           <Route path="payments" element={<PaymentsPage />} />

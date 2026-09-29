@@ -1,15 +1,16 @@
 import { signOut } from 'firebase/auth';
 import {
-    BarChart3,
-    Bell,
-    BookOpenText,
-    ChevronRight,
-    CreditCard,
-    LayoutDashboard,
-    LogOut,
-    Menu,
-    Settings,
-    Users,
+  BarChart3,
+  Bell,
+  BookOpenText,
+  ChevronRight,
+  CreditCard,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Settings,
+  Users,
+  Video,
 } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -21,6 +22,7 @@ import { AdminActionPopup } from './AdminActionPopup';
 const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/articles', label: 'Articles', icon: BookOpenText },
+  { to: '/video-studio', label: 'Video Studio', icon: Video },
   { to: '/reporters', label: 'Reporters', icon: Users },
   { to: '/payments', label: 'Payments', icon: CreditCard },
   { to: '/notifications', label: 'Notifications', icon: Bell },

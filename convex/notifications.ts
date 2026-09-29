@@ -42,6 +42,8 @@ export const add = mutation({
       } else if (notification.type === 'article_pending') {
         const article = await findByExternalId(ctx.db, 'articles', notification.articleId);
         if (!article || article.reporterId !== reporter.id) throw new Error('You can only notify administrators about your own article.');
+      } else if (notification.type === 'membership_expired') {
+        if (!reporterIdAliases(email, reporter.id).has(notification.reporterId)) throw new Error('Invalid reporter notification.');
       } else {
         throw new Error('This notification can only be created by an administrator.');
       }
@@ -54,6 +56,46 @@ export const add = mutation({
       data,
     });
     await ctx.scheduler.runAfter(0, internal.notificationActions.deliver, { notificationId: data.id });
+  },
+});
+
+export const notifyMembershipExpired = mutation({
+  args: { reporterId: v.string() },
+  handler: async (ctx, { reporterId }) => {
+    const email = await getAuthEmail(ctx);
+    const reporter = await findByExternalId(ctx.db, 'reporters', reporterId);
+    if (!reporter) return { notified: false };
+    if (!isAdminEmail(email)) {
+      const allowedIds = reporterIdAliases(email, reporter.data.id);
+      if (!allowedIds.has(reporterId)) throw new Error('You can only report your own membership status.');
+    }
+
+    const existing = await ctx.db.query('notifications')
+      .withIndex('by_reporter', (query) => query.eq('reporterId', reporterId))
+      .collect();
+
+    const alreadyNotified = existing.some(
+      (n) => n.audience === 'admin' && n.data?.type === 'membership_expired' && !n.data?.isRead,
+    );
+    if (alreadyNotified) return { notified: false };
+
+    const data = createNotification({
+      type: 'membership_expired',
+      audience: 'admin',
+      title: 'Membership Expired',
+      message: `${reporter.data.name}'s 1-year press credential has expired. Please set a renewal fee.`,
+      reporterId: reporter.id,
+    });
+
+    await ctx.db.insert('notifications', {
+      id: data.id,
+      audience: 'admin',
+      reporterId: reporter.id,
+      data,
+    });
+
+    await ctx.scheduler.runAfter(0, internal.notificationActions.deliver, { notificationId: data.id });
+    return { notified: true };
   },
 });
 

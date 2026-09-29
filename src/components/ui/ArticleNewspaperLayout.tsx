@@ -426,49 +426,44 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
         );
       })}
 
-      {/* If no page 2, render gallery, ads, and footer on page 1 */}
-      {!hasPage2 ? (
-        <>
-          {/* Gallery */}
-          {article.images.length > 0 ? (
-            <View style={styles.gallery}>
-              {article.images.map((uri, i) => (
-                <View key={`${uri}-${i}`} style={styles.galleryItem}>
-                  <AutoImage
-                    uri={uri}
-                    style={styles.galleryImage}
-                    radius={theme.radius.sm}
-                    onPress={onImagePress ? () => onImagePress({ kind: 'gallery', index: i, uri }) : undefined}
-                  />
-                </View>
-              ))}
+      {/* Page 1 Gallery */}
+      {article.images.length > 0 ? (
+        <View style={styles.gallery}>
+          {article.images.map((uri, i) => (
+            <View key={`${uri}-${i}`} style={styles.galleryItem}>
+              <AutoImage
+                uri={uri}
+                style={styles.galleryImage}
+                radius={theme.radius.sm}
+                onPress={onImagePress ? () => onImagePress({ kind: 'gallery', index: i, uri }) : undefined}
+              />
             </View>
-          ) : null}
+          ))}
+        </View>
+      ) : null}
 
-          {/* Advertisement */}
-          {article.advertisements.length > 0 ? (
-            <>
-              <View style={[styles.sectionDividerRule, shareMode && styles.shareSectionDividerRule]} />
-              <View style={[styles.adSection, shareMode && styles.shareAdSection]}>
-                <AdvertisementGrid
-                  uris={article.advertisements}
-                  radius={theme.radius.sm}
-                  onImagePress={onImagePress}
-                />
-              </View>
-            </>
-          ) : null}
-
-          {/* Footer */}
-          <View style={[styles.footer, shareMode && styles.shareFooter]}>
-            <Text style={[styles.reporterLabel, shareMode && styles.shareReporterLabel]}>News Reporter</Text>
-            <Text style={[styles.reporterName, shareMode && styles.shareReporterName]}>
-              {article.reporterName}
-              {phone ? ` : ${phone}` : ''}
-            </Text>
+      {/* Page 1 Advertisement */}
+      {article.advertisements.length > 0 ? (
+        <>
+          <View style={[styles.sectionDividerRule, shareMode && styles.shareSectionDividerRule]} />
+          <View style={[styles.adSection, shareMode && styles.shareAdSection]}>
+            <AdvertisementGrid
+              uris={article.advertisements}
+              radius={theme.radius.sm}
+              onImagePress={onImagePress}
+            />
           </View>
         </>
       ) : null}
+
+      {/* Page 1 Footer */}
+      <View style={[styles.footer, shareMode && styles.shareFooter]}>
+        <Text style={[styles.reporterLabel, shareMode && styles.shareReporterLabel]}>News Reporter</Text>
+        <Text style={[styles.reporterName, shareMode && styles.shareReporterName]}>
+          {article.reporterName}
+          {phone ? ` : ${phone}` : ''}
+        </Text>
+      </View>
 
       {/* PAGE 2 */}
       {hasPage2 && article.page2 ? (

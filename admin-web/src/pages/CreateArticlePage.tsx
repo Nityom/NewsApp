@@ -13,7 +13,7 @@ import { uploadImage } from '../lib/upload';
 import { dateInputValue, errorMessage, publicationDate, stripHtml } from '../lib/utils';
 import type { Article, ArticlePage, ArticleSection, ArticleStatus } from '../types';
 
-type UploadTarget = 'banner' | 'page2Banner' | 'gallery' | 'advertisements';
+type UploadTarget = 'banner' | 'page2Banner' | 'gallery' | 'advertisements' | 'page2Advertisements';
 const SINGLE_ARTICLE_WORD_LIMIT = 320;
 const TWO_NEWS_WORD_LIMIT = 150;
 
@@ -47,6 +47,7 @@ export function CreateArticlePage({ editing = false }: { editing?: boolean }) {
   const [page2Content, setPage2Content] = useState('');
   const [page2Banner, setPage2Banner] = useState('');
   const [page2Sections, setPage2Sections] = useState<ArticleSection[]>([]);
+  const [page2Advertisements, setPage2Advertisements] = useState<string[]>([]);
 
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
@@ -82,6 +83,7 @@ export function CreateArticlePage({ editing = false }: { editing?: boolean }) {
         title: articleMarkupToHtml(section.title),
         content: articleMarkupToHtml(section.content),
       })));
+      setPage2Advertisements(selectedArticle.page2.advertisements ?? []);
     }
   }, [selectedArticle]);
 
@@ -100,6 +102,7 @@ export function CreateArticlePage({ editing = false }: { editing?: boolean }) {
     sections: page2Sections
       .filter((section) => stripHtml(section.title).trim() || stripHtml(section.content).trim() || section.image)
       .map((section) => ({ ...section, title: htmlToArticleMarkup(section.title) })),
+    advertisements: page2Advertisements,
   } : undefined;
 
   const previewArticle: Article = {
@@ -134,11 +137,12 @@ export function CreateArticlePage({ editing = false }: { editing?: boolean }) {
     setBusy(`upload-${target}`);
     setMessage('');
     try {
-      const folder = target === 'advertisements' ? 'education-news/advertisements' : 'education-news/articles';
+      const folder = (target === 'advertisements' || target === 'page2Advertisements') ? 'education-news/advertisements' : 'education-news/articles';
       const urls = await Promise.all(files.map((file) => uploadImage(file, folder)));
       if (target === 'banner') setBanner(urls[0]);
       else if (target === 'page2Banner') setPage2Banner(urls[0]);
       else if (target === 'gallery') setImages((current) => [...current, ...urls]);
+      else if (target === 'page2Advertisements') setPage2Advertisements((current) => [...current, ...urls]);
       else setAdvertisements((current) => [...current, ...urls]);
     } catch (error) {
       setMessage(errorMessage(error));
@@ -372,7 +376,7 @@ export function CreateArticlePage({ editing = false }: { editing?: boolean }) {
 
               <section className="panel composer-section media-editor-grid">
                 <MediaEditor title="Gallery images" eyebrow="Photo gallery" images={images} loading={busy === 'upload-gallery'} onUpload={(event) => void uploadFiles('gallery', event)} onRemove={(index) => setImages((current) => current.filter((_, itemIndex) => itemIndex !== index))} />
-                <MediaEditor title="Advertisements" eyebrow="Advertising" images={advertisements} loading={busy === 'upload-advertisements'} onUpload={(event) => void uploadFiles('advertisements', event)} onRemove={(index) => setAdvertisements((current) => current.filter((_, itemIndex) => itemIndex !== index))} />
+                <MediaEditor title="Page 1 Advertisements" eyebrow="Page 1 Advertising" images={advertisements} loading={busy === 'upload-advertisements'} onUpload={(event) => void uploadFiles('advertisements', event)} onRemove={(index) => setAdvertisements((current) => current.filter((_, itemIndex) => itemIndex !== index))} />
               </section>
             </>
           ) : (
@@ -424,6 +428,17 @@ export function CreateArticlePage({ editing = false }: { editing?: boolean }) {
                   {section.image ? <div className="section-thumb"><img src={section.image} alt="" /><button type="button" onClick={() => updatePage2Section(section.id, { image: undefined })}><X size={14} /></button></div> : null}
                 </div>)}</div>
                 {!page2Sections.length ? <p className="muted">Add a section for a second story on Page 2.</p> : null}
+              </section>
+
+              <section className="panel composer-section media-editor-grid">
+                <MediaEditor
+                  title="Page 2 Advertisements"
+                  eyebrow="Page 2 Advertising"
+                  images={page2Advertisements}
+                  loading={busy === 'upload-page2Advertisements'}
+                  onUpload={(event) => void uploadFiles('page2Advertisements', event)}
+                  onRemove={(index) => setPage2Advertisements((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                />
               </section>
             </>
           )}

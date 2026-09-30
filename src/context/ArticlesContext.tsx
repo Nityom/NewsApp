@@ -43,6 +43,27 @@ async function resolveArticleImages(articleId: string, data: Partial<Article>): 
       })),
     );
   }
+  if (data.page2) {
+    next.page2 = {
+      ...data.page2,
+      banner: data.page2.banner
+        ? await uploadLocalFile(data.page2.banner, `articles/${articleId}/page2`)
+        : data.page2.banner,
+      advertisements: data.page2.advertisements
+        ? await uploadLocalFiles(data.page2.advertisements, `articles/${articleId}/page2-ads`)
+        : data.page2.advertisements,
+      sections: data.page2.sections
+        ? await Promise.all(
+            data.page2.sections.map(async (section) => ({
+              ...section,
+              image: section.image
+                ? await uploadLocalFile(section.image, `articles/${articleId}/page2-sections`)
+                : section.image,
+            })),
+          )
+        : data.page2.sections,
+    };
+  }
   return next;
 }
 

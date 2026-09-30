@@ -64,13 +64,14 @@ export default function CreateArticleScreen() {
   const [page2Title, setPage2Title] = useState(editingDraft?.page2?.title ?? '');
   const [page2Content, setPage2Content] = useState(editingDraft?.page2?.content ?? '');
   const [page2Sections, setPage2Sections] = useState<ArticleSection[]>(editingDraft?.page2?.sections ?? []);
+  const [page2Advertisements, setPage2Advertisements] = useState<string[]>(editingDraft?.page2?.advertisements ?? []);
 
   const [submitting, setSubmitting] = useState<'draft' | 'submit' | 'save' | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
   const authorPhone = resolvedAuthorPhone;
   const authorName = editingDraft?.reporterName ?? user?.name ?? 'Unknown Reporter';
 
-  const pickImage = async (mode: 'banner' | 'page2Banner' | 'gallery' | 'ad') => {
+  const pickImage = async (mode: 'banner' | 'page2Banner' | 'gallery' | 'ad' | 'page2Ad') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission required', 'Please allow photo library access to upload images.');
@@ -79,7 +80,7 @@ export default function CreateArticleScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
-      quality: mode === 'ad' ? 1 : 0.9,
+      quality: mode === 'ad' || mode === 'page2Ad' ? 1 : 0.9,
       allowsMultipleSelection: false,
     });
     if (result.canceled) return;
@@ -92,6 +93,8 @@ export default function CreateArticleScreen() {
       setPage2Banner(asset.uri);
     } else if (mode === 'gallery') {
       setImages((prev) => [...prev, asset.uri]);
+    } else if (mode === 'page2Ad') {
+      setPage2Advertisements((prev) => [...prev, asset.uri]);
     } else {
       setAdvertisements((prev) => [...prev, asset.uri]);
     }
@@ -236,6 +239,7 @@ export default function CreateArticleScreen() {
       content: page2Content,
       banner: page2Banner || '',
       sections: page2Sections.filter((s) => s.title.trim() || s.content.trim() || s.image),
+      advertisements: page2Advertisements,
     };
   };
 
@@ -422,6 +426,7 @@ export default function CreateArticleScreen() {
       page2Content,
       page2Banner,
       page2Sections,
+      page2Advertisements,
       user,
       isAdmin,
       authorPhone,
@@ -681,7 +686,7 @@ export default function CreateArticleScreen() {
 
             <View style={[styles.imagesHeader, { marginTop: 20 }]}>
               <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
-                Add Advertisement Photo ({advertisements.length})
+                {hasPage2 ? `Add Page 1 Advertisement Photo (${advertisements.length})` : `Add Advertisement Photo (${advertisements.length})`}
               </Text>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
@@ -963,6 +968,33 @@ export default function CreateArticleScreen() {
                 </View>
               </View>
             ))}
+
+            {/* Page 2 Advertisement Photos */}
+            <View style={[styles.imagesHeader, { marginTop: 20 }]}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.textSecondary }]}>
+                Add Page 2 Advertisement Photo ({page2Advertisements.length})
+              </Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+              <View
+                style={[
+                  styles.addImageTile,
+                  { borderColor: theme.colors.border, backgroundColor: theme.colors.backgroundSubtle, borderRadius: theme.radius.md },
+                ]}
+                onTouchEnd={() => pickImage('page2Ad')}>
+                <Icon name="add" size={24} color={theme.colors.textMuted} />
+              </View>
+              {page2Advertisements.map((uri, i) => (
+                <View key={`p2-ad-${uri}-${i}`} style={styles.imageTile}>
+                  <Image source={{ uri }} style={styles.imageThumb} contentFit="cover" />
+                  <View
+                    style={styles.removeBadge}
+                    onTouchEnd={() => setPage2Advertisements((prev) => prev.filter((_, idx) => idx !== i))}>
+                    <Icon name="close" size={12} color="#fff" />
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
           </View>
         )}
 

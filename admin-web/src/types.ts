@@ -13,6 +13,7 @@ export interface ArticlePage {
   content: string;
   banner: string;
   sections?: ArticleSection[];
+  advertisements?: string[];
 }
 
 export interface Article {

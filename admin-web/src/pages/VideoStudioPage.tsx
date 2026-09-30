@@ -19,7 +19,6 @@ import {
 import type { ChangeEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
-import { ADMIN_NAME, ADMIN_PHONE } from '../lib/admin';
 import { uploadImage } from '../lib/upload';
 import type { SponsorAdItem } from '../lib/videoBurner';
 import { burnAndExportVideo } from '../lib/videoBurner';
@@ -35,8 +34,8 @@ export function VideoStudioPage() {
   const [headline, setHeadline] = useState('');
   const [headlineSize, setHeadlineSize] = useState<number>(56);
   const [showLogo, setShowLogo] = useState(true);
-  const [reporterName, setReporterName] = useState(ADMIN_NAME);
-  const [reporterPhone, setReporterPhone] = useState(ADMIN_PHONE);
+  const [reporterName, setReporterName] = useState('');
+  const [reporterPhone, setReporterPhone] = useState('');
 
   // Orientation & Audio State
   const [orientation, setOrientation] = useState<'auto' | 'portrait' | 'landscape'>('auto');
@@ -60,22 +59,20 @@ export function VideoStudioPage() {
     {
       id: 'ad-1',
       type: 'text',
-      businessName: 'श्री गणेश कोचिंग क्लासेस',
-      tagline: 'इयत्ता १० वी व १२ वी नवीन प्रवेश सुरू',
-      phone: '९८५०५४११११',
-    },
-    {
-      id: 'ad-2',
-      type: 'text',
-      businessName: 'डॉ. पाटील मल्टिस्पेशालिटी हॉस्पिटल',
-      tagline: '२४ तास इमर्जन्सी व ॲम्ब्युलन्स सेवा',
-      phone: '९८२२००००००',
+      businessName: '',
+      tagline: '',
+      phone: '',
     },
   ]);
   const [adScrollMode, setAdScrollMode] = useState<'scroll' | 'rotate'>('scroll');
   const [adRotateInterval, setAdRotateInterval] = useState<number>(6);
   const [adScrollSpeed, setAdScrollSpeed] = useState<number>(140);
   const [activePreviewAdIndex, setActivePreviewAdIndex] = useState<number>(0);
+
+  // Footer Dimensions & Video Crop Adjustment State
+  const [footerHeight, setFooterHeight] = useState<number>(180);
+  const footerWidth = 100; // Fixed full width edge-to-edge
+  const [videoYShift, setVideoYShift] = useState<number>(0);
 
   // Export State
   const [isExporting, setIsExporting] = useState(false);
@@ -188,6 +185,9 @@ export function VideoStudioPage() {
         adScrollSpeed,
         aspectRatio: orientation,
         muteAudio: muteAudioInExport,
+        footerHeight,
+        footerWidth,
+        videoYShift,
         onProgress: (percent, statusText) => {
           setProgressPercent(percent);
           setProgressStatus(statusText);
@@ -213,6 +213,9 @@ export function VideoStudioPage() {
   }
 
   const isOverOneMinute = duration > 60;
+  const previewFooterH = Math.max(45, Math.round(footerHeight * (effectiveLandscape ? 0.41 : 0.52)));
+  const previewVideoY = Math.round(videoYShift * (effectiveLandscape ? 0.41 : 0.52));
+  const footerLeftPct = Math.max(0, (100 - footerWidth) / 2);
 
   return (
     <div className="page video-studio-page">
@@ -580,6 +583,79 @@ export function VideoStudioPage() {
               )}
             </div>
 
+            {/* Footer Height, Width & Video Crop Adjustment Sliders */}
+            <div
+              style={{
+                background: 'var(--canvas)',
+                border: '1px solid var(--line)',
+                borderRadius: 8,
+                padding: '16px',
+                marginBottom: 16,
+              }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <strong style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  📐 Footer Size & Video Crop Adjustment
+                </strong>
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  style={{ fontSize: 11, padding: '2px 8px', height: 26 }}
+                  onClick={() => {
+                    setFooterHeight(180);
+                    setVideoYShift(0);
+                  }}>
+                  Reset to Default
+                </button>
+              </div>
+
+              {/* Footer Height */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  <span>Footer Height (Bottom Coverage / Crop):</span>
+                  <span style={{ color: 'var(--yellow)', fontWeight: 800 }}>{footerHeight}px</span>
+                </div>
+                <input
+                  type="range"
+                  min={70}
+                  max={720}
+                  step={5}
+                  value={footerHeight}
+                  onChange={(e) => setFooterHeight(parseInt(e.target.value, 10))}
+                  style={{ width: '100%', accentColor: 'var(--yellow)', cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                  <span>70px (Slim)</span>
+                  <span>180px (Standard)</span>
+                  <span>360px (Tall)</span>
+                  <span>720px (Maximum Crop)</span>
+                </div>
+              </div>
+
+              {/* Video Vertical Crop Shift */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
+                  <span>Video Vertical Shift (Crop / Nudge Position):</span>
+                  <span style={{ color: 'var(--yellow)', fontWeight: 800 }}>
+                    {videoYShift > 0 ? `+${videoYShift}px` : `${videoYShift}px`}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={-160}
+                  max={160}
+                  step={4}
+                  value={videoYShift}
+                  onChange={(e) => setVideoYShift(parseInt(e.target.value, 10))}
+                  style={{ width: '100%', accentColor: 'var(--yellow)', cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
+                  <span>-160px (Shift Up)</span>
+                  <span>0px (Centered)</span>
+                  <span>+160px (Shift Down)</span>
+                </div>
+              </div>
+            </div>
+
             {/* List of Ads */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {ads.map((ad, index) => (
@@ -703,7 +779,7 @@ export function VideoStudioPage() {
 
           {/* Export Action Card */}
           <div className="panel" style={{ background: '#191918', color: 'white', borderColor: '#333' }}>
-            <h2 style={{ fontSize: 18, color: 'white', marginBottom: 8 }}>Burn & Download Video</h2>
+            <h2 style={{ fontSize: 18, color: 'white', marginBottom: 8 }}>Download Video</h2>
             <p style={{ color: '#aaa', fontSize: 13, marginBottom: 16 }}>
               This composites the video frames, top breaking news headline, channel logo, reporter badge, and all{' '}
               <strong>{ads.length} sponsor ads ({adScrollMode === 'scroll' ? 'auto-scrolling ticker' : 'slideshow'})</strong> into a permanent MP4 video directly in your browser.
@@ -751,7 +827,7 @@ export function VideoStudioPage() {
                 ) : (
                   <>
                     <Download size={18} />
-                    <span>Burn & Download MP4 for WhatsApp</span>
+                    <span>Download MP4 for WhatsApp</span>
                   </>
                 )}
               </button>
@@ -821,7 +897,13 @@ export function VideoStudioPage() {
                   controls
                   muted={isPreviewMuted}
                   playsInline
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    transform: `translateY(${previewVideoY}px)`,
+                    transition: 'transform 0.15s ease-out',
+                  }}
                 />
               ) : (
                 <div style={{ textAlign: 'center', color: '#64748B', padding: 20 }}>
@@ -862,12 +944,13 @@ export function VideoStudioPage() {
                       src="/app-logo.png"
                       alt="Logo"
                       style={{
-                        width: 32,
-                        height: 32,
+                        width: 48,
+                        height: 48,
                         borderRadius: '50%',
                         background: 'white',
                         objectFit: 'contain',
-                        padding: 1,
+                        padding: 2,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
                       }}
                     />
                   ) : null}
@@ -894,19 +977,21 @@ export function VideoStudioPage() {
                 <div
                   style={{
                     position: 'absolute',
-                    bottom: effectiveLandscape ? '54px' : '68px',
-                    left: 0,
-                    right: 0,
+                    bottom: `${previewFooterH}px`,
+                    left: `${footerLeftPct}%`,
+                    width: `${footerWidth}%`,
                     background: 'rgba(15, 15, 15, 0.92)',
                     borderLeft: '4px solid #FFD700',
-                    padding: '4px 10px',
-                    fontSize: 11,
+                    padding: '5px 12px',
+                    fontSize: 12,
                     color: 'white',
-                    fontWeight: 600,
+                    fontWeight: 700,
                     pointerEvents: 'none',
                     zIndex: 2,
+                    boxSizing: 'border-box',
+                    transition: 'bottom 0.15s ease-out, width 0.15s ease-out, left 0.15s ease-out',
                   }}>
-                  बातमीदार / Reporter: {reporterName} {reporterPhone ? ` | संपर्क: ${reporterPhone}` : ''}
+                  बातमीदार: {reporterName} {reporterPhone ? ` | संपर्क: ${reporterPhone}` : ''}
                 </div>
               ) : null}
 
@@ -915,9 +1000,9 @@ export function VideoStudioPage() {
                 style={{
                   position: 'absolute',
                   bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: effectiveLandscape ? '54px' : '68px',
+                  left: `${footerLeftPct}%`,
+                  width: `${footerWidth}%`,
+                  height: `${previewFooterH}px`,
                   background: 'linear-gradient(to bottom, #1E293B, #0F172A)',
                   borderTop: '3px solid #FFD700',
                   overflow: 'hidden',
@@ -925,29 +1010,12 @@ export function VideoStudioPage() {
                   alignItems: 'center',
                   pointerEvents: 'none',
                   zIndex: 2,
+                  boxSizing: 'border-box',
+                  transition: 'height 0.15s ease-out, width 0.15s ease-out, left 0.15s ease-out',
                 }}>
                 {adScrollMode === 'scroll' ? (
-                  // Continuous Auto-Scrolling Ticker
+                  // Continuous Auto-Scrolling Ticker (Full Width - Red box removed)
                   <div style={{ display: 'flex', width: '100%', alignItems: 'center', height: '100%' }}>
-                    {/* Fixed Pinned Sponsor Badge on Left */}
-                    <div
-                      style={{
-                        background: 'linear-gradient(to right, #B71C1C, #880E4F)',
-                        color: 'white',
-                        padding: '0 10px',
-                        height: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        borderRight: '3px solid #FFD700',
-                        flexShrink: 0,
-                        zIndex: 3,
-                        boxShadow: '4px 0 10px rgba(0,0,0,0.5)',
-                      }}>
-                      <div style={{ fontSize: 10, fontWeight: 800, color: 'white', whiteSpace: 'nowrap' }}>⭐ जाहिराती</div>
-                      <div style={{ fontSize: 8, fontWeight: 800, color: '#FFD700', letterSpacing: '.05em' }}>SPONSORS</div>
-                    </div>
-
                     {/* Marquee Ticker Track */}
                     <div
                       style={{
@@ -956,47 +1024,58 @@ export function VideoStudioPage() {
                         alignItems: 'center',
                         whiteSpace: 'nowrap',
                         animation: `previewTicker ${Math.max(10, 240 / (adScrollSpeed / 10))}s linear infinite`,
-                        paddingLeft: 12,
+                        paddingLeft: 8,
                       }}>
-                      {/* Repeat list twice for continuous scrolling look */}
-                      {[...ads, ...ads, ...ads].map((ad, idx) => (
-                        <div
-                          key={`${ad.id}-${idx}`}
-                          style={{
-                            background: 'rgba(255, 255, 255, 0.08)',
-                            borderLeft: '3px solid #FFD700',
-                            borderRadius: 4,
-                            padding: '4px 10px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                            height: '52px',
-                            flexShrink: 0,
-                          }}>
-                          {ad.type === 'image' && ad.imageUrl ? (
-                            <img src={ad.imageUrl} alt="Ad" style={{ height: '44px', objectFit: 'contain' }} />
-                          ) : (
-                            <>
-                              <div style={{ fontSize: 11, fontWeight: 800, color: '#FFD700' }}>
-                                {ad.businessName || 'आपली जाहिरात'}
-                              </div>
-                              <div style={{ fontSize: 9, color: '#F1F5F9' }}>
-                                {[ad.tagline, ad.phone ? `📞 ${ad.phone}` : ''].filter(Boolean).join(' | ') || 'संपर्क: ९८५०५४१११'}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ))}
+                      {/* Repeat list for continuous scrolling look */}
+                      {[...ads, ...ads, ...ads].map((ad, idx) => {
+                        if (ad.type === 'image' && ad.imageUrl) {
+                          return (
+                            <img
+                              key={`${ad.id}-${idx}`}
+                              src={ad.imageUrl}
+                              alt="Ad"
+                              style={{
+                                height: `${Math.max(40, previewFooterH - 10)}px`,
+                                objectFit: 'contain',
+                                borderRadius: 4,
+                                flexShrink: 0,
+                                margin: '0 4px',
+                              }}
+                            />
+                          );
+                        }
+                        return (
+                          <div
+                            key={`${ad.id}-${idx}`}
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              borderRadius: 6,
+                              padding: '6px 14px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              height: `${Math.max(42, previewFooterH - 18)}px`,
+                              flexShrink: 0,
+                            }}>
+                            <div style={{ fontSize: 13, fontWeight: 800, color: '#FFD700' }}>
+                              {ad.businessName || 'आपली जाहिरात'}
+                            </div>
+                            <div style={{ fontSize: 11, color: '#F1F5F9', marginTop: 2 }}>
+                              {[ad.tagline, ad.phone ? `📞 ${ad.phone}` : ''].filter(Boolean).join(' | ') || 'संपर्क: ९८५०५४१११'}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (
                   // Timed Rotating Slideshow
-                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', padding: '0 12px' }}>
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px' }}>
                     {ads[activePreviewAdIndex]?.type === 'image' && ads[activePreviewAdIndex]?.imageUrl ? (
                       <img
                         src={ads[activePreviewAdIndex]?.imageUrl}
                         alt="Ad"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        style={{ height: `${Math.max(40, previewFooterH - 10)}px`, maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
                       />
                     ) : (
                       <div>

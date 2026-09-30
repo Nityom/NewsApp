@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArticlePreview } from '../components/ArticlePreview';
 import { Button, Dialog, EmptyState, LoadingState, PageHeader, StatusBadge } from '../components/ui';
 import { api } from '../lib/api';
-import { exportArticleAsPng } from '../lib/exportArticle';
+import { exportArticlePageAsPng, exportArticlePagesAsPng } from '../lib/exportArticle';
 import { plainRichText } from '../lib/richText';
 import { uploadImage } from '../lib/upload';
 import { articleImageFilename, dateInputValue, errorMessage, publicationDate } from '../lib/utils';
@@ -22,6 +22,7 @@ export function ArticleDetailPage() {
   const selectedArticle = articles?.find((item) => item.id === id);
   const [date, setDate] = useState('');
   const [ads, setAds] = useState<string[] | null>(null);
+  const [page2Ads, setPage2Ads] = useState<string[] | null>(null);
   const [rejecting, setRejecting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [busy, setBusy] = useState('');
@@ -32,8 +33,19 @@ export function ArticleDetailPage() {
   const article = selectedArticle;
   const plainTitle = plainRichText(article.title);
   const currentAds = ads ?? article.advertisements;
+  const currentPage2Ads = page2Ads ?? (article.page2?.advertisements ?? []);
   const currentDate = date || dateInputValue(article.registrationDate ?? article.reviewedAt);
-  const previewArticle = { ...article, advertisements: currentAds, registrationDate: currentDate ? publicationDate(currentDate) : article.registrationDate };
+  const previewArticle = {
+    ...article,
+    advertisements: currentAds,
+    registrationDate: currentDate ? publicationDate(currentDate) : article.registrationDate,
+    page2: article.page2
+      ? {
+          ...article.page2,
+          advertisements: currentPage2Ads,
+        }
+      : undefined,
+  };
 
   async function run(name: string, action: () => Promise<void>) {
     setBusy(name);
@@ -56,8 +68,18 @@ export function ArticleDetailPage() {
     const files = [...(event.target.files ?? [])];
     if (!files.length) return;
     await run('upload', async () => {
-      const uploaded = await Promise.all(files.map((file) => uploadImage(file)));
+      const uploaded = await Promise.all(files.map((file) => uploadImage(file, 'education-news/advertisements')));
       setAds([...currentAds, ...uploaded]);
+    });
+    event.target.value = '';
+  }
+
+  async function uploadPage2Ads(event: ChangeEvent<HTMLInputElement>) {
+    const files = [...(event.target.files ?? [])];
+    if (!files.length) return;
+    await run('upload-p2', async () => {
+      const uploaded = await Promise.all(files.map((file) => uploadImage(file, 'education-news/advertisements')));
+      setPage2Ads([...currentPage2Ads, ...uploaded]);
     });
     event.target.value = '';
   }
@@ -67,8 +89,10 @@ export function ArticleDetailPage() {
       await patchArticle({ id: article.id, patch: {
         advertisements: currentAds,
         ...(currentDate ? { registrationDate: publicationDate(currentDate) } : {}),
+        ...(article.page2 ? { page2: { ...article.page2, advertisements: currentPage2Ads } } : {}),
       } });
       setAds(null);
+      setPage2Ads(null);
     });
   }
 
@@ -78,6 +102,7 @@ export function ArticleDetailPage() {
       await patchArticle({ id: article.id, patch: {
         status: 'approved', reviewedAt, advertisements: currentAds,
         registrationDate: currentDate ? publicationDate(currentDate) : publicationDate(reviewedAt.slice(0, 10)),
+        ...(article.page2 ? { page2: { ...article.page2, advertisements: currentPage2Ads } } : {}),
       } });
       await notify('approved');
     });
@@ -88,36 +113,132 @@ export function ArticleDetailPage() {
     return run('reject', async () => {
       await patchArticle({ id: article.id, patch: {
         status: 'rejected', reviewedAt: new Date().toISOString(), rejectionReason: rejectionReason.trim(), advertisements: currentAds,
+        ...(article.page2 ? { page2: { ...article.page2, advertisements: currentPage2Ads } } : {}),
       } });
       await notify('rejected', rejectionReason.trim());
       setRejecting(false);
     });
   }
 
-  async function downloadPreview() {
-    await run('download', async () => {
-      const url = await exportArticleAsPng(previewArticle, publication);
+  async function downloadPage(pageNumber: 1 | 2) {
+    await run(`download-p${pageNumber}`, async () => {
+      const url = await exportArticlePageAsPng(previewArticle, publication, pageNumber);
       const link = document.createElement('a');
-      link.download = articleImageFilename(plainTitle);
+      link.download = articleImageFilename(`${plainTitle}-page-${pageNumber}`);
       link.href = url;
       link.click();
+    });
+  }
+
+  async function downloadBothPages() {
+    await run('download-both', async () => {
+      const { page1, page2 } = await exportArticlePagesAsPng(previewArticle, publication);
+      const link1 = document.createElement('a');
+      link1.download = articleImageFilename(`${plainTitle}-page-1`);
+      link1.href = page1;
+      link1.click();
+
+      if (page2) {
+        setTimeout(() => {
+          const link2 = document.createElement('a');
+          link2.download = articleImageFilename(`${plainTitle}-page-2`);
+          link2.href = page2;
+          link2.click();
+        }, 500);
+      }
     });
   }
 
   return (
     <div className="page article-detail-page">
       <Link to="/articles" className="back-link"><ArrowLeft size={17} /> Back to articles</Link>
-      <PageHeader title={plainTitle} description={`${article.reporterName} · Editorial workspace`} actions={<><StatusBadge value={article.status} />{article.status === 'pending' || article.status === 'approved' ? <Link to={`/articles/${article.id}/edit`}><Button variant="secondary"><Pencil size={16} /> Edit</Button></Link> : null}<Button variant="secondary" onClick={() => void downloadPreview()} loading={busy === 'download'}><Download size={16} /> Download</Button></>} />
+      <PageHeader
+        title={plainTitle}
+        description={`${article.reporterName} · Editorial workspace`}
+        actions={
+          <>
+            <StatusBadge value={article.status} />
+            {article.status === 'pending' || article.status === 'approved' ? (
+              <Link to={`/articles/${article.id}/edit`}>
+                <Button variant="secondary"><Pencil size={16} /> Edit</Button>
+              </Link>
+            ) : null}
+            {previewArticle.page2 ? (
+              <>
+                <Button variant="secondary" onClick={() => void downloadPage(1)} loading={busy === 'download-p1'}>
+                  <Download size={15} /> Page 1
+                </Button>
+                <Button variant="secondary" onClick={() => void downloadPage(2)} loading={busy === 'download-p2'}>
+                  <Download size={15} /> Page 2
+                </Button>
+                <Button variant="primary" onClick={() => void downloadBothPages()} loading={busy === 'download-both'}>
+                  <Download size={15} /> Download Both Pages
+                </Button>
+              </>
+            ) : (
+              <Button variant="secondary" onClick={() => void downloadPage(1)} loading={busy === 'download-p1'}>
+                <Download size={16} /> Download
+              </Button>
+            )}
+          </>
+        }
+      />
       {message ? <div className="form-error">{message}</div> : null}
       <div className="article-workspace">
         <div className="preview-stage"><ArticlePreview article={previewArticle} publication={publication} /></div>
         <aside className="editor-panel">
           <section><span className="eyebrow">Publication</span><h2>Issue controls</h2><label>Registration date<input type="date" value={currentDate} onChange={(event) => setDate(event.target.value)} /></label></section>
-          <section><div className="section-heading"><div><span className="eyebrow">Advertising</span><h2>Ad placements</h2></div><label className="upload-button"><ImagePlus size={16} /> Add<input type="file" accept="image/*" multiple onChange={(event) => void uploadAds(event)} /></label></div>
-            <div className="ad-editor">{currentAds.map((image, index) => <div key={`${image}-${index}`}><img src={image} alt="Advertisement" /><button type="button" onClick={() => setAds(currentAds.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remove advertisement"><X size={14} /></button></div>)}</div>
-            {!currentAds.length ? <p className="muted">No advertisements assigned.</p> : null}
+          <section>
+            <div className="section-heading">
+              <div>
+                <span className="eyebrow">Advertising</span>
+                <h2>{article.page2 ? 'Page 1 Ad placements' : 'Ad placements'}</h2>
+              </div>
+              <label className="upload-button">
+                <ImagePlus size={16} /> Add
+                <input type="file" accept="image/*" multiple onChange={(event) => void uploadAds(event)} />
+              </label>
+            </div>
+            <div className="ad-editor">
+              {currentAds.map((image, index) => (
+                <div key={`${image}-${index}`}>
+                  <img src={image} alt="Advertisement" />
+                  <button type="button" onClick={() => setAds(currentAds.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remove advertisement">
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            {!currentAds.length ? <p className="muted">No advertisements assigned to Page 1.</p> : null}
           </section>
-          <Button variant="secondary" onClick={() => void saveChanges()} loading={busy === 'save' || busy === 'upload'}><Save size={16} /> Save date & ads</Button>
+
+          {article.page2 ? (
+            <section>
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">Advertising</span>
+                  <h2>Page 2 Ad placements</h2>
+                </div>
+                <label className="upload-button">
+                  <ImagePlus size={16} /> Add
+                  <input type="file" accept="image/*" multiple onChange={(event) => void uploadPage2Ads(event)} />
+                </label>
+              </div>
+              <div className="ad-editor">
+                {currentPage2Ads.map((image, index) => (
+                  <div key={`p2-${image}-${index}`}>
+                    <img src={image} alt="Advertisement" />
+                    <button type="button" onClick={() => setPage2Ads(currentPage2Ads.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remove advertisement">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {!currentPage2Ads.length ? <p className="muted">No advertisements assigned to Page 2.</p> : null}
+            </section>
+          ) : null}
+
+          <Button variant="secondary" onClick={() => void saveChanges()} loading={busy === 'save' || busy === 'upload' || busy === 'upload-p2'}><Save size={16} /> Save date & ads</Button>
           <div className="editor-actions">
             {article.status === 'pending' || article.status === 'rejected' ? <Button onClick={() => void approve()} loading={busy === 'approve'}><Check size={17} /> Approve</Button> : null}
             {article.status === 'pending' || article.status === 'approved' ? <Button variant="secondary" onClick={() => setRejecting(true)}><X size={17} /> Reject</Button> : null}

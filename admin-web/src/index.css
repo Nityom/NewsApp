@@ -145,7 +145,9 @@ textarea { resize: vertical; }
 
 .article-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 20px; align-items: start; }
 .preview-stage { overflow: auto; padding: 28px; background: #d8d5ce; border: 1px solid #ccc7bd; }
-.newspaper { width: min(780px, 100%); margin: 0 auto; background: white; color: #171717; padding-bottom: 25px; box-shadow: 0 8px 24px rgba(0,0,0,.12); font-family: Georgia, serif; }
+.newspaper-container { display: flex; flex-direction: column; gap: 36px; width: min(780px, 100%); margin: 0 auto; }
+.newspaper { width: 100%; margin: 0 auto; background: white; color: #171717; padding-bottom: 25px; box-shadow: 0 8px 24px rgba(0,0,0,.12); font-family: Georgia, serif; border-radius: 4px; }
+.newspaper-page-top-badge { display: flex; align-items: center; justify-content: center; margin: 16px 0 12px; }
 .newspaper-masthead { width: 100%; }
 .publication-strip { margin: 4px 12px; background: #ffe600; border-block: 1px solid #171717; padding: 5px 7px; text-align: center; font: 700 10px Arial, sans-serif; white-space: nowrap; overflow: hidden; }
 .newspaper > h1 { margin: 10px 15px 0; font: 900 31px/1.05 Arial, sans-serif; text-transform: uppercase; }

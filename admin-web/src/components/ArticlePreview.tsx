@@ -12,48 +12,50 @@ export function ArticlePreview({ article, publication }: { article: Article; pub
   const isMainTitleCenter = isCenterAligned(article.title);
 
   return (
-    <article className="newspaper" id="article-preview">
-      {/* PAGE 1 */}
-      <img className="newspaper-masthead" src="/logoBanner.jpeg" alt="Education News" />
-      <div className="publication-strip">
-        वर्ष : {publication?.year ?? '—'} &nbsp;|&nbsp; अंक : {publication?.issueNumber ?? '—'} &nbsp;|&nbsp;
-        पृष्ठ : {article.page2 ? '1 / 2' : (1 + restSections.length)} &nbsp;|&nbsp; दिनांक {article.registrationDate ?? '—'} &nbsp;|&nbsp;
-        मूल्य : {publication?.price ?? '—'}
-      </div>
-      {firstSection ? (
-        <div className="newspaper-columns">
-          <CompactStory title={article.title} image={article.banner} content={article.content} />
-          <CompactStory title={firstSection.title} image={firstSection.image ?? article.banner} content={firstSection.content} />
+    <div className="newspaper-container" id="article-preview">
+      {/* PAGE 1 (SEPARATE PAGE FRAME) */}
+      <article className="newspaper newspaper-page newspaper-page-1">
+        <img className="newspaper-masthead" src="/logoBanner.jpeg" alt="Education News" />
+        <div className="publication-strip">
+          वर्ष : {publication?.year ?? '—'} &nbsp;|&nbsp; अंक : {publication?.issueNumber ?? '—'} &nbsp;|&nbsp;
+          पृष्ठ : {article.page2 ? '1 / 2' : (1 + restSections.length)} &nbsp;|&nbsp; दिनांक {article.registrationDate ?? '—'} &nbsp;|&nbsp;
+          मूल्य : {publication?.price ?? '—'}
         </div>
-      ) : (
-        <>
-          <h1 style={isMainTitleCenter ? { textAlign: 'center' } : undefined}><RichTitle value={article.title} /></h1>
-          <div className="newspaper-rule" />
-          <img className="lead-photo" src={article.banner} alt="" />
-          <RichTextContent value={article.content} className="story-body" />
-        </>
-      )}
-      {restSections.map((section) => (
-        <section className="newspaper-section" key={section.id}>
-          {section.image ? <img src={section.image} alt="" /> : null}
-          <h2 style={isCenterAligned(section.title) ? { textAlign: 'center' } : undefined}><RichTitle value={section.title} /></h2>
-          <RichTextContent value={section.content} />
-        </section>
-      ))}
-      {article.images.length ? <div className="newspaper-gallery">{article.images.map((image) => <img key={image} src={image} alt="" />)}</div> : null}
-      {article.advertisements.length ? (
-        <>
-          <div className="newspaper-divider-rule" />
-          <div className="newspaper-ads">{article.advertisements.map((image) => <img key={image} src={image} alt="Advertisement" />)}</div>
-        </>
-      ) : null}
-      <footer><span>News Reporter</span><strong>{byline.name}{byline.phone ? ` : ${byline.phone}` : ''}</strong></footer>
+        {firstSection ? (
+          <div className="newspaper-columns">
+            <CompactStory title={article.title} image={article.banner} content={article.content} />
+            <CompactStory title={firstSection.title} image={firstSection.image ?? article.banner} content={firstSection.content} />
+          </div>
+        ) : (
+          <>
+            <h1 style={isMainTitleCenter ? { textAlign: 'center' } : undefined}><RichTitle value={article.title} /></h1>
+            <div className="newspaper-rule" />
+            <img className="lead-photo" src={article.banner} alt="" />
+            <RichTextContent value={article.content} className="story-body" />
+          </>
+        )}
+        {restSections.map((section) => (
+          <section className="newspaper-section" key={section.id}>
+            {section.image ? <img src={section.image} alt="" /> : null}
+            <h2 style={isCenterAligned(section.title) ? { textAlign: 'center' } : undefined}><RichTitle value={section.title} /></h2>
+            <RichTextContent value={section.content} />
+          </section>
+        ))}
+        {article.images.length ? <div className="newspaper-gallery">{article.images.map((image) => <img key={image} src={image} alt="" />)}</div> : null}
+        {article.advertisements.length ? (
+          <>
+            <div className="newspaper-divider-rule" />
+            <div className="newspaper-ads">{article.advertisements.map((image) => <img key={image} src={image} alt="Advertisement" />)}</div>
+          </>
+        ) : null}
+        <footer><span>News Reporter</span><strong>{byline.name}{byline.phone ? ` : ${byline.phone}` : ''}</strong></footer>
+      </article>
 
-      {/* PAGE 2 (if present) */}
+      {/* PAGE 2 (SEPARATE PAGE FRAME) */}
       {article.page2 ? (
-        <>
-          <div className="newspaper-page-break">
-            <span className="newspaper-page-badge">पृष्ठ २</span>
+        <article className="newspaper newspaper-page newspaper-page-2">
+          <div className="newspaper-page-top-badge">
+            <span className="newspaper-page-badge">पृष्ठ २ (PAGE 2)</span>
           </div>
           <img className="newspaper-masthead" src="/logoBanner.jpeg" alt="Education News" />
           <div className="publication-strip">
@@ -81,16 +83,16 @@ export function ArticlePreview({ article, publication }: { article: Article; pub
               <RichTextContent value={section.content} />
             </section>
           ))}
-          {article.advertisements.length ? (
+          {article.page2.advertisements && article.page2.advertisements.length ? (
             <>
               <div className="newspaper-divider-rule" />
-              <div className="newspaper-ads">{article.advertisements.map((image) => <img key={image} src={image} alt="Advertisement" />)}</div>
+              <div className="newspaper-ads">{article.page2.advertisements.map((image) => <img key={image} src={image} alt="Advertisement" />)}</div>
             </>
           ) : null}
           <footer><span>News Reporter</span><strong>{byline.name}{byline.phone ? ` : ${byline.phone}` : ''}</strong></footer>
-        </>
+        </article>
       ) : null}
-    </article>
+    </div>
   );
 }
 

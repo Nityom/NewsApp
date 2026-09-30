@@ -4,9 +4,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import type { ElementRef } from 'react';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
+
+import type { Article } from '@/types/models';
 
 import { ArticleNewspaperLayout, plainArticleText } from '@/components/ui/ArticleNewspaperLayout';
 import { Avatar } from '@/components/ui/Avatar';
@@ -47,6 +49,7 @@ export default function AdminArticleDetailScreen() {
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [reason, setReason] = useState('');
   const [advertisements, setAdvertisements] = useState<string[]>(article?.advertisements ?? []);
+  const [page2Advertisements, setPage2Advertisements] = useState<string[]>(article?.page2?.advertisements ?? []);
   const [registrationDate, setRegistrationDate] = useState(
     article?.registrationDate ?? (article?.reviewedAt ? formatRegistrationDate(article.reviewedAt) : ''),
   );
@@ -54,9 +57,28 @@ export default function AdminArticleDetailScreen() {
     parseRegistrationDate(article?.registrationDate, article?.reviewedAt),
   );
   const [datePickerVisible, setDatePickerVisible] = useState(false);
-  const viewShotRef = useRef<ElementRef<typeof ViewShot>>(null);
+  const viewShotRef1 = useRef<ElementRef<typeof ViewShot>>(null);
+  const viewShotRef2 = useRef<ElementRef<typeof ViewShot>>(null);
   const [sharing, setSharing] = useState(false);
-  const [captureHeight, setCaptureHeight] = useState(CAPTURE_LAYOUT_HEIGHT);
+  const [captureHeight1, setCaptureHeight1] = useState(CAPTURE_LAYOUT_HEIGHT);
+  const [captureHeight2, setCaptureHeight2] = useState(CAPTURE_LAYOUT_HEIGHT);
+
+  const previewArticle = useMemo(() => {
+    if (!article) return undefined;
+    return {
+      ...article,
+      registrationDate,
+      advertisements,
+      page2: article.page2
+        ? {
+            ...article.page2,
+            advertisements: page2Advertisements,
+          }
+        : undefined,
+    };
+  }, [article, registrationDate, advertisements, page2Advertisements]);
+
+  const hasPage2 = !!(previewArticle?.page2 && previewArticle.page2.title.trim());
 
   if (isLoading && !article) {
     return (
@@ -77,22 +99,57 @@ export default function AdminArticleDetailScreen() {
     );
   }
 
-  const handleShare = async () => {
-    if (!viewShotRef.current?.capture) return;
+  const capturePage = async (page: 1 | 2) => {
+    const ref = page === 1 ? viewShotRef1 : viewShotRef2;
+    if (!ref.current?.capture) return null;
+    return await ref.current.capture();
+  };
+
+  const shareSinglePage = async (page: 1 | 2) => {
     setSharing(true);
     try {
-      const uri = await viewShotRef.current.capture();
+      const uri = await capturePage(page);
+      if (!uri) return;
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
         Alert.alert('Sharing unavailable', 'Sharing is not supported on this device.');
         return;
       }
-      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: plainArticleText(article.title) });
+      const pageTitle = page === 2 && previewArticle?.page2?.title
+        ? `${plainArticleText(previewArticle.page2.title)} (Page 2)`
+        : `${plainArticleText(article.title)} (Page ${page})`;
+      await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle: pageTitle });
     } catch {
-      Alert.alert('Share failed', 'Could not generate the article image. Please try again.');
+      Alert.alert('Share failed', `Could not generate Page ${page} image. Please try again.`);
     } finally {
       setSharing(false);
     }
+  };
+
+  const handleShare = async () => {
+    if (!hasPage2) {
+      await shareSinglePage(1);
+      return;
+    }
+
+    Alert.alert(
+      'Share Newspaper Page',
+      'This article has 2 separate pages. Which page would you like to share?',
+      [
+        {
+          text: 'Share Page 1 (पृष्ठ १)',
+          onPress: () => shareSinglePage(1),
+        },
+        {
+          text: 'Share Page 2 (पृष्ठ २)',
+          onPress: () => shareSinglePage(2),
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
   };
 
   const pickAd = async () => {
@@ -111,8 +168,31 @@ export default function AdminArticleDetailScreen() {
     setAdvertisements((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
   };
 
+  const pickPage2Ad = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Please allow photo library access to upload ad photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 1,
+      allowsMultipleSelection: false,
+    });
+    if (result.canceled) return;
+    setPage2Advertisements((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
+  };
+
   const saveAdvertisements = async () => {
-    await updateArticle(article.id, { advertisements });
+    const patchPayload: Partial<Article> = { advertisements };
+    if (article.page2) {
+      patchPayload.page2 = {
+        ...article.page2,
+        advertisements: page2Advertisements,
+      };
+    }
+    await updateArticle(article.id, patchPayload);
     Alert.alert('Advertisements Saved', 'The ad photos for this article have been updated.');
   };
 
@@ -130,12 +210,19 @@ export default function AdminArticleDetailScreen() {
   const approve = async () => {
     const now = new Date().toISOString();
     const registrationLabel = registrationDate || formatRegistrationDate(now);
-    await updateArticle(article.id, {
+    const patchPayload: Partial<Article> = {
       status: 'approved',
       reviewedAt: now,
       registrationDate: registrationLabel,
       advertisements,
-    });
+    };
+    if (article.page2) {
+      patchPayload.page2 = {
+        ...article.page2,
+        advertisements: page2Advertisements,
+      };
+    }
+    await updateArticle(article.id, patchPayload);
     setRegistrationDate(registrationLabel);
     Alert.alert('Article Approved', 'The article has been published successfully.', [
       { text: 'OK', onPress: () => router.back() },
@@ -145,12 +232,19 @@ export default function AdminArticleDetailScreen() {
   const reject = async () => {
     if (!reason.trim()) return;
     setRejectVisible(false);
-    await updateArticle(article.id, {
+    const patchPayload: Partial<Article> = {
       status: 'rejected',
       rejectionReason: reason.trim(),
       reviewedAt: new Date().toISOString(),
       advertisements,
-    });
+    };
+    if (article.page2) {
+      patchPayload.page2 = {
+        ...article.page2,
+        advertisements: page2Advertisements,
+      };
+    }
+    await updateArticle(article.id, patchPayload);
     Alert.alert('Article Rejected', 'Feedback has been sent to the reporter.', [
       { text: 'OK', onPress: () => router.back() },
     ]);
@@ -201,7 +295,7 @@ export default function AdminArticleDetailScreen() {
         </View>
 
         <View>
-          <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} />
+          {previewArticle ? <ArticleNewspaperLayout article={previewArticle} reporterPhone={reporterPhone} /> : null}
         </View>
 
         <View style={{ marginTop: 24 }}>
@@ -238,7 +332,7 @@ export default function AdminArticleDetailScreen() {
 
         <View style={{ marginTop: 24 }}>
           <Text style={[styles.summary, { color: theme.colors.textSecondary, marginTop: 0, fontWeight: '700' }]}>
-            Advertisements ({advertisements.length})
+            {article.page2 ? `Page 1 Advertisements (${advertisements.length})` : `Advertisements (${advertisements.length})`}
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
             <View
@@ -260,6 +354,35 @@ export default function AdminArticleDetailScreen() {
               </View>
             ))}
           </ScrollView>
+
+          {article.page2 ? (
+            <View style={{ marginTop: 16 }}>
+              <Text style={[styles.summary, { color: theme.colors.textSecondary, marginTop: 0, fontWeight: '700' }]}>
+                Page 2 Advertisements ({page2Advertisements.length})
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+                <View
+                  style={[
+                    styles.adAddTile,
+                    { borderColor: theme.colors.border, backgroundColor: theme.colors.backgroundSubtle },
+                  ]}
+                  onTouchEnd={pickPage2Ad}>
+                  <Icon name="add" size={24} color={theme.colors.textMuted} />
+                </View>
+                {page2Advertisements.map((uri, i) => (
+                  <View key={`${uri}-${i}`} style={styles.adTile}>
+                    <Image source={{ uri }} style={styles.adThumb} contentFit="cover" />
+                    <View
+                      style={styles.removeBadge}
+                      onTouchEnd={() => setPage2Advertisements((prev) => prev.filter((_, idx) => idx !== i))}>
+                      <Icon name="close" size={12} color="#fff" />
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
+
           <View style={{ marginTop: 12 }}>
             <Button label="Save Advertisements" variant="outline" onPress={saveAdvertisements} />
           </View>
@@ -296,18 +419,34 @@ export default function AdminArticleDetailScreen() {
 
       <View pointerEvents="none" style={styles.captureHost}>
         <ViewShot
-          ref={viewShotRef}
-          style={[styles.articleCapture, { width: CAPTURE_LAYOUT_WIDTH, height: captureHeight }]}
-          options={{ format: 'png', quality: 1, width: SHARE_WIDTH, height: Math.round(SHARE_WIDTH * (captureHeight / CAPTURE_LAYOUT_WIDTH)) }}>
+          ref={viewShotRef1}
+          style={[styles.articleCapture, { width: CAPTURE_LAYOUT_WIDTH, height: captureHeight1 }]}
+          options={{ format: 'png', quality: 1, width: SHARE_WIDTH, height: Math.round(SHARE_WIDTH * (captureHeight1 / CAPTURE_LAYOUT_WIDTH)) }}>
           <View
             style={[styles.captureContent, { width: CAPTURE_LAYOUT_WIDTH }]}
             onLayout={({ nativeEvent }) => {
               const measured = Math.ceil(nativeEvent.layout.height);
-              if (measured > 0 && measured !== captureHeight) setCaptureHeight(measured);
+              if (measured > 0 && measured !== captureHeight1) setCaptureHeight1(measured);
             }}>
-            <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} shareMode />
+            {previewArticle ? <ArticleNewspaperLayout article={previewArticle} reporterPhone={reporterPhone} shareMode pageOnly={1} /> : null}
           </View>
         </ViewShot>
+
+        {hasPage2 ? (
+          <ViewShot
+            ref={viewShotRef2}
+            style={[styles.articleCapture, { width: CAPTURE_LAYOUT_WIDTH, height: captureHeight2, marginTop: 40 }]}
+            options={{ format: 'png', quality: 1, width: SHARE_WIDTH, height: Math.round(SHARE_WIDTH * (captureHeight2 / CAPTURE_LAYOUT_WIDTH)) }}>
+            <View
+              style={[styles.captureContent, { width: CAPTURE_LAYOUT_WIDTH }]}
+              onLayout={({ nativeEvent }) => {
+                const measured = Math.ceil(nativeEvent.layout.height);
+                if (measured > 0 && measured !== captureHeight2) setCaptureHeight2(measured);
+              }}>
+              {previewArticle ? <ArticleNewspaperLayout article={previewArticle} reporterPhone={reporterPhone} shareMode pageOnly={2} /> : null}
+            </View>
+          </ViewShot>
+        ) : null}
       </View>
 
       <Dialog

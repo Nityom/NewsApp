@@ -22,6 +22,9 @@ export interface VideoBurnerConfig {
   adScrollSpeed?: number; // pixels per second (default 140)
   aspectRatio?: 'auto' | 'portrait' | 'landscape'; // video orientation
   muteAudio?: boolean; // mute/unmute exported video audio
+  footerHeight?: number; // base height in px
+  footerWidth?: number; // percentage (50 - 100)
+  videoYShift?: number; // vertical shift in px
   sponsorBannerUrl?: string;
   sponsorName?: string;
   sponsorPhone?: string;
@@ -79,6 +82,9 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
     adScrollSpeed = 140,
     aspectRatio = 'auto',
     muteAudio = false,
+    footerHeight = 180,
+    footerWidth = 100,
+    videoYShift = 0,
     sponsorBannerUrl,
     sponsorName,
     sponsorPhone,
@@ -287,7 +293,7 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
         }
       }
 
-      ctx.drawImage(video, drawVideoX, drawVideoY, drawVideoW, drawVideoH);
+      ctx.drawImage(video, drawVideoX, drawVideoY + Math.round((videoYShift || 0) * scaleFactor), drawVideoW, drawVideoH);
 
       // Typography scaling: Target 1080p standards
       const baseHeadlineSize = headlineFontSize || 56;
@@ -342,7 +348,7 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
 
       // Draw Channel Logo in top right
       if (logoImg) {
-        const logoSize = Math.max(44, Math.round(64 * scaleFactor));
+        const logoSize = Math.max(64, Math.round(92 * scaleFactor));
         const logoX = canvasWidth - logoSize - Math.round(24 * scaleFactor);
         const logoY = Math.round(14 * scaleFactor);
 
@@ -383,24 +389,28 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
       const reporterBadgeHeight = hasReporter ? Math.max(34, Math.round(48 * scaleFactor)) : 0;
 
       // 4. BOTTOM SPONSOR ADVERTISEMENT BANNER
-      const bottomAdHeight = Math.max(90, Math.round(160 * scaleFactor));
+      const baseFooterHeight = footerHeight || 180;
+      const bottomAdHeight = Math.max(50, Math.round(baseFooterHeight * scaleFactor));
       const bottomAdY = canvasHeight - bottomAdHeight;
+      const footerWidthPercent = footerWidth || 100;
+      const footerW = Math.round(canvasWidth * (footerWidthPercent / 100));
+      const footerX = Math.round((canvasWidth - footerW) / 2);
 
       if (hasReporter) {
         const repY = bottomAdY - reporterBadgeHeight;
         // Semi-transparent dark strip for reporter
         ctx.fillStyle = 'rgba(15, 15, 15, 0.92)';
-        ctx.fillRect(0, repY, canvasWidth, reporterBadgeHeight);
+        ctx.fillRect(footerX, repY, footerW, reporterBadgeHeight);
 
         // Yellow strip accent
         ctx.fillStyle = '#FFD700';
-        ctx.fillRect(0, repY, Math.max(5, Math.round(8 * scaleFactor)), reporterBadgeHeight);
+        ctx.fillRect(footerX, repY, Math.max(5, Math.round(8 * scaleFactor)), reporterBadgeHeight);
 
         ctx.font = `bold ${Math.max(14, Math.round(22 * scaleFactor))}px 'DM Sans', Arial, sans-serif`;
         ctx.fillStyle = '#FFFFFF';
         ctx.textBaseline = 'middle';
-        const repText = `बातमीदार / Reporter: ${reporterName || ''} ${reporterPhone ? ` | संपर्क: ${reporterPhone}` : ''}`.trim();
-        ctx.fillText(repText, Math.round(24 * scaleFactor), repY + reporterBadgeHeight / 2);
+        const repText = `बातमीदार: ${reporterName || ''} ${reporterPhone ? ` | संपर्क: ${reporterPhone}` : ''}`.trim();
+        ctx.fillText(repText, footerX + Math.round(24 * scaleFactor), repY + reporterBadgeHeight / 2);
       }
 
       // Base Sponsor Banner Background
@@ -408,11 +418,11 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
       adGradient.addColorStop(0, '#1E293B');
       adGradient.addColorStop(1, '#0F172A');
       ctx.fillStyle = adGradient;
-      ctx.fillRect(0, bottomAdY, canvasWidth, bottomAdHeight);
+      ctx.fillRect(footerX, bottomAdY, footerW, bottomAdHeight);
 
       // Top accent line on sponsor banner
       ctx.fillStyle = '#FFD700';
-      ctx.fillRect(0, bottomAdY, canvasWidth, Math.max(3, Math.round(5 * scaleFactor)));
+      ctx.fillRect(footerX, bottomAdY, footerW, Math.max(3, Math.round(5 * scaleFactor)));
 
       // Normalized Ads List
       const activeAds: SponsorAdItem[] =
@@ -482,31 +492,9 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
           drawFullAd(activeAds[currentIndex], 0);
         }
       } else {
-        // CONTINUOUS AUTO-SCROLLING TICKER MODE (Marquee)
-        // Fixed Pinned Sponsor Label on the Left
-        const pinnedWidth = Math.round(150 * scaleFactor);
-        const pinnedGradient = ctx.createLinearGradient(0, bottomAdY, pinnedWidth, bottomAdY);
-        pinnedGradient.addColorStop(0, '#B71C1C'); // News Red anchor
-        pinnedGradient.addColorStop(1, '#880E4F');
-        ctx.fillStyle = pinnedGradient;
-        ctx.fillRect(0, bottomAdY, pinnedWidth, bottomAdHeight);
-
-        // Gold divider bar on right of pinned label
-        ctx.fillStyle = '#FFD700';
-        ctx.fillRect(pinnedWidth - Math.max(3, Math.round(5 * scaleFactor)), bottomAdY, Math.max(3, Math.round(5 * scaleFactor)), bottomAdHeight);
-
-        // Pinned Label Text
-        ctx.font = `bold ${Math.max(13, Math.round(18 * scaleFactor))}px 'DM Sans', 'Mukta', sans-serif`;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('⭐ जाहिराती', Math.round(14 * scaleFactor), bottomAdY + bottomAdHeight / 2 - Math.round(10 * scaleFactor));
-        ctx.font = `bold ${Math.max(11, Math.round(14 * scaleFactor))}px 'DM Sans', sans-serif`;
-        ctx.fillStyle = '#FFD700';
-        ctx.fillText('SPONSORS', Math.round(14 * scaleFactor), bottomAdY + bottomAdHeight / 2 + Math.round(14 * scaleFactor));
-
-        // Scrolling Track (Clipped to prevent bleeding over pinned label)
-        const trackX = pinnedWidth;
-        const trackWidth = canvasWidth - trackX;
+        // CONTINUOUS AUTO-SCROLLING TICKER MODE
+        const trackX = footerX;
+        const trackWidth = footerW;
 
         ctx.save();
         ctx.beginPath();
@@ -514,15 +502,15 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
         ctx.clip();
 
         // Calculate card widths for each ad
-        const adGap = Math.round(36 * scaleFactor);
-        const cardHeights = bottomAdHeight - Math.round(24 * scaleFactor);
+        const adGap = Math.round(16 * scaleFactor);
+        const cardHeights = bottomAdHeight - Math.round(18 * scaleFactor);
 
         const measuredAds = activeAds.map((ad) => {
           const img = ad.imageUrl ? adImagesMap.get(ad.id) : null;
           let width = Math.round(380 * scaleFactor);
           if (ad.type === 'image' && img) {
             const aspect = img.width / Math.max(1, img.height);
-            width = Math.round(cardHeights * aspect) + Math.round(16 * scaleFactor);
+            width = Math.round(cardHeights * aspect);
           } else {
             ctx.font = `bold ${Math.max(16, Math.round(24 * scaleFactor))}px 'DM Sans', 'Mukta', Arial, sans-serif`;
             const nameW = ctx.measureText(ad.businessName || '').width;
@@ -549,30 +537,24 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
 
             // Only draw if within visible viewport
             if (currentDrawX + width > trackX && currentDrawX < canvasWidth) {
-              const cardY = bottomAdY + Math.round(12 * scaleFactor);
-
-              // Ad Card Container
-              ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-              ctx.beginPath();
-              ctx.roundRect(currentDrawX, cardY, width, cardHeights, Math.round(8 * scaleFactor));
-              ctx.fill();
-
-              // Card left accent bar
-              ctx.fillStyle = '#FFD700';
-              ctx.fillRect(currentDrawX, cardY, Math.max(3, Math.round(5 * scaleFactor)), cardHeights);
+              const cardY = bottomAdY + Math.round(9 * scaleFactor);
 
               if (ad.type === 'image' && img) {
-                // Image Ad
-                const imgPadding = Math.round(4 * scaleFactor);
+                // Show image directly, NO yellow line, NO card background
                 ctx.drawImage(
                   img,
-                  currentDrawX + imgPadding + Math.round(6 * scaleFactor),
-                  cardY + imgPadding,
-                  width - imgPadding * 2 - Math.round(6 * scaleFactor),
-                  cardHeights - imgPadding * 2
+                  currentDrawX,
+                  cardY,
+                  width,
+                  cardHeights
                 );
               } else {
-                // Text Ad
+                // Text Ad Card Container without yellow border line
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.beginPath();
+                ctx.roundRect(currentDrawX, cardY, width, cardHeights, Math.round(8 * scaleFactor));
+                ctx.fill();
+
                 // Business Name
                 ctx.font = `bold ${Math.max(15, Math.round(24 * scaleFactor))}px 'DM Sans', 'Mukta', Arial, sans-serif`;
                 ctx.fillStyle = '#FFD700';

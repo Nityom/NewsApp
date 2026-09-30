@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -231,30 +232,47 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
     }
     .ctrl-btn:active { background: #e2e8f0; }
 
-    .export-btn {
+    body {
+      padding-bottom: 96px;
+    }
+
+    .action-btn-row {
       position: fixed;
       bottom: 14px;
       left: 14px;
       right: 14px;
-      padding: 15px;
-      font-size: 15px;
+      display: flex;
+      gap: 10px;
+      z-index: 999;
+    }
+    .export-btn {
+      flex: 1;
+      padding: 14px 8px;
+      font-size: 14px;
       font-weight: 800;
-      background: linear-gradient(135deg, #f59e0b, #d97706);
-      color: #ffffff;
       border: none;
       border-radius: 12px;
       cursor: pointer;
-      box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
       display: flex;
       justify-content: center;
       align-items: center;
-      gap: 8px;
-      z-index: 999;
+      gap: 6px;
+      text-align: center;
+    }
+    .btn-download {
+      background: #0f172a;
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.35);
+    }
+    .btn-share {
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(22, 163, 74, 0.4);
     }
     .export-btn:disabled {
-      background: #cbd5e1;
-      color: #64748b;
-      box-shadow: none;
+      background: #cbd5e1 !important;
+      color: #64748b !important;
+      box-shadow: none !important;
       cursor: not-allowed;
     }
 
@@ -379,6 +397,42 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       </div>
     </div>
 
+    <!-- Footer Height, Width & Video Crop Sliders -->
+    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:14px;">
+      <div style="font-size:13px; font-weight:800; color:#0f172a; margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+        <span>📐 Footer Size & Video Crop Adjustment</span>
+      </div>
+
+      <!-- Footer Height Slider -->
+      <div style="margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:#334155; font-weight:700; margin-bottom:4px;">
+          <span>Footer Height (Bottom Coverage / Crop):</span>
+          <span id="footerHeightVal" style="color:#d97706; font-weight:800;">180px</span>
+        </div>
+        <input type="range" id="footerHeightSlider" min="70" max="720" value="180" step="5" style="width:100%; accent-color:#d97706; margin:0;" oninput="updateFooterSize()" />
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; margin-top:2px;">
+          <span>70px (Slim)</span>
+          <span>180px (Default)</span>
+          <span>360px (Tall)</span>
+          <span>720px (Max Crop)</span>
+        </div>
+      </div>
+
+      <!-- Video Vertical Crop Position Slider -->
+      <div>
+        <div style="display:flex; justify-content:space-between; font-size:12px; color:#334155; font-weight:700; margin-bottom:4px;">
+          <span>Video Vertical Shift (Crop / Position):</span>
+          <span id="videoYShiftVal" style="color:#d97706; font-weight:800;">0px</span>
+        </div>
+        <input type="range" id="videoYShiftSlider" min="-160" max="160" value="0" step="4" style="width:100%; accent-color:#d97706; margin:0;" oninput="updateFooterSize()" />
+        <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; margin-top:2px;">
+          <span>Shift Up (-160px)</span>
+          <span>Center (0px)</span>
+          <span>Shift Down (+160px)</span>
+        </div>
+      </div>
+    </div>
+
     <div id="adsContainer">
       <!-- Dynamic ads will be inserted here -->
     </div>
@@ -399,10 +453,19 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
     </div>
   </div>
 
-  <!-- FIXED BURN & SHARE BUTTON -->
-  <button type="button" class="export-btn" id="exportBtn" onclick="burnAndShare()" disabled>
-    Share to WhatsApp
-  </button>
+  <div style="margin: 14px 0 16px 0; background: #fef3c7; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 14px; font-size: 12px; color: #92400e; line-height: 1.45;">
+    💡 <strong>WhatsApp Tip:</strong> If WhatsApp shows <em>"Couldn't process video"</em> during direct sharing, tap <strong>"Download to Phone"</strong> to save to your Gallery/Files, then attach it from Gallery or send as a Document in WhatsApp.
+  </div>
+
+  <!-- FIXED ACTION BUTTONS ROW -->
+  <div class="action-btn-row">
+    <button type="button" class="export-btn btn-download" id="downloadBtn" onclick="burnAndExport('download')" disabled>
+      💾 Download to Phone
+    </button>
+    <button type="button" class="export-btn btn-share" id="exportBtn" onclick="burnAndExport('share')" disabled>
+      📲 Share to WhatsApp
+    </button>
+  </div>
 
   <!-- PROGRESS OVERLAY -->
   <div class="progress-overlay" id="progressOverlay">
@@ -421,6 +484,9 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
     let currentAdMode = 'scroll'; // 'scroll' | 'rotate'
     let currentScrollSpeed = 120;
     let isExportMuted = false;
+    let footerHeightSetting = 180;
+    let footerWidthSetting = 100;
+    let videoYShiftSetting = 0;
     const loadedImages = {}; // id -> HTMLImageElement
     
     // Default Education News Logo
@@ -446,6 +512,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
     const previewCanvas = document.getElementById('previewCanvas');
     const ctx = previewCanvas.getContext('2d');
     const exportBtn = document.getElementById('exportBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
     const playBtn = document.getElementById('playBtn');
     const muteBtn = document.getElementById('muteBtn');
     const filePrompt = document.getElementById('filePrompt');
@@ -615,6 +682,20 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       drawFrame();
     }
 
+    function updateFooterSize() {
+      const hEl = document.getElementById('footerHeightSlider');
+      const yEl = document.getElementById('videoYShiftSlider');
+      if (hEl) {
+        footerHeightSetting = parseInt(hEl.value, 10);
+        document.getElementById('footerHeightVal').innerText = footerHeightSetting + 'px';
+      }
+      if (yEl) {
+        videoYShiftSetting = parseInt(yEl.value, 10);
+        document.getElementById('videoYShiftVal').innerText = (videoYShiftSetting > 0 ? '+' : '') + videoYShiftSetting + 'px';
+      }
+      drawFrame();
+    }
+
     videoInput.addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       if (!file) return;
@@ -629,6 +710,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
           setAspect('portrait');
         }
         exportBtn.disabled = false;
+        if (downloadBtn) downloadBtn.disabled = false;
         hiddenVideo.currentTime = 0;
         updateCanvasDimensions();
       };
@@ -722,6 +804,8 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
           dw = h * vAspect;
           dx = (w - dw) / 2;
         }
+        // Adjust vertical position with slider
+        dy += Math.round(videoYShiftSetting * scale);
         ctx.drawImage(hiddenVideo, dx, dy, dw, dh);
       }
 
@@ -794,7 +878,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       // Default or Custom Channel Logo watermark in top-right
       const logoToDraw = customLogoImg || defaultLogoImg;
       if (logoToDraw && (logoToDraw.complete || logoToDraw.naturalWidth > 0)) {
-        const logoSize = Math.max(38, Math.round(56 * scale));
+        const logoSize = Math.max(54, Math.round(85 * scale));
         const logoX = w - logoSize - Math.round(20 * scale);
         const logoY = Math.round(14 * scale);
         ctx.fillStyle = '#FFFFFF';
@@ -823,19 +907,21 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       // Reporter Strip (Optional)
       const repName = (document.getElementById('reporterName') && document.getElementById('reporterName').value.trim()) || '';
       const repHeight = repName ? Math.max(30, Math.round(42 * scale)) : 0;
-      const bottomAdHeight = Math.max(85, Math.round(155 * scale));
+      const bottomAdHeight = Math.max(50, Math.round(footerHeightSetting * scale));
       const bottomAdY = h - bottomAdHeight;
+      const footerW = Math.round(w * (footerWidthSetting / 100));
+      const footerX = Math.round((w - footerW) / 2);
 
       if (repName) {
         const repY = bottomAdY - repHeight;
         ctx.fillStyle = 'rgba(15, 15, 15, 0.92)';
-        ctx.fillRect(0, repY, w, repHeight);
+        ctx.fillRect(footerX, repY, footerW, repHeight);
         ctx.fillStyle = '#FFD700';
-        ctx.fillRect(0, repY, Math.round(6 * scale), repHeight);
+        ctx.fillRect(footerX, repY, Math.round(6 * scale), repHeight);
         ctx.font = 'bold ' + Math.max(13, Math.round(20 * scale)) + "px 'Mukta', Arial, sans-serif";
         ctx.fillStyle = '#FFFFFF';
         ctx.textBaseline = 'middle';
-        ctx.fillText('बातमीदार: ' + repName, Math.round(20 * scale), repY + repHeight / 2);
+        ctx.fillText('बातमीदार: ' + repName, footerX + Math.round(20 * scale), repY + repHeight / 2);
       }
 
       // Bottom Sponsor Bar Background
@@ -843,11 +929,11 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       adGrad.addColorStop(0, '#1E293B');
       adGrad.addColorStop(1, '#0F172A');
       ctx.fillStyle = adGrad;
-      ctx.fillRect(0, bottomAdY, w, bottomAdHeight);
+      ctx.fillRect(footerX, bottomAdY, footerW, bottomAdHeight);
 
       // Gold accent line
       ctx.fillStyle = '#FFD700';
-      ctx.fillRect(0, bottomAdY, w, Math.round(5 * scale));
+      ctx.fillRect(footerX, bottomAdY, footerW, Math.round(5 * scale));
 
       // Filter valid ads
       const validAds = ads.filter(a => a.type === 'image' ? (a.imageUrl || loadedImages[a.id]) : (a.businessName || a.tagline));
@@ -857,25 +943,11 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       if (currentAdMode === 'rotate' || activeList.length <= 1) {
         // ROTATION MODE: Slide swap every 5s
         const activeAd = activeList[Math.floor(currentTime / 5) % activeList.length];
-        drawFullSlotAd(activeAd, 0, bottomAdY, w, bottomAdHeight, scale);
+        drawFullSlotAd(activeAd, footerX, bottomAdY, footerW, bottomAdHeight, scale);
       } else {
         // CONTINUOUS MARQUEE TICKER MODE
-        const pinnedWidth = Math.round(135 * scale);
-        ctx.fillStyle = '#B71C1C';
-        ctx.fillRect(0, bottomAdY, pinnedWidth, bottomAdHeight);
-        ctx.fillStyle = '#FFD700';
-        ctx.fillRect(pinnedWidth - Math.round(4 * scale), bottomAdY, Math.round(4 * scale), bottomAdHeight);
-
-        ctx.font = 'bold ' + Math.max(12, Math.round(17 * scale)) + "px 'Mukta', sans-serif";
-        ctx.fillStyle = '#FFFFFF';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('⭐ जाहिराती', Math.round(10 * scale), bottomAdY + bottomAdHeight / 2 - Math.round(8 * scale));
-        ctx.font = 'bold ' + Math.max(10, Math.round(13 * scale)) + "px 'Plus Jakarta Sans', sans-serif";
-        ctx.fillStyle = '#FFD700';
-        ctx.fillText('SPONSORS', Math.round(10 * scale), bottomAdY + bottomAdHeight / 2 + Math.round(12 * scale));
-
-        const trackX = pinnedWidth;
-        const trackW = w - trackX;
+        const trackX = footerX;
+        const trackW = footerW;
         ctx.save();
         ctx.beginPath();
         ctx.rect(trackX, bottomAdY, trackW, bottomAdHeight);
@@ -885,15 +957,15 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
         const measuredAds = activeList.map(ad => {
           const img = ad.type === 'image' ? loadedImages[ad.id] : null;
           let itemW = Math.round(420 * scale);
-          const cardH = bottomAdHeight - Math.round(20 * scale);
+          const cardH = bottomAdHeight - Math.round(18 * scale);
           if (ad.type === 'image' && img) {
-            const aspect = img.width / Math.max(1, img.height);
-            itemW = Math.max(Math.round(220 * scale), Math.round(cardH * aspect));
+            const aspect = (img.width || 1) / Math.max(1, img.height || 1);
+            itemW = Math.round(cardH * aspect);
           }
           return { ad, itemW, img };
         });
 
-        const gap = Math.round(20 * scale);
+        const gap = Math.round(16 * scale);
         const totalItemsWidth = measuredAds.reduce((acc, m) => acc + m.itemW + gap, 0) || 500;
         const speed = (currentScrollSpeed || 120) * scale;
         const scrollOffset = (currentTime * speed) % totalItemsWidth;
@@ -945,38 +1017,33 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
     }
 
     function drawMarqueeCard(ad, x, y, width, height, scale, img) {
-      const cardH = height - Math.round(20 * scale);
-      const cardY = y + Math.round(10 * scale);
-
-      ctx.fillStyle = '#1e293b';
-      ctx.beginPath();
-      ctx.roundRect(x, cardY, width, cardH, Math.round(8 * scale));
-      ctx.fill();
-
-      // Yellow indicator line on card left
-      ctx.fillStyle = '#FFD700';
-      ctx.fillRect(x, cardY, Math.max(3, Math.round(5 * scale)), cardH);
+      const cardH = height - Math.round(18 * scale);
+      const cardY = y + Math.round(9 * scale);
 
       if (ad.type === 'image' && img) {
-        // Render Image Banner inside card
-        const pad = Math.round(4 * scale);
-        ctx.drawImage(img, x + pad + Math.round(5 * scale), cardY + pad, width - pad * 2 - Math.round(5 * scale), cardH - pad * 2);
+        // Show Image directly without background card or yellow line
+        ctx.drawImage(img, x, cardY, width, cardH);
       } else {
-        // Render Text Card
-        ctx.font = '800 ' + Math.max(14, Math.round(20 * scale)) + "px 'Mukta', Arial, sans-serif";
+        // Render Text Card without yellow line
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.roundRect(x, cardY, width, cardH, Math.round(8 * scale));
+        ctx.fill();
+
+        ctx.font = '800 ' + Math.max(16, Math.round(24 * scale)) + "px 'Mukta', Arial, sans-serif";
         ctx.fillStyle = '#FFFFFF';
         ctx.textBaseline = 'top';
-        ctx.fillText(ad.businessName || '', x + Math.round(14 * scale), cardY + Math.round(12 * scale));
+        ctx.fillText(ad.businessName || '', x + Math.round(16 * scale), cardY + Math.round(14 * scale));
 
-        ctx.font = '500 ' + Math.max(11, Math.round(15 * scale)) + "px 'Mukta', Arial, sans-serif";
+        ctx.font = '500 ' + Math.max(12, Math.round(18 * scale)) + "px 'Mukta', Arial, sans-serif";
         ctx.fillStyle = '#94a3b8';
         const sub = [ad.tagline, ad.phone ? '📞 ' + ad.phone : ''].filter(Boolean).join(' • ');
-        ctx.fillText(sub, x + Math.round(14 * scale), cardY + Math.round(42 * scale));
+        ctx.fillText(sub, x + Math.round(16 * scale), cardY + Math.round(48 * scale));
       }
     }
 
-    // BURN & SHARE
-    async function burnAndShare() {
+    // BURN & EXPORT (DOWNLOAD OR SHARE)
+    async function burnAndExport(action = 'share') {
       if (!videoFile) return;
       if (isPlaying) togglePlay();
 
@@ -988,7 +1055,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       progressOverlay.style.display = 'flex';
       progressBar.style.width = '5%';
       progressText.innerText = '5%';
-      progressStatus.innerText = 'Initializing burner engine...';
+      progressStatus.innerText = action === 'download' ? 'Initializing video download...' : 'Initializing video for WhatsApp...';
 
       let audioCtx = null;
 
@@ -1024,10 +1091,20 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
         }
 
         const combinedStream = new MediaStream(combinedTracks);
-        const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+        const types = [
+          'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+          'video/mp4;codecs=avc1',
+          'video/mp4;codecs=h264',
+          'video/mp4',
+          'video/webm;codecs=h264,opus',
+          'video/webm;codecs=h264',
+          'video/webm;codecs=vp8,opus',
+          'video/webm;codecs=vp8',
+          'video/webm'
+        ];
         const chosenType = types.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
 
-        const recorder = new MediaRecorder(combinedStream, { mimeType: chosenType, videoBitsPerSecond: 3500000 });
+        const recorder = new MediaRecorder(combinedStream, { mimeType: chosenType, videoBitsPerSecond: 2500000 });
         const chunks = [];
         recorder.ondataavailable = e => { if (e.data && e.data.size > 0) chunks.push(e.data); };
 
@@ -1045,7 +1122,8 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
             if (audioCtx && audioCtx.state !== 'closed') {
               void audioCtx.close();
             }
-            const blob = new Blob(chunks, { type: chosenType });
+            const cleanBlobType = (chosenType.split(';')[0] || 'video/mp4').trim();
+            const blob = new Blob(chunks, { type: cleanBlobType });
             resolve(blob);
           };
           recorder.onerror = (err) => {
@@ -1068,7 +1146,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
             const pct = Math.min(99, Math.round((hiddenVideo.currentTime / duration) * 100));
             progressBar.style.width = pct + '%';
             progressText.innerText = pct + '%';
-            progressStatus.innerText = 'Rendering video frames with overlays... ' + pct + '%';
+            progressStatus.innerText = 'Rendering frames with overlays... ' + pct + '%';
 
             burnLoopId = requestAnimationFrame(step);
           }
@@ -1076,23 +1154,36 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
         });
 
         const finalBlob = await burnPromise;
-        progressStatus.innerText = 'Preparing video for WhatsApp share...';
+        progressStatus.innerText = action === 'download' ? 'Saving video file...' : 'Preparing video for WhatsApp share...';
         progressBar.style.width = '100%';
         progressText.innerText = '100%';
 
         // Convert blob to base64
         const reader = new FileReader();
         reader.onloadend = () => {
-          const base64Data = reader.result.split(',')[1];
-          const ext = chosenType.includes('mp4') ? 'mp4' : 'webm';
+          const rawResult = String(reader.result || '');
+          const base64Marker = ';base64,';
+          const markerIdx = rawResult.indexOf(base64Marker);
+          let base64Data = '';
+          if (markerIdx !== -1) {
+            base64Data = rawResult.substring(markerIdx + base64Marker.length);
+          } else {
+            const lastComma = rawResult.lastIndexOf(',');
+            base64Data = lastComma !== -1 ? rawResult.substring(lastComma + 1) : rawResult;
+          }
+          base64Data = base64Data.replace(/[\r\n\s]+/g, '');
+
+          const cleanMime = (chosenType.split(';')[0] || 'video/mp4').trim();
+          const ext = cleanMime.includes('mp4') ? 'mp4' : 'webm';
           const filename = 'news_reel_' + Date.now() + '.' + ext;
 
           if (window.ReactNativeWebView) {
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'VIDEO_EXPORTED',
+              action: action,
               base64: base64Data,
               filename: filename,
-              mimeType: chosenType
+              mimeType: cleanMime
             }));
           } else {
             // Browser fallback
@@ -1136,24 +1227,109 @@ export default function AdminVideoStudioScreen() {
       if (data.type === 'VIDEO_EXPORTED') {
         setExporting(true);
         const filename = data.filename || `news_reel_${Date.now()}.mp4`;
-        
+        const cleanMime = data.mimeType || 'video/mp4';
+
+        let cleanBase64 = String(data.base64 || '');
+        const marker = ';base64,';
+        const markerIdx = cleanBase64.indexOf(marker);
+        if (markerIdx !== -1) {
+          cleanBase64 = cleanBase64.substring(markerIdx + marker.length);
+        } else if (cleanBase64.startsWith('data:')) {
+          const lastComma = cleanBase64.lastIndexOf(',');
+          if (lastComma !== -1) {
+            cleanBase64 = cleanBase64.substring(lastComma + 1);
+          }
+        }
+        cleanBase64 = cleanBase64.replace(/[\r\n\s]+/g, '');
+
+        if (!cleanBase64) {
+          throw new Error('Video data is empty. Please try recording again.');
+        }
+
         // Stored completely in device local storage cache directory
         const fileUri = `${FileSystem.cacheDirectory}${filename}`;
 
-        await FileSystem.writeAsStringAsync(fileUri, data.base64, {
+        await FileSystem.writeAsStringAsync(fileUri, cleanBase64, {
           encoding: FileSystem.EncodingType.Base64,
         });
 
         setExporting(false);
 
-        // Native device share dialog (WhatsApp, Status, Photos, etc.)
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(fileUri, {
-            mimeType: data.mimeType || 'video/mp4',
-            dialogTitle: 'Share News Reel to WhatsApp',
-          });
+        const performDownload = async () => {
+          if (Platform.OS === 'android') {
+            try {
+              const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+              if (permissions.granted) {
+                const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
+                  permissions.directoryUri,
+                  filename,
+                  cleanMime
+                );
+                await FileSystem.writeAsStringAsync(destUri, cleanBase64, {
+                  encoding: FileSystem.EncodingType.Base64,
+                });
+                Alert.alert(
+                  'Video Downloaded! 🎉',
+                  'Video has been saved successfully to your selected folder. You can now view it in your Gallery or Files app, and attach it directly to WhatsApp.',
+                  [
+                    { text: 'OK' },
+                    {
+                      text: 'Share to WhatsApp',
+                      onPress: () => void performShare(),
+                    },
+                  ]
+                );
+                return;
+              }
+            } catch (err: any) {
+              console.warn('StorageAccessFramework note:', err);
+            }
+          }
+
+          // iOS or fallback if folder picker was dismissed
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(fileUri, {
+              mimeType: cleanMime,
+              dialogTitle: 'Save Video to Device',
+              UTI: 'public.movie',
+            });
+          } else {
+            Alert.alert('Video Saved', `Video saved to app local storage: ${filename}`);
+          }
+        };
+
+        const performShare = async () => {
+          if (await Sharing.isAvailableAsync()) {
+            await Sharing.shareAsync(fileUri, {
+              mimeType: cleanMime,
+              dialogTitle: 'Share News Reel to WhatsApp',
+              UTI: 'public.movie',
+            });
+          } else {
+            Alert.alert('Sharing Unavailable', 'Sharing is not available on this device.');
+          }
+        };
+
+        if (data.action === 'download') {
+          await performDownload();
+        } else if (data.action === 'share') {
+          await performShare();
         } else {
-          Alert.alert('Video Saved', `Video saved to local device: ${filename}`);
+          Alert.alert(
+            'Video Ready! 🎬',
+            'Choose how you want to use this video. Tip: If WhatsApp shows "Couldn\'t process video", choose "Download to Phone" first, then attach the video from your Gallery or send as a Document in WhatsApp.',
+            [
+              {
+                text: '💾 Download to Phone',
+                onPress: () => void performDownload(),
+              },
+              {
+                text: '📲 Share to WhatsApp',
+                onPress: () => void performShare(),
+              },
+              { text: 'Cancel', style: 'cancel' },
+            ]
+          );
         }
       } else if (data.type === 'ALERT') {
         Alert.alert('Video Studio', data.message || '');

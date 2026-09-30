@@ -146,8 +146,9 @@ interface ArticleNewspaperLayoutProps {
   article: Article;
   reporterPhone?: string;
   shareMode?: boolean;
+  pageOnly?: 1 | 2;
   onImagePress?: (target: {
-    kind: 'banner' | 'gallery' | 'ad' | 'section';
+    kind: 'banner' | 'gallery' | 'ad' | 'page2Ad' | 'section';
     index?: number;
     sectionId?: string;
     uri: string;
@@ -252,10 +253,12 @@ function AdImage({ uri, radius, width, frameRatio, onPress }: {
 function AdvertisementGrid({
   uris,
   radius,
+  kind = 'ad',
   onImagePress,
 }: {
   uris: string[];
   radius: number;
+  kind?: 'ad' | 'page2Ad';
   onImagePress?: ArticleNewspaperLayoutProps['onImagePress'];
 }) {
   const [ratios, setRatios] = useState<Record<number, number>>({});
@@ -291,7 +294,7 @@ function AdvertisementGrid({
             radius={radius}
             width={widths[index]}
             frameRatio={advertisementFrameRatio(resolvedRatios[index])}
-            onPress={onImagePress ? () => onImagePress({ kind: 'ad', index, uri }) : undefined}
+            onPress={onImagePress ? () => onImagePress({ kind, index, uri }) : undefined}
           />
         );
       })}
@@ -337,7 +340,7 @@ function PublicationInfoBar({
  * 5. Advertisement photo(s)
  * 6. Reporter name + contact footer
  */
-export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = false, onImagePress }: ArticleNewspaperLayoutProps) {
+export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = false, pageOnly, onImagePress }: ArticleNewspaperLayoutProps) {
   const theme = useAppTheme();
   const phone = article.reporterPhone?.trim()
     || reporterPhone?.trim()
@@ -349,16 +352,14 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
 
   const [page2FirstSection] = article.page2?.sections ?? [];
 
-  return (
-    <View style={[styles.paper, shareMode && styles.sharePaper]}>
+  const renderPage1 = (customStyle?: any) => (
+    <View style={[styles.paper, customStyle, shareMode && styles.sharePaper]}>
       {/* PAGE 1 */}
       <Image source={logoBanner} style={styles.logoBanner} contentFit="contain" />
       <PublicationInfoBar pageCount={pageCount} pageNumber={hasPage2 ? 1 : undefined} registrationLabel={registrationLabel} shareMode={shareMode} />
       <View style={styles.mastRule} />
 
       {firstSection ? (
-        // Additional article added via "+" — same side-by-side layout as the combined preview.
-        // Reporter is the same for both, so the name is shown once in the page footer below.
         <View style={[styles.twoUpRow, shareMode && styles.shareTwoUpRow]}>
           <CompactStory
             title={article.title}
@@ -382,11 +383,9 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
         </View>
       ) : (
         <>
-          {/* Headline */}
           <Text style={[styles.title, isCenterAligned(article.title) && { textAlign: 'center' }]}>{renderInlineText(article.title, 'title')}</Text>
           <View style={styles.headlineRule} />
 
-          {/* Full-width photo */}
           <View style={styles.fullImageWrap}>
             <AutoImage
               uri={article.banner}
@@ -396,14 +395,12 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
             />
           </View>
 
-          {/* Single-column body, matching the reference layout */}
           <View style={styles.simpleBody}>
             {renderBodyLines(article.content.split(/\n+/).filter(Boolean), 'body')}
           </View>
         </>
       )}
 
-      {/* Any further sections beyond the first stack below in full width */}
       {restSections.map((section) => {
         const sContent = truncate(plainArticleText(section.content), MAX_SECTION_BODY_CHARS);
         const sLines = sContent.split(/\n+/).filter(Boolean);
@@ -426,7 +423,6 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
         );
       })}
 
-      {/* Page 1 Gallery */}
       {article.images.length > 0 ? (
         <View style={styles.gallery}>
           {article.images.map((uri, i) => (
@@ -442,7 +438,6 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
         </View>
       ) : null}
 
-      {/* Page 1 Advertisement */}
       {article.advertisements.length > 0 ? (
         <>
           <View style={[styles.sectionDividerRule, shareMode && styles.shareSectionDividerRule]} />
@@ -456,7 +451,6 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
         </>
       ) : null}
 
-      {/* Page 1 Footer */}
       <View style={[styles.footer, shareMode && styles.shareFooter]}>
         <Text style={[styles.reporterLabel, shareMode && styles.shareReporterLabel]}>News Reporter</Text>
         <Text style={[styles.reporterName, shareMode && styles.shareReporterName]}>
@@ -464,107 +458,120 @@ export function ArticleNewspaperLayout({ article, reporterPhone, shareMode = fal
           {phone ? ` : ${phone}` : ''}
         </Text>
       </View>
-
-      {/* PAGE 2 */}
-      {hasPage2 && article.page2 ? (
-        <>
-          <View style={[styles.pageBreak, shareMode && styles.sharePageBreak]}>
-            <View style={styles.pageBreakRule} />
-            <View style={styles.pageBadge}>
-              <Text style={styles.pageBadgeText}>पृष्ठ २</Text>
-            </View>
-            <View style={styles.pageBreakRule} />
-          </View>
-
-          {/* Page 2 Masthead */}
-          <Image source={logoBanner} style={styles.logoBanner} contentFit="contain" />
-          <PublicationInfoBar pageCount={2} pageNumber={2} registrationLabel={registrationLabel} shareMode={shareMode} />
-          <View style={styles.mastRule} />
-
-          {page2FirstSection ? (
-            <View style={[styles.twoUpRow, shareMode && styles.shareTwoUpRow]}>
-              <CompactStory
-                title={article.page2.title}
-                image={article.page2.banner}
-                content={article.page2.content}
-                maxBodyWords={MAX_TWO_NEWS_BODY_WORDS}
-                shareMode={shareMode}
-                onImagePress={onImagePress ? () => onImagePress({ kind: 'banner', uri: article.page2!.banner }) : undefined}
-              />
-              <View style={styles.colDivider} />
-              <CompactStory
-                title={page2FirstSection.title}
-                image={page2FirstSection.image ?? article.page2.banner}
-                content={page2FirstSection.content}
-                maxBodyWords={MAX_TWO_NEWS_BODY_WORDS}
-                shareMode={shareMode}
-                onImagePress={onImagePress ? () => onImagePress(page2FirstSection.image
-                  ? { kind: 'section', sectionId: page2FirstSection.id, uri: page2FirstSection.image }
-                  : { kind: 'banner', uri: article.page2!.banner }) : undefined}
-              />
-            </View>
-          ) : (
-            <>
-              <Text style={[styles.title, isCenterAligned(article.page2.title) && { textAlign: 'center' }]}>
-                {renderInlineText(article.page2.title, 'p2-title')}
-              </Text>
-              <View style={styles.headlineRule} />
-              <View style={styles.fullImageWrap}>
-                <AutoImage
-                  uri={article.page2.banner}
-                  style={styles.fullImage}
-                  radius={theme.radius.sm}
-                  onPress={onImagePress ? () => onImagePress({ kind: 'banner', uri: article.page2!.banner }) : undefined}
-                />
-              </View>
-              <View style={styles.simpleBody}>
-                {renderBodyLines(article.page2.content.split(/\n+/).filter(Boolean), 'p2-body')}
-              </View>
-            </>
-          )}
-
-          {/* Page 2 Gallery */}
-          {article.images.length > 0 ? (
-            <View style={styles.gallery}>
-              {article.images.map((uri, i) => (
-                <View key={`p2-${uri}-${i}`} style={styles.galleryItem}>
-                  <AutoImage
-                    uri={uri}
-                    style={styles.galleryImage}
-                    radius={theme.radius.sm}
-                    onPress={onImagePress ? () => onImagePress({ kind: 'gallery', index: i, uri }) : undefined}
-                  />
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          {/* Page 2 Advertisements */}
-          {article.advertisements.length > 0 ? (
-            <>
-              <View style={[styles.sectionDividerRule, shareMode && styles.shareSectionDividerRule]} />
-              <View style={[styles.adSection, shareMode && styles.shareAdSection]}>
-                <AdvertisementGrid
-                  uris={article.advertisements}
-                  radius={theme.radius.sm}
-                  onImagePress={onImagePress}
-                />
-              </View>
-            </>
-          ) : null}
-
-          {/* Page 2 Footer */}
-          <View style={[styles.footer, shareMode && styles.shareFooter]}>
-            <Text style={[styles.reporterLabel, shareMode && styles.shareReporterLabel]}>News Reporter</Text>
-            <Text style={[styles.reporterName, shareMode && styles.shareReporterName]}>
-              {article.reporterName}
-              {phone ? ` : ${phone}` : ''}
-            </Text>
-          </View>
-        </>
-      ) : null}
     </View>
   );
+
+  const renderPage2 = (customStyle?: any) => {
+    if (!hasPage2 || !article.page2) return null;
+    return (
+      <View style={[styles.paper, customStyle, shareMode && styles.sharePaper]}>
+        <View style={[styles.pageBreak, shareMode && styles.sharePageBreak]}>
+          <View style={styles.pageBreakRule} />
+          <View style={styles.pageBadge}>
+            <Text style={styles.pageBadgeText}>पृष्ठ २ (PAGE 2)</Text>
+          </View>
+          <View style={styles.pageBreakRule} />
+        </View>
+
+        <Image source={logoBanner} style={styles.logoBanner} contentFit="contain" />
+        <PublicationInfoBar pageCount={2} pageNumber={2} registrationLabel={registrationLabel} shareMode={shareMode} />
+        <View style={styles.mastRule} />
+
+        {page2FirstSection ? (
+          <View style={[styles.twoUpRow, shareMode && styles.shareTwoUpRow]}>
+            <CompactStory
+              title={article.page2.title}
+              image={article.page2.banner}
+              content={article.page2.content}
+              maxBodyWords={MAX_TWO_NEWS_BODY_WORDS}
+              shareMode={shareMode}
+              onImagePress={onImagePress ? () => onImagePress({ kind: 'banner', uri: article.page2!.banner }) : undefined}
+            />
+            <View style={styles.colDivider} />
+            <CompactStory
+              title={page2FirstSection.title}
+              image={page2FirstSection.image ?? article.page2.banner}
+              content={page2FirstSection.content}
+              maxBodyWords={MAX_TWO_NEWS_BODY_WORDS}
+              shareMode={shareMode}
+              onImagePress={onImagePress ? () => onImagePress(page2FirstSection.image
+                ? { kind: 'section', sectionId: page2FirstSection.id, uri: page2FirstSection.image }
+                : { kind: 'banner', uri: article.page2!.banner }) : undefined}
+            />
+          </View>
+        ) : (
+          <>
+            <Text style={[styles.title, isCenterAligned(article.page2.title) && { textAlign: 'center' }]}>
+              {renderInlineText(article.page2.title, 'p2-title')}
+            </Text>
+            <View style={styles.headlineRule} />
+            <View style={styles.fullImageWrap}>
+              <AutoImage
+                uri={article.page2.banner}
+                style={styles.fullImage}
+                radius={theme.radius.sm}
+                onPress={onImagePress ? () => onImagePress({ kind: 'banner', uri: article.page2!.banner }) : undefined}
+              />
+            </View>
+            <View style={styles.simpleBody}>
+              {renderBodyLines(article.page2.content.split(/\n+/).filter(Boolean), 'p2-body')}
+            </View>
+          </>
+        )}
+
+        {article.images.length > 0 ? (
+          <View style={styles.gallery}>
+            {article.images.map((uri, i) => (
+              <View key={`p2-${uri}-${i}`} style={styles.galleryItem}>
+                <AutoImage
+                  uri={uri}
+                  style={styles.galleryImage}
+                  radius={theme.radius.sm}
+                  onPress={onImagePress ? () => onImagePress({ kind: 'gallery', index: i, uri }) : undefined}
+                />
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {article.page2.advertisements && article.page2.advertisements.length > 0 ? (
+          <>
+            <View style={[styles.sectionDividerRule, shareMode && styles.shareSectionDividerRule]} />
+            <View style={[styles.adSection, shareMode && styles.shareAdSection]}>
+              <AdvertisementGrid
+                uris={article.page2.advertisements}
+                radius={theme.radius.sm}
+                kind="page2Ad"
+                onImagePress={onImagePress}
+              />
+            </View>
+          </>
+        ) : null}
+
+        <View style={[styles.footer, shareMode && styles.shareFooter]}>
+          <Text style={[styles.reporterLabel, shareMode && styles.shareReporterLabel]}>News Reporter</Text>
+          <Text style={[styles.reporterName, shareMode && styles.shareReporterName]}>
+            {article.reporterName}
+            {phone ? ` : ${phone}` : ''}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  if (pageOnly === 1) return renderPage1();
+  if (pageOnly === 2) return renderPage2();
+
+  if (hasPage2) {
+    return (
+      <View style={styles.pagesContainer}>
+        {renderPage1(styles.pageCard)}
+        {renderPage2(styles.pageCard)}
+      </View>
+    );
+  }
+
+  return renderPage1();
 }
 
 interface TwoArticleNewspaperLayoutProps {
@@ -681,6 +688,21 @@ export function TwoArticleNewspaperLayout({
 }
 
 const styles = StyleSheet.create({
+  pagesContainer: {
+    width: '100%',
+    gap: 24,
+  },
+  pageCard: {
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   paper: {
     width: '100%',
     backgroundColor: PAPER,

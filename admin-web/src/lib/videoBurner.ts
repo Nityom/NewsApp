@@ -318,8 +318,14 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
       const badgeX = Math.round(24 * scaleFactor);
       const badgeY = Math.round(18 * scaleFactor);
 
-      // Top Bar dynamic height based on lines
-      const topBarHeight = badgeY + badgeHeight + Math.round(14 * scaleFactor) + (numLines * lineHeight) + Math.round(20 * scaleFactor);
+      // Top Bar dynamic height based on lines and logo
+      const logoSize = Math.max(80, Math.round(135 * scaleFactor));
+      const logoX = canvasWidth - logoSize - Math.round(24 * scaleFactor);
+      const logoY = Math.round(14 * scaleFactor);
+
+      const calculatedBarHeight = badgeY + badgeHeight + Math.round(14 * scaleFactor) + (numLines * lineHeight) + Math.round(20 * scaleFactor);
+      const minBarForLogo = logoImg ? (logoY + logoSize + Math.round(14 * scaleFactor)) : 0;
+      const topBarHeight = Math.max(calculatedBarHeight, minBarForLogo);
 
       // Draw Top Bar background gradient
       const topGradient = ctx.createLinearGradient(0, 0, 0, topBarHeight);
@@ -348,10 +354,6 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
 
       // Draw Channel Logo in top right
       if (logoImg) {
-        const logoSize = Math.max(64, Math.round(92 * scaleFactor));
-        const logoX = canvasWidth - logoSize - Math.round(24 * scaleFactor);
-        const logoY = Math.round(14 * scaleFactor);
-
         // Circular white backing for contrast
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();

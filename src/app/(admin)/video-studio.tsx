@@ -845,9 +845,17 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
         ? badgeY + badgeHeight + Math.round(14 * scale)
         : Math.round(18 * scale);
 
-      const topBarHeight = (lines.length > 0 || hasBadge)
+      // Default or Custom Channel Logo watermark in top-right
+      const logoToDraw = customLogoImg || defaultLogoImg;
+      const logoSize = Math.max(76, Math.round(130 * scale));
+      const logoX = w - logoSize - Math.round(18 * scale);
+      const logoY = Math.round(14 * scale);
+
+      const calculatedBarHeight = (lines.length > 0 || hasBadge)
         ? headlineStartY + (numLines * lineHeight) + Math.round(18 * scale)
         : Math.round(70 * scale);
+      const minBarForLogo = logoY + logoSize + Math.round(14 * scale);
+      const topBarHeight = Math.max(calculatedBarHeight, minBarForLogo);
 
       // Gradient top bar (Rich News Red)
       const grad = ctx.createLinearGradient(0, 0, 0, topBarHeight);
@@ -875,12 +883,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
         ctx.fillText(badgeText, badgeX + badgePadX, badgeY + badgeHeight / 2);
       }
 
-      // Default or Custom Channel Logo watermark in top-right
-      const logoToDraw = customLogoImg || defaultLogoImg;
       if (logoToDraw && (logoToDraw.complete || logoToDraw.naturalWidth > 0)) {
-        const logoSize = Math.max(54, Math.round(85 * scale));
-        const logoX = w - logoSize - Math.round(20 * scale);
-        const logoY = Math.round(14 * scale);
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
         ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 2, 0, Math.PI * 2);

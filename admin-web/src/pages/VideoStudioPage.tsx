@@ -944,8 +944,8 @@ export function VideoStudioPage() {
                       src="/app-logo.png"
                       alt="Logo"
                       style={{
-                        width: 48,
-                        height: 48,
+                        width: 68,
+                        height: 68,
                         borderRadius: '50%',
                         background: 'white',
                         objectFit: 'contain',

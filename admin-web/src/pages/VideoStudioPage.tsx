@@ -37,6 +37,17 @@ export function VideoStudioPage() {
   const [reporterName, setReporterName] = useState('');
   const [reporterPhone, setReporterPhone] = useState('');
 
+  // Short News Ticker Marquee State (Optional toggle, multiple items, height slider)
+  const [showTicker, setShowTicker] = useState(false);
+  const [tickerItems, setTickerItems] = useState<string[]>(['']);
+  const [tickerBadge, setTickerBadge] = useState('🔴 ताजी बातमी');
+  const [tickerHeight, setTickerHeight] = useState<number>(34);
+  const [tickerSpeed, setTickerSpeed] = useState<number>(130);
+  const [tickerPosition, setTickerPosition] = useState<'above_footer' | 'below_headline'>('above_footer');
+
+  const validTickerItems = tickerItems.map((t) => t.trim()).filter(Boolean);
+  const combinedTickerText = validTickerItems.join('   ◆   ');
+
   // Orientation & Audio State
   const [orientation, setOrientation] = useState<'auto' | 'portrait' | 'landscape'>('auto');
   const [isPreviewMuted, setIsPreviewMuted] = useState(false);
@@ -188,6 +199,13 @@ export function VideoStudioPage() {
         footerHeight,
         footerWidth,
         videoYShift,
+        enableTicker: showTicker,
+        tickerText: showTicker ? combinedTickerText : '',
+        tickerItems: showTicker ? validTickerItems : [],
+        tickerBadge: showTicker ? tickerBadge : '',
+        tickerHeight: showTicker ? tickerHeight : 34,
+        tickerSpeed,
+        tickerPosition,
         onProgress: (percent, statusText) => {
           setProgressPercent(percent);
           setProgressStatus(statusText);
@@ -511,13 +529,176 @@ export function VideoStudioPage() {
             </div>
           </div>
 
-          {/* Step 4: Multiple Sponsor Advertisements & Scrolling */}
+          {/* Step 4: Running Short News Ticker (Marquee) */}
+          <div className="panel">
+            <header style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Sparkles size={20} color="var(--red)" />
+                  <h2 style={{ fontSize: 18 }}>4. Running Short News Ticker (Marquee)</h2>
+                </div>
+                <p>Add continuous scrolling breaking updates / short news (ताजी बातमी / संक्षिप्त बातम्या) running across the screen like TV news channels.</p>
+              </div>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer', background: 'var(--surface-hover, #f1f5f9)', padding: '6px 12px', borderRadius: 8, fontWeight: 700, fontSize: 13, border: '1px solid var(--border)' }}>
+                <input
+                  type="checkbox"
+                  checked={showTicker}
+                  onChange={(e) => setShowTicker(e.target.checked)}
+                  style={{ accentColor: 'var(--red)', width: 16, height: 16, cursor: 'pointer' }}
+                />
+                <span>Enable Ticker</span>
+              </label>
+            </header>
+
+            {showTicker ? (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 14, marginBottom: 16 }}>
+                  <label>
+                    Ticker Badge / Tag
+                    <input
+                      type="text"
+                      value={tickerBadge}
+                      onChange={(e) => setTickerBadge(e.target.value)}
+                      placeholder="उदा. 🔴 ताजी बातमी / FLASH NEWS (किंवा रिकामे ठेवा)"
+                    />
+                  </label>
+
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <strong style={{ fontSize: 12, fontWeight: 600 }}>Short News Items ({tickerItems.length})</strong>
+                      <button
+                        type="button"
+                        onClick={() => setTickerItems([...tickerItems, ''])}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
+                          padding: '4px 10px',
+                          fontSize: 12,
+                          background: 'var(--red-light, #fee2e2)',
+                          color: 'var(--red, #dc2626)',
+                          border: '1px solid var(--red, #dc2626)',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                        }}>
+                        <Plus size={14} /> बातमी जोडा (+ Add News)
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {tickerItems.map((item, idx) => (
+                        <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', width: 20, textAlign: 'right', fontWeight: 700 }}>
+                            {idx + 1}.
+                          </span>
+                          <input
+                            type="text"
+                            value={item}
+                            onChange={(e) => {
+                              const next = [...tickerItems];
+                              next[idx] = e.target.value;
+                              setTickerItems(next);
+                            }}
+                            placeholder={`संक्षिप्त बातमी #${idx + 1} टाईप करा... (उदा. शाळांना १५ मे पर्यंत सुट्टी जाहीर)`}
+                            style={{ flex: 1 }}
+                          />
+                          {tickerItems.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setTickerItems(tickerItems.filter((_, i) => i !== idx))}
+                              style={{
+                                border: 'none',
+                                background: '#fee2e2',
+                                color: '#ef4444',
+                                cursor: 'pointer',
+                                padding: '8px',
+                                borderRadius: 6,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                              title="Delete news item">
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, paddingTop: 10, borderTop: '1px dashed var(--border)' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <strong style={{ fontSize: 12, fontWeight: 600 }}>Ticker Bar Height</strong>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', fontWeight: 600 }}>{tickerHeight}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={26}
+                      max={54}
+                      value={tickerHeight}
+                      onChange={(e) => setTickerHeight(Number(e.target.value))}
+                      style={{ width: '100%', accentColor: 'var(--red)', cursor: 'pointer' }}
+                    />
+                  </div>
+
+                  <div>
+                    <strong style={{ display: 'block', fontSize: 12, marginBottom: 6, fontWeight: 600 }}>Scroll Speed</strong>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {[
+                        { label: 'Slow', speed: 80 },
+                        { label: 'Normal', speed: 130 },
+                        { label: 'Fast', speed: 190 },
+                      ].map((s) => (
+                        <button
+                          key={s.speed}
+                          type="button"
+                          className={`composer-mode-btn ${tickerSpeed === s.speed ? 'active' : ''}`}
+                          style={{ padding: '6px 10px', fontSize: 12, flex: 1 }}
+                          onClick={() => setTickerSpeed(s.speed)}>
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <strong style={{ display: 'block', fontSize: 12, marginBottom: 6, fontWeight: 600 }}>Ticker Position</strong>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        type="button"
+                        className={`composer-mode-btn ${tickerPosition === 'above_footer' ? 'active' : ''}`}
+                        style={{ padding: '6px 10px', fontSize: 12, flex: 1 }}
+                        onClick={() => setTickerPosition('above_footer')}>
+                        Above Footer
+                      </button>
+                      <button
+                        type="button"
+                        className={`composer-mode-btn ${tickerPosition === 'below_headline' ? 'active' : ''}`}
+                        style={{ padding: '6px 10px', fontSize: 12, flex: 1 }}
+                        onClick={() => setTickerPosition('below_headline')}>
+                        Below Headline
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{ padding: '12px 14px', background: 'var(--surface-hover, #f8fafc)', borderRadius: 8, fontSize: 13, color: 'var(--text-muted, #64748b)' }}>
+                ℹ️ Short news ticker is currently <strong>disabled</strong>. Check "Enable Ticker" above to add scrolling flash news items.
+              </div>
+            )}
+          </div>
+
+          {/* Step 5: Multiple Sponsor Advertisements & Scrolling */}
           <div className="panel">
             <header style={{ marginBottom: 16, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <ImageIcon size={20} color="var(--red)" />
-                  <h2 style={{ fontSize: 18 }}>4. Sponsor Advertisements ({ads.length})</h2>
+                  <h2 style={{ fontSize: 18 }}>5. Sponsor Advertisements ({ads.length})</h2>
                 </div>
                 <p>Run multiple sponsor ads with auto-scrolling ticker or slide rotation.</p>
               </div>
@@ -971,6 +1152,79 @@ export function VideoStudioPage() {
                   {headline || 'Enter headline to preview...'}
                 </div>
               </div>
+
+              {/* OVERLAY: Running Short News Ticker Marquee */}
+              {showTicker && combinedTickerText ? (
+                <div
+                  style={{
+                    position: 'absolute',
+                    ...(tickerPosition === 'below_headline'
+                      ? { top: '80px' }
+                      : { bottom: `${previewFooterH + (reporterName || reporterPhone ? 28 : 0)}px` }),
+                    left: 0,
+                    right: 0,
+                    height: `${tickerHeight}px`,
+                    background: 'linear-gradient(to bottom, #0F172A, #020617)',
+                    borderTop: '2px solid #EF4444',
+                    display: 'flex',
+                    alignItems: 'center',
+                    overflow: 'hidden',
+                    zIndex: 3,
+                    boxSizing: 'border-box',
+                    pointerEvents: 'none',
+                  }}>
+                  {tickerBadge ? (
+                    <div
+                      style={{
+                        position: 'relative',
+                        zIndex: 10,
+                        background: 'linear-gradient(135deg, #DC2626, #991B1B)',
+                        color: '#FFFFFF',
+                        fontWeight: 800,
+                        fontSize: `${Math.max(10, Math.round(tickerHeight * 0.32))}px`,
+                        padding: '3px 10px',
+                        borderRadius: '4px',
+                        margin: '0 8px 0 8px',
+                        border: '1px solid #FEF08A',
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                        boxShadow: '4px 0 10px rgba(0,0,0,0.8)',
+                      }}>
+                      {tickerBadge}
+                    </div>
+                  ) : null}
+                  <div
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      height: '100%',
+                      overflow: 'hidden',
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}>
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        whiteSpace: 'nowrap',
+                        animation: `previewTicker ${Math.max(8, 200 / (tickerSpeed / 10))}s linear infinite`,
+                        color: '#FFFFFF',
+                        fontSize: `${Math.max(11, Math.round(tickerHeight * 0.36))}px`,
+                        fontWeight: 800,
+                        gap: '24px',
+                        paddingLeft: '12px',
+                      }}>
+                      {[...validTickerItems, ...validTickerItems, ...validTickerItems, ...validTickerItems].map((t, idx) => (
+                        <span key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+                          <span>{t}</span>
+                          <span style={{ color: '#F59E0B', fontSize: '11px', opacity: 0.9 }}>◆</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               {/* OVERLAY: Reporter Badge */}
               {reporterName || reporterPhone ? (

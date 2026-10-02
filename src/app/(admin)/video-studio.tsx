@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useRef, useState } from 'react';
@@ -311,8 +312,8 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
   <!-- 1. VIDEO SOURCE -->
   <div class="card">
     <div class="card-title">📹 Select Video File (1 min / Reel)</div>
-    <div class="btn-file" id="dropArea">
-      <input type="file" id="videoInput" accept="video/*" />
+    <div class="btn-file" id="dropArea" onclick="handleVideoBoxClick(event)">
+      <input type="file" id="videoInput" accept="video/mp4,video/quicktime,video/webm,video/*" />
       <div style="font-size:28px">🎬</div>
       <span id="filePrompt">Tap to choose video from phone gallery</span>
     </div>
@@ -378,7 +379,63 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
     </div>
   </div>
 
-  <!-- 4. SPONSOR ADS SECTION (TEXT & IMAGE BANNER) -->
+  <!-- 4. SHORT NEWS TICKER / RUNNING MARQUEE -->
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+      <div>
+        <div class="card-title" style="margin-bottom:4px;">🔴 Running Short News Ticker (Marquee)</div>
+        <div style="font-size:12px; color:#64748b; line-height:1.4;">
+          TV न्यूज चॅनेलप्रमाणे स्क्रीनवर सतत धावणारी ताजी / संक्षिप्त बातमी (Live Scrolling Ticker)
+        </div>
+      </div>
+      <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; background:#f1f5f9; padding:5px 10px; border-radius:6px; font-weight:700; font-size:12px; border:1px solid #cbd5e1;">
+        <input type="checkbox" id="enableTickerCheckbox" onchange="toggleTicker(this.checked)" style="width:16px; height:16px;" />
+        <span>Enable</span>
+      </label>
+    </div>
+
+    <div id="tickerConfigWrap" style="display:none;">
+      <label>Ticker Badge / Label</label>
+      <input type="text" id="tickerBadgeText" placeholder="उदा. 🔴 ताजी बातमी / FLASH NEWS (किंवा रिकामे ठेवा)" value="🔴 ताजी बातमी" oninput="drawFrame()" />
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; margin-bottom:6px;">
+        <label style="margin:0; font-weight:700;">Short News Items (संक्षिप्त बातम्या)</label>
+        <button type="button" onclick="addTickerItem()" style="display:inline-flex; align-items:center; gap:4px; padding:4px 10px; font-size:11px; font-weight:700; background:#fee2e2; color:#dc2626; border:1px solid #dc2626; border-radius:6px; cursor:pointer;">
+          + बातमी जोडा (+ Add News)
+        </button>
+      </div>
+
+      <div id="tickerItemsContainer"></div>
+
+      <div style="margin-top:12px; margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+          <label style="margin:0;">Ticker Bar Height</label>
+          <span id="tickerHeightVal" style="font-size:12px; color:#64748b; font-weight:700;">36px</span>
+        </div>
+        <input type="range" id="tickerHeightSlider" min="26" max="54" value="36" oninput="updateTickerHeight(this.value)" style="width:100%;" />
+      </div>
+
+      <div class="row">
+        <div class="col">
+          <label>Marquee Scroll Speed</label>
+          <div class="segmented" id="tickerSpeedSelector">
+            <button type="button" onclick="setTickerSpeed(80)">Slow</button>
+            <button type="button" class="active" onclick="setTickerSpeed(130)">Normal</button>
+            <button type="button" onclick="setTickerSpeed(190)">Fast</button>
+          </div>
+        </div>
+        <div class="col">
+          <label>Ticker Position</label>
+          <div class="segmented" id="tickerPosSelector">
+            <button type="button" class="active" onclick="setTickerPosition('above_footer')">Above Footer</button>
+            <button type="button" onclick="setTickerPosition('below_headline')">Below Headline</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. SPONSOR ADS SECTION (TEXT & IMAGE BANNER) -->
   <div class="card">
     <div class="card-title">📢 Bottom Sponsor Ads (Image / Text)</div>
 
@@ -454,7 +511,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
   </div>
 
   <div style="margin: 14px 0 16px 0; background: #fef3c7; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 14px; font-size: 12px; color: #92400e; line-height: 1.45;">
-    💡 <strong>WhatsApp Tip:</strong> If WhatsApp shows <em>"Couldn't process video"</em> during direct sharing, tap <strong>"Download to Phone"</strong> to save to your Gallery/Files, then attach it from Gallery or send as a Document in WhatsApp.
+    💡 <strong>WhatsApp Tip:</strong> I WhatsApp shows <em>"Couldn't process video"</em> during direct sharing, tap <strong>"Download to Phone"</strong> to save to your Gallery/Files, then attach it from Gallery or send as a Document in WhatsApp.
   </div>
 
   <!-- FIXED ACTION BUTTONS ROW -->
@@ -477,12 +534,17 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
     <span id="progressText" style="font-weight:800; color:#d97706; font-size:16px;">0%</span>
   </div>
 
-  <video id="hiddenVideo" playsinline style="display:none"></video>
+  <video id="hiddenVideo" playsinline muted preload="auto" style="position:fixed;top:-9999px;left:-9999px;width:10px;height:10px;opacity:0.01;pointer-events:none;"></video>
 
   <script>
     let currentAspect = 'portrait'; // 'portrait' | 'landscape'
     let currentAdMode = 'scroll'; // 'scroll' | 'rotate'
     let currentScrollSpeed = 120;
+    let currentTickerSpeed = 130;
+    let currentTickerPos = 'above_footer'; // 'above_footer' | 'below_headline'
+    let enableTickerSetting = false;
+    let tickerItems = [''];
+    let tickerHeightSetting = 36;
     let isExportMuted = false;
     let footerHeightSetting = 180;
     let footerWidthSetting = 100;
@@ -671,6 +733,74 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       });
     }
 
+    function setTickerSpeed(speed) {
+      currentTickerSpeed = speed;
+      document.querySelectorAll('#tickerSpeedSelector button').forEach((btn, idx) => {
+        btn.classList.toggle('active', (speed === 80 && idx === 0) || (speed === 130 && idx === 1) || (speed === 190 && idx === 2));
+      });
+      drawFrame();
+    }
+
+    function setTickerPosition(pos) {
+      currentTickerPos = pos;
+      document.querySelectorAll('#tickerPosSelector button').forEach((btn, idx) => {
+        btn.classList.toggle('active', (pos === 'above_footer' && idx === 0) || (pos === 'below_headline' && idx === 1));
+      });
+      drawFrame();
+    }
+
+    function toggleTicker(checked) {
+      enableTickerSetting = checked;
+      const wrap = document.getElementById('tickerConfigWrap');
+      if (wrap) wrap.style.display = checked ? 'block' : 'none';
+      if (checked) {
+        renderTickerItems();
+      }
+      drawFrame();
+    }
+
+    function updateTickerHeight(val) {
+      tickerHeightSetting = parseInt(val, 10) || 36;
+      const el = document.getElementById('tickerHeightVal');
+      if (el) el.innerText = tickerHeightSetting + 'px';
+      drawFrame();
+    }
+
+    function renderTickerItems() {
+      const container = document.getElementById('tickerItemsContainer');
+      if (!container) return;
+      container.innerHTML = tickerItems.map(function(item, idx) {
+        const safeVal = (item || '').replace(/"/g, '&quot;');
+        let html = '<div style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">';
+        html += '<span style="font-size:12px; color:#64748b; font-weight:700; width:18px; text-align:right;">' + (idx + 1) + '.</span>';
+        html += '<input type="text" value="' + safeVal + '" placeholder="संक्षिप्त बातमी #' + (idx + 1) + ' टाईप करा..." oninput="updateTickerItem(' + idx + ', this.value)" style="flex:1; margin-bottom:0;" />';
+        if (tickerItems.length > 1) {
+          html += '<button type="button" onclick="removeTickerItem(' + idx + ')" style="background:#fee2e2; border:1px solid #fca5a5; color:#ef4444; border-radius:6px; padding:6px 10px; cursor:pointer; font-weight:700;">✕</button>';
+        }
+        html += '</div>';
+        return html;
+      }).join('');
+    }
+
+    function addTickerItem() {
+      tickerItems.push('');
+      renderTickerItems();
+      drawFrame();
+    }
+
+    function removeTickerItem(idx) {
+      if (tickerItems.length > 1) {
+        tickerItems.splice(idx, 1);
+        renderTickerItems();
+        drawFrame();
+      }
+    }
+
+    function updateTickerItem(idx, val) {
+      tickerItems[idx] = val;
+      drawFrame();
+    }
+
     function updateCanvasDimensions() {
       if (currentAspect === 'landscape') {
         previewCanvas.width = 1280;
@@ -696,14 +826,39 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       drawFrame();
     }
 
-    videoInput.addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      videoFile = file;
-      filePrompt.innerText = '✅ ' + file.name;
-      hiddenVideo.src = URL.createObjectURL(file);
+    function handleVideoBoxClick(event) {
+      if (window.ReactNativeWebView) {
+        event.preventDefault();
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'PICK_VIDEO_NATIVE' }));
+        return false;
+      }
+    }
+
+    function base64ToBlob(b64Data, contentType) {
+      contentType = contentType || 'video/mp4';
+      const sliceSize = 512 * 1024;
+      const byteCharacters = atob(b64Data);
+      const byteArrays = [];
+      for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+        const slice = byteCharacters.slice(offset, offset + sliceSize);
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+          byteNumbers[i] = slice.charCodeAt(i);
+        }
+        byteArrays.push(new Uint8Array(byteNumbers));
+      }
+      return new Blob(byteArrays, { type: contentType });
+    }
+
+    function setVideoSource(sourceUrl, name) {
+      if (!sourceUrl) return;
+      filePrompt.innerText = '⌛ Loading video...';
+      hiddenVideo.src = sourceUrl;
+      hiddenVideo.muted = true;
       hiddenVideo.load();
-      hiddenVideo.onloadedmetadata = () => {
+
+      const onMetadataReady = () => {
+        filePrompt.innerText = '✅ ' + (name || 'Video Loaded');
         if (hiddenVideo.videoWidth > hiddenVideo.videoHeight) {
           setAspect('landscape');
         } else {
@@ -711,9 +866,144 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
         }
         exportBtn.disabled = false;
         if (downloadBtn) downloadBtn.disabled = false;
-        hiddenVideo.currentTime = 0;
+        videoFile = { name: name || 'news_video.mp4' };
         updateCanvasDimensions();
+
+        // Seek to 0.001 to guarantee the video decoder prepares the first frame
+        try {
+          hiddenVideo.currentTime = 0.001;
+        } catch (e) {}
+
+        // Prime decoder pipeline
+        hiddenVideo.play().then(() => {
+          hiddenVideo.pause();
+          drawFrame();
+        }).catch(() => {
+          drawFrame();
+        });
       };
+
+      hiddenVideo.onloadedmetadata = onMetadataReady;
+      hiddenVideo.onloadeddata = () => { drawFrame(); };
+      hiddenVideo.onseeked = () => { drawFrame(); };
+      hiddenVideo.ontimeupdate = () => { if (isPlaying) drawFrame(); };
+
+      hiddenVideo.onerror = (e) => {
+        console.warn('hiddenVideo decode error:', hiddenVideo.error, e);
+        filePrompt.innerText = '❌ Failed to decode video';
+      };
+    }
+
+    window.loadNativeVideoUri = function(uri, name) {
+      if (!uri) return;
+      filePrompt.innerText = '⌛ Loading ' + (name || 'video') + '...';
+
+      // 1. Try reading directly into an in-memory Blob (fastest on modern WebViews)
+      fetch(uri)
+        .then(r => {
+          if (!r.ok && r.status !== 0) throw new Error('Fetch error: ' + r.status);
+          return r.blob();
+        })
+        .then(blob => {
+          if (blob && blob.size > 0) {
+            const blobUrl = URL.createObjectURL(blob);
+            setVideoSource(blobUrl, name);
+          } else {
+            throw new Error('Empty blob');
+          }
+        })
+        .catch(fetchErr => {
+          console.warn('fetch(uri) failed, trying XHR:', fetchErr);
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', uri, true);
+          xhr.responseType = 'blob';
+          xhr.onload = function() {
+            if ((xhr.status === 200 || xhr.status === 0) && xhr.response && xhr.response.size > 0) {
+              const blobUrl = URL.createObjectURL(xhr.response);
+              setVideoSource(blobUrl, name);
+            } else {
+              requestFallbackChunks(uri, name);
+            }
+          };
+          xhr.onerror = function() {
+            requestFallbackChunks(uri, name);
+          };
+          xhr.send();
+        });
+    };
+
+    function requestFallbackChunks(uri, name) {
+      if (window.ReactNativeWebView) {
+        filePrompt.innerText = '⌛ Reading video file...';
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'LOAD_VIDEO_CHUNKS',
+          uri: uri,
+          name: name
+        }));
+      } else {
+        // Direct assignment as fallback
+        setVideoSource(uri, name);
+      }
+    }
+
+    let chunkBuffer = [];
+    let chunkTotal = 0;
+    let chunkName = '';
+    let chunkMime = '';
+
+    window.startChunkedTransfer = function(total, name, mime) {
+      chunkTotal = total;
+      chunkName = name;
+      chunkMime = mime || 'video/mp4';
+      chunkBuffer = new Array(total);
+      filePrompt.innerText = '⌛ Loading video (0%)...';
+    };
+
+    window.receiveChunk = function(index, chunk) {
+      chunkBuffer[index] = chunk;
+      const pct = Math.round(((index + 1) / chunkTotal) * 100);
+      filePrompt.innerText = '⌛ Loading video (' + pct + '%)...';
+      if (index === chunkTotal - 1) {
+        filePrompt.innerText = '⌛ Decoding video...';
+        const fullBase64 = chunkBuffer.join('');
+        chunkBuffer = [];
+        try {
+          const blob = base64ToBlob(fullBase64, chunkMime);
+          const blobUrl = URL.createObjectURL(blob);
+          setVideoSource(blobUrl, chunkName);
+        } catch (err) {
+          console.warn('Blob reassembly failed:', err);
+          setVideoSource('data:' + chunkMime + ';base64,' + fullBase64, chunkName);
+        }
+      }
+    };
+
+    window.loadVideoDataUrl = function(dataUrl, name) {
+      if (!dataUrl) return;
+      try {
+        const marker = ';base64,';
+        const idx = dataUrl.indexOf(marker);
+        if (idx !== -1) {
+          const mime = dataUrl.substring(5, idx);
+          const b64 = dataUrl.substring(idx + marker.length);
+          const blob = base64ToBlob(b64, mime);
+          const blobUrl = URL.createObjectURL(blob);
+          setVideoSource(blobUrl, name);
+          return;
+        }
+      } catch (e) {}
+      setVideoSource(dataUrl, name);
+    };
+
+    videoInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        const blobUrl = URL.createObjectURL(file);
+        setVideoSource(blobUrl, file.name);
+      } catch (err) {
+        console.warn('URL.createObjectURL failed:', err);
+      }
     });
 
     function togglePlay() {
@@ -723,10 +1013,20 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
         isPlaying = false;
         playBtn.innerText = '▶ Play';
       } else {
-        hiddenVideo.play();
-        isPlaying = true;
-        playBtn.innerText = '⏸ Pause';
-        startLoop();
+        hiddenVideo.muted = isPreviewMuted;
+        hiddenVideo.play().then(() => {
+          isPlaying = true;
+          playBtn.innerText = '⏸ Pause';
+          startLoop();
+        }).catch(err => {
+          console.warn('Play error:', err);
+          hiddenVideo.muted = true;
+          hiddenVideo.play().then(() => {
+            isPlaying = true;
+            playBtn.innerText = '⏸ Pause';
+            startLoop();
+          });
+        });
       }
     }
 
@@ -739,17 +1039,30 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
     function restartVideo() {
       if (!videoFile) return;
       hiddenVideo.currentTime = 0;
-      if (!isPlaying) {
-        hiddenVideo.play();
+      hiddenVideo.muted = isPreviewMuted;
+      hiddenVideo.play().then(() => {
         isPlaying = true;
         playBtn.innerText = '⏸ Pause';
         startLoop();
-      }
+      }).catch(() => {
+        hiddenVideo.muted = true;
+        hiddenVideo.play().then(() => {
+          isPlaying = true;
+          playBtn.innerText = '⏸ Pause';
+          startLoop();
+        });
+      });
     }
 
     hiddenVideo.onended = () => {
       isPlaying = false;
       playBtn.innerText = '▶ Play';
+    };
+    hiddenVideo.onseeked = () => {
+      drawFrame();
+    };
+    hiddenVideo.onloadeddata = () => {
+      drawFrame();
     };
 
     function startLoop() {
@@ -791,22 +1104,32 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       ctx.fillRect(0, 0, w, h);
 
       // Draw Video if loaded (Aspect Fit with letterboxing)
-      if (hiddenVideo.readyState >= 2) {
-        const vw = hiddenVideo.videoWidth || w;
-        const vh = hiddenVideo.videoHeight || h;
-        const vAspect = vw / vh;
-        const cAspect = w / h;
-        let dw = w, dh = h, dx = 0, dy = 0;
-        if (vAspect > cAspect) {
-          dh = w / vAspect;
-          dy = (h - dh) / 2;
-        } else {
-          dw = h * vAspect;
-          dx = (w - dw) / 2;
+      if (hiddenVideo.readyState >= 1 || hiddenVideo.videoWidth > 0) {
+        try {
+          const vw = hiddenVideo.videoWidth || w;
+          const vh = hiddenVideo.videoHeight || h;
+          const vAspect = vw / vh;
+          const cAspect = w / h;
+          let dw = w, dh = h, dx = 0, dy = 0;
+          if (vAspect > cAspect) {
+            dh = w / vAspect;
+            dy = (h - dh) / 2;
+          } else {
+            dw = h * vAspect;
+            dx = (w - dw) / 2;
+          }
+          // Adjust vertical position with slider
+          dy += Math.round(videoYShiftSetting * scale);
+          ctx.drawImage(hiddenVideo, dx, dy, dw, dh);
+        } catch (err) {
+          console.warn('Frame draw note:', err);
         }
-        // Adjust vertical position with slider
-        dy += Math.round(videoYShiftSetting * scale);
-        ctx.drawImage(hiddenVideo, dx, dy, dw, dh);
+      } else if (videoFile) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'bold ' + Math.round(26 * scale) + 'px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('⏳ Preparing video frames...', w / 2, h / 2);
+        ctx.textAlign = 'left';
       }
 
       // Draw Top Breaking News Header
@@ -914,6 +1237,109 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       const bottomAdY = h - bottomAdHeight;
       const footerW = Math.round(w * (footerWidthSetting / 100));
       const footerX = Math.round((w - footerW) / 2);
+      const currentTime = hiddenVideo.currentTime || 0;
+
+      // Short News Marquee Ticker (संक्षिप्त बातम्या धावती पट्टी)
+      const tickerBadge = (document.getElementById('tickerBadgeText') && document.getElementById('tickerBadgeText').value.trim()) || '';
+      const combinedTicker = enableTickerSetting ? tickerItems.map(t => t.trim()).filter(Boolean).join('   ◆   ') : '';
+
+      if (enableTickerSetting && combinedTicker) {
+        const userH = tickerHeightSetting || 36;
+        const tickerBarHeight = Math.max(24, Math.round(userH * 1.35 * scale));
+        let tickerY = 0;
+        if (currentTickerPos === 'below_headline') {
+          tickerY = topBarHeight;
+        } else {
+          const bottomBaseY = repName ? (bottomAdY - repHeight) : bottomAdY;
+          tickerY = bottomBaseY - tickerBarHeight;
+        }
+
+        // Ticker background: Glossy deep slate/navy
+        const tGrad = ctx.createLinearGradient(0, tickerY, 0, tickerY + tickerBarHeight);
+        tGrad.addColorStop(0, '#0F172A');
+        tGrad.addColorStop(1, '#020617');
+        ctx.fillStyle = tGrad;
+        ctx.fillRect(0, tickerY, w, tickerBarHeight);
+
+        // Vibrant accent top line
+        ctx.fillStyle = '#EF4444';
+        ctx.fillRect(0, tickerY, w, Math.max(2, Math.round(3 * scale)));
+
+        // Measure badge first so we calculate trackStartX
+        let trackStartX = Math.round(12 * scale);
+        const bPadX = Math.round(14 * scale);
+        const bFontSize = Math.max(10, Math.round(userH * 0.44 * scale));
+        const bFont = 'bold ' + bFontSize + "px 'Plus Jakarta Sans', 'Mukta', Arial, sans-serif";
+        ctx.font = bFont;
+        const bWidth = tickerBadge ? (Math.ceil(ctx.measureText(tickerBadge).width) + (bPadX * 2)) : 0;
+        const bHeight = tickerBarHeight - Math.round(8 * scale);
+        const bX = Math.round(8 * scale);
+        const bY = tickerY + Math.round(4 * scale);
+
+        if (tickerBadge) {
+          trackStartX = bX + bWidth + Math.round(14 * scale);
+        }
+
+        // 1. Scrolling Marquee Track (strictly clipped to the right of the badge area)
+        const trackW = w - trackStartX;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(trackStartX, tickerY, trackW, tickerBarHeight);
+        ctx.clip();
+
+        const tFontSize = Math.max(12, Math.round(userH * 0.52 * scale));
+        const tFont = '800 ' + tFontSize + "px 'Mukta', 'Plus Jakarta Sans', Arial, sans-serif";
+        ctx.font = tFont;
+        const textW = ctx.measureText(combinedTicker).width;
+        const gap = Math.round(130 * scale);
+        const cycleW = textW + gap;
+        const speed = (currentTickerSpeed || 130) * scale;
+        const offset = (currentTime * speed) % cycleW;
+
+        let curX = trackStartX - offset;
+        const midY = tickerY + (tickerBarHeight / 2);
+        ctx.textBaseline = 'middle';
+
+        while (curX < w) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillText(combinedTicker, curX, midY);
+
+          // Diamond broadcast separator between loops
+          ctx.fillStyle = '#F59E0B';
+          ctx.fillText('   ◆   ', curX + textW + Math.round(10 * scale), midY);
+
+          curX += cycleW;
+        }
+        ctx.restore();
+
+        // 2. Fixed Badge on left (rendered AFTER marquee to guarantee zero overlap)
+        if (tickerBadge) {
+          // Solid base fill over badge area to cleanly mask any scrolling text boundary
+          ctx.fillStyle = tGrad;
+          ctx.fillRect(0, tickerY, trackStartX, tickerBarHeight);
+
+          // Top red accent on the solid backing
+          ctx.fillStyle = '#EF4444';
+          ctx.fillRect(0, tickerY, trackStartX, Math.max(2, Math.round(3 * scale)));
+
+          const bGrad = ctx.createLinearGradient(bX, bY, bX + bWidth, bY + bHeight);
+          bGrad.addColorStop(0, '#DC2626');
+          bGrad.addColorStop(1, '#991B1B');
+          ctx.fillStyle = bGrad;
+          ctx.beginPath();
+          ctx.roundRect(bX, bY, bWidth, bHeight, Math.round(6 * scale));
+          ctx.fill();
+
+          ctx.strokeStyle = '#FEF08A';
+          ctx.lineWidth = Math.max(1, Math.round(1.5 * scale));
+          ctx.stroke();
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = bFont;
+          ctx.textBaseline = 'middle';
+          ctx.fillText(tickerBadge, bX + bPadX, bY + bHeight / 2);
+        }
+      }
 
       if (repName) {
         const repY = bottomAdY - repHeight;
@@ -941,7 +1367,6 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       // Filter valid ads
       const validAds = ads.filter(a => a.type === 'image' ? (a.imageUrl || loadedImages[a.id]) : (a.businessName || a.tagline));
       const activeList = validAds.length > 0 ? validAds : ads;
-      const currentTime = hiddenVideo.currentTime || 0;
 
       if (currentAdMode === 'rotate' || activeList.length <= 1) {
         // ROTATION MODE: Slide swap every 5s
@@ -1174,7 +1599,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
             const lastComma = rawResult.lastIndexOf(',');
             base64Data = lastComma !== -1 ? rawResult.substring(lastComma + 1) : rawResult;
           }
-          base64Data = base64Data.replace(/[\r\n\s]+/g, '');
+          base64Data = base64Data.replace(/[\\r\\n\\s]+/g, '');
 
           const cleanMime = (chosenType.split(';')[0] || 'video/mp4').trim();
           const ext = cleanMime.includes('mp4') ? 'mp4' : 'webm';
@@ -1320,7 +1745,7 @@ export default function AdminVideoStudioScreen() {
         } else {
           Alert.alert(
             'Video Ready! 🎬',
-            'Choose how you want to use this video. Tip: If WhatsApp shows "Couldn\'t process video", choose "Download to Phone" first, then attach the video from your Gallery or send as a Document in WhatsApp.',
+            'Choose how you want to use this video. Tip: I WhatsApp shows "Couldn\'t process video", choose "Download to Phone" first, then attach the video from your Gallery or send as a Document in WhatsApp.',
             [
               {
                 text: '💾 Download to Phone',
@@ -1334,12 +1759,83 @@ export default function AdminVideoStudioScreen() {
             ]
           );
         }
+      } else if (data.type === 'PICK_VIDEO_NATIVE') {
+        void pickVideoNatively();
+      } else if (data.type === 'LOAD_VIDEO_CHUNKS' || data.type === 'LOAD_VIDEO_BASE64') {
+        try {
+          const base64 = await FileSystem.readAsStringAsync(data.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          const mime = (data.name && data.name.toLowerCase().endsWith('.webm')) ? 'video/webm' : 'video/mp4';
+          const CHUNK_SIZE = 250000;
+          const totalChunks = Math.ceil(base64.length / CHUNK_SIZE);
+
+          webViewRef.current?.injectJavaScript(`
+            if (typeof window.startChunkedTransfer === 'function') {
+              window.startChunkedTransfer(${totalChunks}, ${JSON.stringify(data.name || 'video.mp4')}, ${JSON.stringify(mime)});
+            }
+            true;
+          `);
+
+          for (let i = 0; i < totalChunks; i++) {
+            const chunk = base64.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+            webViewRef.current?.injectJavaScript(`
+              if (typeof window.receiveChunk === 'function') {
+                window.receiveChunk(${i}, ${JSON.stringify(chunk)});
+              }
+              true;
+            `);
+          }
+        } catch (err: any) {
+          Alert.alert('Load Video Error', 'Could not read video file: ' + err.message);
+        }
       } else if (data.type === 'ALERT') {
         Alert.alert('Video Studio', data.message || '');
       }
     } catch (err: any) {
       setExporting(false);
       Alert.alert('Export Error', err.message || 'Failed to process exported video.');
+    }
+  };
+
+  const pickVideoNatively = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission Required', 'Please allow gallery access to select your video reel.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['videos'],
+        allowsEditing: false,
+        quality: 1,
+      });
+      if (result.canceled || !result.assets || !result.assets[0]) return;
+      const asset = result.assets[0];
+      const filename = asset.fileName || `video_${Date.now()}.mp4`;
+
+      // Copy to app's cache directory so it's a solid, local file:/// path with standard extension
+      let localUri = asset.uri;
+      const cleanExt = filename.toLowerCase().endsWith('.webm') ? '.webm' : '.mp4';
+      const cachePath = `${FileSystem.cacheDirectory}studio_picked_${Date.now()}${cleanExt}`;
+      try {
+        await FileSystem.copyAsync({
+          from: asset.uri,
+          to: cachePath,
+        });
+        localUri = cachePath;
+      } catch (copyErr) {
+        console.warn('Cache copy note:', copyErr);
+      }
+
+      webViewRef.current?.injectJavaScript(`
+        if (typeof window.loadNativeVideoUri === 'function') {
+          window.loadNativeVideoUri(${JSON.stringify(localUri)}, ${JSON.stringify(filename)});
+        }
+        true;
+      `);
+    } catch (err: any) {
+      Alert.alert('Video Selection Error', err.message || 'Could not pick video.');
     }
   };
 
@@ -1354,18 +1850,23 @@ export default function AdminVideoStudioScreen() {
             Burn Headlines, Image Banners & Ads
           </Text>
         </View>
-        <View style={{ width: 40 }} />
+        <IconButton icon="videocam-outline" onPress={pickVideoNatively} accessibilityLabel="Choose Video from Gallery" />
       </View>
 
       {/* Light Theme Studio WebView Container */}
       <View style={styles.webViewContainer}>
         <WebView
           ref={webViewRef}
-          source={{ html: buildVideoStudioHtml(DEFAULT_LOGO_BASE64) }}
+          source={{
+            html: buildVideoStudioHtml(DEFAULT_LOGO_BASE64),
+            baseUrl: 'file:///',
+          }}
           originWhitelist={['*']}
           javaScriptEnabled={true}
           domStorageEnabled={true}
           allowFileAccess={true}
+          allowFileAccessFromFileURLs={true}
+          allowUniversalAccessFromFileURLs={true}
           allowsInlineMediaPlayback={true}
           mediaPlaybackRequiresUserAction={false}
           mixedContentMode="always"

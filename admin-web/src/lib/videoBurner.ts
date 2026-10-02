@@ -20,6 +20,13 @@ export interface VideoBurnerConfig {
   adScrollMode?: 'scroll' | 'rotate'; // 'scroll' = continuous marquee ticker, 'rotate' = slide rotation
   adRotateInterval?: number; // seconds per ad (default 6)
   adScrollSpeed?: number; // pixels per second (default 140)
+  enableTicker?: boolean; // Keep short news ticker optional
+  tickerText?: string; // Short news continuous marquee text (single or combined)
+  tickerItems?: string[]; // Multiple short news items
+  tickerBadge?: string; // Ticker badge label (e.g. '🔴 ताजी बातमी' / 'FLASH NEWS')
+  tickerHeight?: number; // Height slider in px (default 36, range 26 - 54)
+  tickerSpeed?: number; // Marquee scroll speed in px/s (default 130)
+  tickerPosition?: 'above_footer' | 'below_headline';
   aspectRatio?: 'auto' | 'portrait' | 'landscape'; // video orientation
   muteAudio?: boolean; // mute/unmute exported video audio
   footerHeight?: number; // base height in px
@@ -85,6 +92,13 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
     footerHeight = 180,
     footerWidth = 100,
     videoYShift = 0,
+    enableTicker = true,
+    tickerText,
+    tickerItems,
+    tickerBadge = '🔴 ताजी बातमी',
+    tickerHeight = 36,
+    tickerSpeed = 130,
+    tickerPosition = 'above_footer',
     sponsorBannerUrl,
     sponsorName,
     sponsorPhone,
@@ -413,6 +427,111 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
         ctx.textBaseline = 'middle';
         const repText = `बातमीदार: ${reporterName || ''} ${reporterPhone ? ` | संपर्क: ${reporterPhone}` : ''}`.trim();
         ctx.fillText(repText, footerX + Math.round(24 * scaleFactor), repY + reporterBadgeHeight / 2);
+      }
+
+      // 4. SHORT NEWS MARQUEE TICKER (संक्षिप्त बातम्या धावती पट्टी)
+      const combinedItems = tickerItems && tickerItems.length > 0 ? tickerItems.map(t => t.trim()).filter(Boolean).join('   ◆   ') : '';
+      const cleanTickerText = (enableTicker !== false && (combinedItems || (tickerText || '').trim())) || '';
+      const hasTicker = cleanTickerText.length > 0;
+
+      if (hasTicker) {
+        // Ticker bar height dynamically controlled by slider (base default 36px)
+        const userH = tickerHeight || 36;
+        const tickerBarHeight = Math.max(24, Math.round(userH * 1.35 * scaleFactor));
+        let tickerY = 0;
+        if (tickerPosition === 'below_headline') {
+          tickerY = topBarHeight;
+        } else {
+          const bottomBaseY = hasReporter ? (bottomAdY - reporterBadgeHeight) : bottomAdY;
+          tickerY = bottomBaseY - tickerBarHeight;
+        }
+
+        // Ticker background: Glossy deep navy/slate
+        const tGrad = ctx.createLinearGradient(0, tickerY, 0, tickerY + tickerBarHeight);
+        tGrad.addColorStop(0, '#0F172A');
+        tGrad.addColorStop(1, '#020617');
+        ctx.fillStyle = tGrad;
+        ctx.fillRect(0, tickerY, canvasWidth, tickerBarHeight);
+
+        // Vibrant accent top line
+        ctx.fillStyle = '#EF4444';
+        ctx.fillRect(0, tickerY, canvasWidth, Math.max(2, Math.round(3 * scaleFactor)));
+
+        // Measure badge first so we calculate trackStartX
+        let trackStartX = Math.round(12 * scaleFactor);
+        const bPadX = Math.round(14 * scaleFactor);
+        const bFontSize = Math.max(10, Math.round(userH * 0.44 * scaleFactor));
+        const bFont = `bold ${bFontSize}px 'DM Sans', 'Mukta', Arial, sans-serif`;
+        ctx.font = bFont;
+        const bWidth = tickerBadge ? (Math.ceil(ctx.measureText(tickerBadge).width) + (bPadX * 2)) : 0;
+        const bHeight = tickerBarHeight - Math.round(8 * scaleFactor);
+        const bX = Math.round(8 * scaleFactor);
+        const bY = tickerY + Math.round(4 * scaleFactor);
+
+        if (tickerBadge) {
+          trackStartX = bX + bWidth + Math.round(14 * scaleFactor);
+        }
+
+        // 1. Scrolling Marquee Track (strictly clipped to the right of the badge area)
+        const trackW = canvasWidth - trackStartX;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(trackStartX, tickerY, trackW, tickerBarHeight);
+        ctx.clip();
+
+        const tFontSize = Math.max(12, Math.round(userH * 0.52 * scaleFactor));
+        const tFont = `800 ${tFontSize}px 'DM Sans', 'Mukta', Arial, sans-serif`;
+        ctx.font = tFont;
+        const textW = ctx.measureText(cleanTickerText).width;
+        const gap = Math.round(130 * scaleFactor);
+        const cycleW = textW + gap;
+        const speed = (tickerSpeed || 130) * scaleFactor;
+        const currentTime = video.currentTime || 0;
+        const offset = (currentTime * speed) % cycleW;
+
+        let curX = trackStartX - offset;
+        const midY = tickerY + (tickerBarHeight / 2);
+        ctx.textBaseline = 'middle';
+
+        while (curX < canvasWidth) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillText(cleanTickerText, curX, midY);
+
+          // Diamond broadcast separator between loops
+          ctx.fillStyle = '#F59E0B';
+          ctx.fillText('   ◆   ', curX + textW + Math.round(10 * scaleFactor), midY);
+
+          curX += cycleW;
+        }
+        ctx.restore();
+
+        // 2. Fixed Badge on left (rendered AFTER marquee to guarantee zero overlap)
+        if (tickerBadge) {
+          // Solid base fill over badge area to cleanly mask any scrolling text boundary
+          ctx.fillStyle = tGrad;
+          ctx.fillRect(0, tickerY, trackStartX, tickerBarHeight);
+
+          // Top red accent on the solid backing
+          ctx.fillStyle = '#EF4444';
+          ctx.fillRect(0, tickerY, trackStartX, Math.max(2, Math.round(3 * scaleFactor)));
+
+          const bGrad = ctx.createLinearGradient(bX, bY, bX + bWidth, bY + bHeight);
+          bGrad.addColorStop(0, '#DC2626');
+          bGrad.addColorStop(1, '#991B1B');
+          ctx.fillStyle = bGrad;
+          ctx.beginPath();
+          ctx.roundRect(bX, bY, bWidth, bHeight, Math.round(6 * scaleFactor));
+          ctx.fill();
+
+          ctx.strokeStyle = '#FEF08A';
+          ctx.lineWidth = Math.max(1, Math.round(1.5 * scaleFactor));
+          ctx.stroke();
+
+          ctx.fillStyle = '#FFFFFF';
+          ctx.font = bFont;
+          ctx.textBaseline = 'middle';
+          ctx.fillText(tickerBadge, bX + bPadX, bY + bHeight / 2);
+        }
       }
 
       // Base Sponsor Banner Background

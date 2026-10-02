@@ -15,6 +15,11 @@ import { api } from '@convex/_generated/api';
 const CHANNEL_ID = 'news-alerts-v4';
 const NOTIFICATION_SOUND = 'news_alert.wav';
 
+const isExpoGo =
+  Constants.appOwnership === 'expo' ||
+  (Constants as any).executionEnvironment === 'storeClient';
+const EFFECTIVE_SOUND = isExpoGo ? 'default' : NOTIFICATION_SOUND;
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
@@ -36,15 +41,27 @@ async function prepareNotifications() {
   if (Platform.OS === 'web') return null;
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-      name: 'Education news alerts',
-      description: 'Article, payment, and account updates',
-      importance: Notifications.AndroidImportance.MAX,
-      sound: NOTIFICATION_SOUND,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#D99A00',
-      showBadge: true,
-    });
+    try {
+      await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+        name: 'Education news alerts',
+        description: 'Article, payment, and account updates',
+        importance: Notifications.AndroidImportance.MAX,
+        sound: EFFECTIVE_SOUND,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#D99A00',
+        showBadge: true,
+      });
+    } catch {
+      await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+        name: 'Education news alerts',
+        description: 'Article, payment, and account updates',
+        importance: Notifications.AndroidImportance.MAX,
+        sound: 'default',
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#D99A00',
+        showBadge: true,
+      });
+    }
   }
 
   let permissions = await Notifications.getPermissionsAsync();
@@ -150,7 +167,7 @@ export function SystemNotifications() {
           content: {
             title: notification.title,
             body: notification.message,
-            sound: NOTIFICATION_SOUND,
+            sound: EFFECTIVE_SOUND,
             data: {
               notificationId: notification.id,
               audience: notification.audience,

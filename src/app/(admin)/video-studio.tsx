@@ -338,7 +338,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
 
   <!-- 3. TOP BREAKING NEWS HEADER -->
   <div class="card">
-    <div class="card-title">📰 Top Breaking News Headline</div>
+    <div class="card-title">📰 Top Breaking News Headline & Description</div>
 
     <label>Badge Category Tag</label>
     <input type="text" id="badgeText" placeholder="उदा. BREAKING NEWS / ताज्या बातम्या (किंवा रिकामे ठेवा)" value="" oninput="drawFrame()" />
@@ -346,19 +346,37 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
     <label>News Headline Text (Marathi / English)</label>
     <textarea id="headlineText" rows="2" placeholder="येथे बातमीचे शीर्षक टाईप करा... (उदा. दहावी-बारावी परीक्षेच्या वेळापत्रकात मोठा बदल)" oninput="drawFrame()"></textarea>
 
-    <div class="row">
-      <div class="col">
-        <label>Headline Font Size</label>
-        <select id="fontSizeSelect" onchange="drawFrame()">
-          <option value="44">Normal (44px)</option>
-          <option value="56" selected>Large (56px)</option>
-          <option value="68">Extra Large (68px)</option>
-          <option value="80">Huge (80px)</option>
-        </select>
+    <!-- Headline Font Size Slider -->
+    <div style="margin-top: 6px; margin-bottom: 12px;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <label style="margin:0; font-weight:700;">Headline Text Size (शीर्षक अक्षरांचा आकार)</label>
+        <span id="headlineSizeVal" style="font-size:12px; color:#d97706; font-weight:800;">56px</span>
       </div>
-      <div class="col">
-        <label>Reporter Name</label>
-        <input type="text" id="reporterName" placeholder="उदा. रमेश सावंत (पर्यायी)" value="" oninput="drawFrame()" />
+      <input type="range" id="headlineSizeSlider" min="36" max="110" value="56" oninput="updateHeadlineSize(this.value)" style="width:100%; accent-color:#d97706;" />
+      <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; margin-top:2px;">
+        <span>36px (Small)</span>
+        <span>56px (Default)</span>
+        <span>80px (Large)</span>
+        <span>110px (Extra Large)</span>
+      </div>
+    </div>
+
+    <!-- News Description / Subtitle Input -->
+    <label>News Description / Subtitle (उपशीर्षक / बातमीचा तपशील - पर्यायी)</label>
+    <textarea id="descriptionText" rows="2" placeholder="बातमीचा सविस्तर तपशील किंवा उपशीर्षक..." oninput="drawFrame()"></textarea>
+
+    <!-- Description Font Size Slider -->
+    <div style="margin-top: 6px; margin-bottom: 12px;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <label style="margin:0; font-weight:700;">Description Text Size (तपशील अक्षरांचा आकार)</label>
+        <span id="descSizeVal" style="font-size:12px; color:#d97706; font-weight:800;">34px</span>
+      </div>
+      <input type="range" id="descSizeSlider" min="20" max="64" value="34" oninput="updateDescSize(this.value)" style="width:100%; accent-color:#d97706;" />
+      <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; margin-top:2px;">
+        <span>20px (Compact)</span>
+        <span>34px (Default)</span>
+        <span>48px (Large)</span>
+        <span>64px (Extra Large)</span>
       </div>
     </div>
 
@@ -379,7 +397,53 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
     </div>
   </div>
 
-  <!-- 4. SHORT NEWS TICKER / RUNNING MARQUEE -->
+  <!-- 4. REPORTER NAME & BANNER DETAILS -->
+  <div class="card">
+    <div class="card-title">🎙️ Reporter Name & Banner Details (बातमीदार पट्टी)</div>
+    
+    <div class="row">
+      <div class="col">
+        <label>Reporter Name</label>
+        <input type="text" id="reporterName" placeholder="उदा. रमेश सावंत (पर्यायी)" value="" oninput="drawFrame()" />
+      </div>
+      <div class="col">
+        <label>Reporter Phone / Contact</label>
+        <input type="text" id="reporterPhone" placeholder="उदा. 9876543210 (पर्यायी)" value="" oninput="drawFrame()" />
+      </div>
+    </div>
+
+    <!-- Reporter Strip Height Slider -->
+    <div style="margin-top: 8px; margin-bottom: 12px;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <label style="margin:0; font-weight:700;">Reporter Strip Height (पट्टीची उंची)</label>
+        <span id="reporterHeightVal" style="font-size:12px; color:#d97706; font-weight:800;">54px</span>
+      </div>
+      <input type="range" id="reporterHeightSlider" min="32" max="120" value="54" oninput="updateReporterHeight(this.value)" style="width:100%; accent-color:#d97706;" />
+      <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; margin-top:2px;">
+        <span>32px (Slim)</span>
+        <span>54px (Default)</span>
+        <span>80px (Medium)</span>
+        <span>120px (Extra Tall)</span>
+      </div>
+    </div>
+
+    <!-- Reporter Text Size Slider -->
+    <div style="margin-top: 6px; margin-bottom: 4px;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <label style="margin:0; font-weight:700;">Reporter Text Size (अक्षरांचा आकार)</label>
+        <span id="reporterTextSizeVal" style="font-size:12px; color:#d97706; font-weight:800;">24px</span>
+      </div>
+      <input type="range" id="reporterTextSizeSlider" min="14" max="44" value="24" oninput="updateReporterTextSize(this.value)" style="width:100%; accent-color:#d97706;" />
+      <div style="display:flex; justify-content:space-between; font-size:10px; color:#94a3b8; margin-top:2px;">
+        <span>14px (Small)</span>
+        <span>24px (Standard)</span>
+        <span>34px (Large)</span>
+        <span>44px (Extra Large)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. SHORT NEWS TICKER / RUNNING MARQUEE -->
   <div class="card">
     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
       <div>
@@ -546,6 +610,10 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
     let tickerItems = [''];
     let tickerHeightSetting = 36;
     let isExportMuted = false;
+    let headlineSizeSetting = 56;
+    let descSizeSetting = 34;
+    let reporterHeightSetting = 54;
+    let reporterTextSizeSetting = 24;
     let footerHeightSetting = 180;
     let footerWidthSetting = 100;
     let videoYShiftSetting = 0;
@@ -823,6 +891,34 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
         videoYShiftSetting = parseInt(yEl.value, 10);
         document.getElementById('videoYShiftVal').innerText = (videoYShiftSetting > 0 ? '+' : '') + videoYShiftSetting + 'px';
       }
+      drawFrame();
+    }
+
+    function updateHeadlineSize(val) {
+      headlineSizeSetting = parseInt(val, 10);
+      const el = document.getElementById('headlineSizeVal');
+      if (el) el.innerText = headlineSizeSetting + 'px';
+      drawFrame();
+    }
+
+    function updateDescSize(val) {
+      descSizeSetting = parseInt(val, 10);
+      const el = document.getElementById('descSizeVal');
+      if (el) el.innerText = descSizeSetting + 'px';
+      drawFrame();
+    }
+
+    function updateReporterHeight(val) {
+      reporterHeightSetting = parseInt(val, 10);
+      const el = document.getElementById('reporterHeightVal');
+      if (el) el.innerText = reporterHeightSetting + 'px';
+      drawFrame();
+    }
+
+    function updateReporterTextSize(val) {
+      reporterTextSizeSetting = parseInt(val, 10);
+      const el = document.getElementById('reporterTextSizeVal');
+      if (el) el.innerText = reporterTextSizeSetting + 'px';
       drawFrame();
     }
 
@@ -1137,7 +1233,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       const hasBadge = Boolean(badgeText);
 
       const headline = (document.getElementById('headlineText') && document.getElementById('headlineText').value) || '';
-      const baseFontSize = parseInt((document.getElementById('fontSizeSelect') && document.getElementById('fontSizeSelect').value) || '56', 10);
+      const baseFontSize = headlineSizeSetting || 56;
       const calcHeadlineSize = Math.max(22, Math.round(baseFontSize * scale));
       const lineHeight = Math.round(calcHeadlineSize * 1.25);
       const headlineFont = '900 ' + calcHeadlineSize + "px 'Mukta', 'Plus Jakarta Sans', Arial, sans-serif";
@@ -1146,6 +1242,16 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       const maxHeadlineWidth = w - Math.round(60 * scale);
       const lines = headline ? wrapText(ctx, headline, maxHeadlineWidth).slice(0, 2) : [];
       const numLines = Math.max(1, lines.length);
+
+      // Description text & styling
+      const description = (document.getElementById('descriptionText') && document.getElementById('descriptionText').value.trim()) || '';
+      const baseDescSize = descSizeSetting || 34;
+      const calcDescSize = Math.max(14, Math.round(baseDescSize * scale));
+      const descLineHeight = Math.round(calcDescSize * 1.25);
+      const descFont = '700 ' + calcDescSize + "px 'Mukta', 'Plus Jakarta Sans', Arial, sans-serif";
+
+      ctx.font = descFont;
+      const descLines = description ? wrapText(ctx, description, maxHeadlineWidth).slice(0, 2) : [];
 
       let badgeHeight = 0;
       let badgeWidth = 0;
@@ -1174,8 +1280,9 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       const logoX = w - logoSize - Math.round(18 * scale);
       const logoY = Math.round(14 * scale);
 
-      const calculatedBarHeight = (lines.length > 0 || hasBadge)
-        ? headlineStartY + (numLines * lineHeight) + Math.round(18 * scale)
+      const descTotalHeight = descLines.length > 0 ? (descLines.length * descLineHeight + Math.round(10 * scale)) : 0;
+      const calculatedBarHeight = (lines.length > 0 || hasBadge || descLines.length > 0)
+        ? headlineStartY + (numLines * lineHeight) + descTotalHeight + Math.round(18 * scale)
         : Math.round(70 * scale);
       const minBarForLogo = logoY + logoSize + Math.round(14 * scale);
       const topBarHeight = Math.max(calculatedBarHeight, minBarForLogo);
@@ -1215,6 +1322,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
       }
 
       // Headlines text
+      let currentTextY = headlineStartY;
       if (lines.length > 0) {
         ctx.font = headlineFont;
         ctx.fillStyle = '#FFFFFF';
@@ -1223,16 +1331,35 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
         ctx.textBaseline = 'top';
-        const startY = badgeY + badgeHeight + Math.round(14 * scale);
         lines.forEach((l, idx) => {
-          ctx.fillText(l, Math.round(20 * scale), startY + idx * lineHeight);
+          ctx.fillText(l, Math.round(20 * scale), currentTextY + idx * lineHeight);
+        });
+        currentTextY += lines.length * lineHeight;
+        ctx.shadowColor = 'transparent';
+      }
+
+      // Description text (Gold/Yellow subtitle)
+      if (descLines.length > 0) {
+        ctx.font = descFont;
+        ctx.fillStyle = '#FEF08A';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        ctx.textBaseline = 'top';
+        const descStartY = currentTextY + Math.round(6 * scale);
+        descLines.forEach((dl, didx) => {
+          ctx.fillText(dl, Math.round(20 * scale), descStartY + didx * descLineHeight);
         });
         ctx.shadowColor = 'transparent';
       }
 
       // Reporter Strip (Optional)
       const repName = (document.getElementById('reporterName') && document.getElementById('reporterName').value.trim()) || '';
-      const repHeight = repName ? Math.max(30, Math.round(42 * scale)) : 0;
+      const repPhone = (document.getElementById('reporterPhone') && document.getElementById('reporterPhone').value.trim()) || '';
+      const hasReporter = Boolean(repName || repPhone);
+      const userRepH = reporterHeightSetting || 54;
+      const repHeight = hasReporter ? Math.max(26, Math.round(userRepH * scale)) : 0;
       const bottomAdHeight = Math.max(50, Math.round(footerHeightSetting * scale));
       const bottomAdY = h - bottomAdHeight;
       const footerW = Math.round(w * (footerWidthSetting / 100));
@@ -1250,7 +1377,7 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
         if (currentTickerPos === 'below_headline') {
           tickerY = topBarHeight;
         } else {
-          const bottomBaseY = repName ? (bottomAdY - repHeight) : bottomAdY;
+          const bottomBaseY = hasReporter ? (bottomAdY - repHeight) : bottomAdY;
           tickerY = bottomBaseY - tickerBarHeight;
         }
 
@@ -1341,16 +1468,19 @@ function buildVideoStudioHtml(defaultLogoBase64: string): string {
         }
       }
 
-      if (repName) {
+      if (hasReporter) {
         const repY = bottomAdY - repHeight;
         ctx.fillStyle = 'rgba(15, 15, 15, 0.92)';
         ctx.fillRect(footerX, repY, footerW, repHeight);
         ctx.fillStyle = '#FFD700';
         ctx.fillRect(footerX, repY, Math.round(6 * scale), repHeight);
-        ctx.font = 'bold ' + Math.max(13, Math.round(20 * scale)) + "px 'Mukta', Arial, sans-serif";
+        const userRepFontSize = reporterTextSizeSetting || 24;
+        const repFontSize = Math.max(12, Math.round(userRepFontSize * scale));
+        ctx.font = 'bold ' + repFontSize + "px 'Mukta', Arial, sans-serif";
         ctx.fillStyle = '#FFFFFF';
         ctx.textBaseline = 'middle';
-        ctx.fillText('बातमीदार: ' + repName, footerX + Math.round(20 * scale), repY + repHeight / 2);
+        const repFullText = 'बातमीदार: ' + repName + (repPhone ? ' | संपर्क: ' + repPhone : '');
+        ctx.fillText(repFullText, footerX + Math.round(20 * scale), repY + repHeight / 2);
       }
 
       // Bottom Sponsor Bar Background

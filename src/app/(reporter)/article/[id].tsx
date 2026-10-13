@@ -1,8 +1,8 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, type Href } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import type { ElementRef } from 'react';
 import { useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import ViewShot from 'react-native-view-shot';
 
 import { ArticleNewspaperLayout, plainArticleText } from '@/components/ui/ArticleNewspaperLayout';
@@ -17,22 +17,22 @@ import { useReporters } from '@/context/ReportersContext';
 import { useAppTheme } from '@/theme';
 
 const SHARE_WIDTH = 1200;
-const SHARE_HEIGHT = 1800;
-const SHARE_ASPECT = SHARE_HEIGHT / SHARE_WIDTH;
+const CAPTURE_LAYOUT_WIDTH = 768;
+const CAPTURE_LAYOUT_HEIGHT = 1152;
 
 export default function ArticleDetailScreen() {
   const theme = useAppTheme();
-  const { width: windowWidth } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getArticle } = useArticles();
   const { getReporter } = useReporters();
   const article = getArticle(id);
-  const reporterPhone = article ? getReporter(article.reporterId)?.phone : undefined;
+  const reporter = article ? getReporter(article.reporterId) : undefined;
+  const reporterPhone = article?.reporterPhone?.trim() || reporter?.phone;
   const viewShotRef1 = useRef<ElementRef<typeof ViewShot>>(null);
   const viewShotRef2 = useRef<ElementRef<typeof ViewShot>>(null);
   const [sharing, setSharing] = useState(false);
-  const [page1Height, setPage1Height] = useState(windowWidth * SHARE_ASPECT);
-  const [page2Height, setPage2Height] = useState(windowWidth * SHARE_ASPECT);
+  const [captureHeight1, setCaptureHeight1] = useState(CAPTURE_LAYOUT_HEIGHT);
+  const [captureHeight2, setCaptureHeight2] = useState(CAPTURE_LAYOUT_HEIGHT);
   const hasPage2 = !!(article?.page2 && article.page2.title.trim());
 
   if (!article) {
@@ -101,16 +101,18 @@ export default function ArticleDetailScreen() {
       <View style={styles.header}>
         <IconButton icon="arrow-back" onPress={() => router.back()} />
         <View style={styles.headerActions}>
+          <StatusBadge status={article.status} />
           {article.status === 'approved' ? (
             <IconButton icon="share-social-outline" onPress={handleShare} disabled={sharing} />
           ) : null}
-          <StatusBadge status={article.status} />
+          <IconButton
+            icon="create-outline"
+            onPress={() => router.push(`/(reporter)/create-article?id=${encodeURIComponent(article.id)}` as Href)}
+          />
         </View>
       </View>
 
-      <ScrollView
-        style={[styles.articleScroll, { width: windowWidth }]}
-        contentContainerStyle={[styles.scroll, { width: windowWidth }]}>
+      <ScrollView contentContainerStyle={styles.scroll}>
         {article.status === 'rejected' && article.rejectionReason ? (
           <Card style={[styles.rejectionCard, { backgroundColor: theme.colors.dangerMuted, borderColor: theme.colors.danger }]}>
             <View style={styles.rejectionHeader}>
@@ -122,26 +124,26 @@ export default function ArticleDetailScreen() {
         ) : null}
 
         <View>
-          <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} shareMode />
+          <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} />
         </View>
       </ScrollView>
 
       <View pointerEvents="none" style={styles.captureHost}>
         <ViewShot
           ref={viewShotRef1}
-          style={[styles.articleCapture, { width: windowWidth, height: page1Height }]}
+          style={[styles.articleCapture, { width: CAPTURE_LAYOUT_WIDTH, height: captureHeight1 }]}
           options={{
             format: 'png',
             quality: 1,
             width: SHARE_WIDTH,
-            height: Math.round(SHARE_WIDTH * (page1Height / windowWidth)),
+            height: Math.round(SHARE_WIDTH * (captureHeight1 / CAPTURE_LAYOUT_WIDTH)),
           }}>
           <View
-            style={[styles.captureContent, { width: windowWidth }]}
+            style={[styles.captureContent, { width: CAPTURE_LAYOUT_WIDTH }]}
             onLayout={({ nativeEvent }) => {
               const measured = Math.ceil(nativeEvent.layout.height);
-              if (measured > 0 && Math.abs(measured - page1Height) > 1) {
-                setPage1Height(measured);
+              if (measured > 0 && measured !== captureHeight1) {
+                setCaptureHeight1(measured);
               }
             }}>
             <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} shareMode pageOnly={1} />
@@ -151,19 +153,19 @@ export default function ArticleDetailScreen() {
         {hasPage2 ? (
           <ViewShot
             ref={viewShotRef2}
-            style={[styles.articleCapture, { width: windowWidth, height: page2Height, marginTop: 40 }]}
+            style={[styles.articleCapture, { width: CAPTURE_LAYOUT_WIDTH, height: captureHeight2, marginTop: 40 }]}
             options={{
               format: 'png',
               quality: 1,
               width: SHARE_WIDTH,
-              height: Math.round(SHARE_WIDTH * (page2Height / windowWidth)),
+              height: Math.round(SHARE_WIDTH * (captureHeight2 / CAPTURE_LAYOUT_WIDTH)),
             }}>
             <View
-              style={[styles.captureContent, { width: windowWidth }]}
+              style={[styles.captureContent, { width: CAPTURE_LAYOUT_WIDTH }]}
               onLayout={({ nativeEvent }) => {
                 const measured = Math.ceil(nativeEvent.layout.height);
-                if (measured > 0 && Math.abs(measured - page2Height) > 1) {
-                  setPage2Height(measured);
+                if (measured > 0 && measured !== captureHeight2) {
+                  setCaptureHeight2(measured);
                 }
               }}>
               <ArticleNewspaperLayout article={article} reporterPhone={reporterPhone} shareMode pageOnly={2} />
@@ -188,11 +190,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   scroll: {
-    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 48,
-  },
-  articleScroll: {
-    alignSelf: 'stretch',
   },
   articleCapture: {
     overflow: 'hidden',
@@ -207,7 +207,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     top: 0,
-    transformOrigin: 'top left',
     backgroundColor: '#FFFFFF',
   },
   banner: {
@@ -233,7 +232,7 @@ const styles = StyleSheet.create({
   },
   rejectionCard: {
     marginTop: 16,
-    marginHorizontal: 20,
+    marginHorizontal: 4,
     gap: 6,
   },
   rejectionHeader: {

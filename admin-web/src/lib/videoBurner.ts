@@ -10,11 +10,15 @@ export interface SponsorAdItem {
 export interface VideoBurnerConfig {
   videoFile: File;
   headline: string;
+  description?: string;
   badgeText: string;
   headlineFontSize?: number;
+  descriptionFontSize?: number;
   badgeColor?: string;
   reporterName?: string;
   reporterPhone?: string;
+  reporterHeight?: number;
+  reporterFontSize?: number;
   showLogo?: boolean;
   ads?: SponsorAdItem[];
   adScrollMode?: 'scroll' | 'rotate'; // 'scroll' = continuous marquee ticker, 'rotate' = slide rotation
@@ -78,10 +82,14 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
   const {
     videoFile,
     headline,
+    description,
     badgeText,
     headlineFontSize,
+    descriptionFontSize,
     reporterName,
     reporterPhone,
+    reporterHeight = 54,
+    reporterFontSize = 24,
     showLogo = true,
     ads,
     adScrollMode = 'scroll',
@@ -321,6 +329,15 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
       const headlineLines = headline ? wrapText(ctx, headline, maxHeadlineWidth).slice(0, 2) : [];
       const numLines = Math.max(1, headlineLines.length);
 
+      // Description Typography & Measurement
+      const baseDescSize = descriptionFontSize || 34;
+      const calcDescSize = Math.max(18, Math.round(baseDescSize * scaleFactor));
+      const descLineHeight = Math.round(calcDescSize * 1.28);
+      const descFont = `700 ${calcDescSize}px 'DM Sans', 'Mukta', 'Noto Sans Devanagari', Arial, sans-serif`;
+      ctx.font = descFont;
+      const descLines = description ? wrapText(ctx, description, maxHeadlineWidth).slice(0, 2) : [];
+      const numDescLines = descLines.length;
+
       // Badge dimensions
       const badgeFontSize = Math.max(16, Math.round(24 * scaleFactor));
       const badgeFont = `bold ${badgeFontSize}px 'DM Sans', 'Mukta', Arial, sans-serif`;
@@ -337,7 +354,8 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
       const logoX = canvasWidth - logoSize - Math.round(24 * scaleFactor);
       const logoY = Math.round(14 * scaleFactor);
 
-      const calculatedBarHeight = badgeY + badgeHeight + Math.round(14 * scaleFactor) + (numLines * lineHeight) + Math.round(20 * scaleFactor);
+      const descBlockHeight = numDescLines > 0 ? (numDescLines * descLineHeight) + Math.round(10 * scaleFactor) : 0;
+      const calculatedBarHeight = badgeY + badgeHeight + Math.round(14 * scaleFactor) + (numLines * lineHeight) + descBlockHeight + Math.round(20 * scaleFactor);
       const minBarForLogo = logoImg ? (logoY + logoSize + Math.round(14 * scaleFactor)) : 0;
       const topBarHeight = Math.max(calculatedBarHeight, minBarForLogo);
 
@@ -400,9 +418,32 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
         ctx.shadowOffsetY = 0;
       }
 
+      // Draw Description Text (High Contrast Light Gold Accent)
+      if (descLines.length > 0) {
+        ctx.font = descFont;
+        ctx.fillStyle = '#FEF08A';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+        ctx.textBaseline = 'top';
+
+        const descStartY = headlineStartY + (headlineLines.length * lineHeight) + Math.round(8 * scaleFactor);
+        descLines.forEach((line, idx) => {
+          ctx.fillText(line, Math.round(24 * scaleFactor), descStartY + idx * descLineHeight);
+        });
+
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      }
+
       // 3. REPORTER INFO BADGE (above bottom sponsor ad)
       const hasReporter = Boolean(reporterName || reporterPhone);
-      const reporterBadgeHeight = hasReporter ? Math.max(34, Math.round(48 * scaleFactor)) : 0;
+      const userRepH = reporterHeight || 54;
+      const reporterBadgeHeight = hasReporter ? Math.max(34, Math.round(userRepH * scaleFactor)) : 0;
 
       // 4. BOTTOM SPONSOR ADVERTISEMENT BANNER
       const baseFooterHeight = footerHeight || 180;
@@ -422,7 +463,9 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
         ctx.fillStyle = '#FFD700';
         ctx.fillRect(footerX, repY, Math.max(5, Math.round(8 * scaleFactor)), reporterBadgeHeight);
 
-        ctx.font = `bold ${Math.max(14, Math.round(22 * scaleFactor))}px 'DM Sans', Arial, sans-serif`;
+        const userRepFontSize = reporterFontSize || 24;
+        const repFontSize = Math.max(14, Math.round(userRepFontSize * scaleFactor));
+        ctx.font = `bold ${repFontSize}px 'DM Sans', 'Mukta', Arial, sans-serif`;
         ctx.fillStyle = '#FFFFFF';
         ctx.textBaseline = 'middle';
         const repText = `बातमीदार: ${reporterName || ''} ${reporterPhone ? ` | संपर्क: ${reporterPhone}` : ''}`.trim();

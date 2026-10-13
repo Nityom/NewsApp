@@ -33,9 +33,13 @@ export function VideoStudioPage() {
   const [badgeText, setBadgeText] = useState('');
   const [headline, setHeadline] = useState('');
   const [headlineSize, setHeadlineSize] = useState<number>(56);
+  const [description, setDescription] = useState('');
+  const [descriptionSize, setDescriptionSize] = useState<number>(34);
   const [showLogo, setShowLogo] = useState(true);
   const [reporterName, setReporterName] = useState('');
   const [reporterPhone, setReporterPhone] = useState('');
+  const [reporterHeight, setReporterHeight] = useState<number>(54);
+  const [reporterFontSize, setReporterFontSize] = useState<number>(24);
 
   // Short News Ticker Marquee State (Optional toggle, multiple items, height slider)
   const [showTicker, setShowTicker] = useState(false);
@@ -185,10 +189,14 @@ export function VideoStudioPage() {
       const exportedBlob = await burnAndExportVideo({
         videoFile,
         headline,
+        description,
         badgeText,
         headlineFontSize: headlineSize,
+        descriptionFontSize: descriptionSize,
         reporterName,
         reporterPhone,
+        reporterHeight,
+        reporterFontSize,
         showLogo,
         ads,
         adScrollMode,
@@ -232,6 +240,7 @@ export function VideoStudioPage() {
 
   const isOverOneMinute = duration > 60;
   const previewFooterH = Math.max(45, Math.round(footerHeight * (effectiveLandscape ? 0.41 : 0.52)));
+  const previewReporterH = Math.max(26, Math.round(reporterHeight * (effectiveLandscape ? 0.41 : 0.52)));
   const previewVideoY = Math.round(videoYShift * (effectiveLandscape ? 0.41 : 0.52));
   const footerLeftPct = Math.max(0, (100 - footerWidth) / 2);
 
@@ -450,17 +459,29 @@ export function VideoStudioPage() {
                 />
               </label>
 
+              <label>
+                News Description / Subheading (पर्यायी बातमीचा तपशील / उपशीर्षक)
+                <textarea
+                  rows={2}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="उदा. सविस्तर बातमी, महत्वाचे मुद्दे किंवा तपशील येथे लिहा..."
+                  style={{ fontSize: 14, fontWeight: 600 }}
+                />
+              </label>
+
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <label style={{ margin: 0 }}>Headline Text Size</label>
-                  <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--red)' }}>{headlineSize}px (Standard TV News)</span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--red)' }}>{headlineSize}px (TV News)</span>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   {[
                     { label: 'Normal (44px)', size: 44 },
                     { label: 'Large (56px)', size: 56 },
                     { label: 'Extra Large (68px)', size: 68 },
-                    { label: 'Mega (80px)', size: 80 },
+                    { label: 'Mega (84px)', size: 84 },
+                    { label: 'Ultra (100px)', size: 100 },
                   ].map((preset) => (
                     <button
                       key={preset.size}
@@ -474,10 +495,43 @@ export function VideoStudioPage() {
                   <input
                     type="range"
                     min="36"
-                    max="96"
+                    max="110"
                     step="2"
                     value={headlineSize}
                     onChange={(e) => setHeadlineSize(Number(e.target.value))}
+                    style={{ flex: 1, minWidth: 100, accentColor: 'var(--red)', margin: 0 }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <label style={{ margin: 0 }}>Description Text Size</label>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--red)' }}>{descriptionSize}px</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {[
+                    { label: 'Small (26px)', size: 26 },
+                    { label: 'Normal (34px)', size: 34 },
+                    { label: 'Large (42px)', size: 42 },
+                    { label: 'Big (52px)', size: 52 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.size}
+                      type="button"
+                      className={`composer-mode-btn ${descriptionSize === preset.size ? 'active' : ''}`}
+                      style={{ padding: '6px 12px', fontSize: 12 }}
+                      onClick={() => setDescriptionSize(preset.size)}>
+                      {preset.label}
+                    </button>
+                  ))}
+                  <input
+                    type="range"
+                    min="20"
+                    max="64"
+                    step="2"
+                    value={descriptionSize}
+                    onChange={(e) => setDescriptionSize(Number(e.target.value))}
                     style={{ flex: 1, minWidth: 100, accentColor: 'var(--red)', margin: 0 }}
                   />
                 </div>
@@ -526,6 +580,74 @@ export function VideoStudioPage() {
                   placeholder="9850541111"
                 />
               </label>
+            </div>
+
+            {/* Reporter Strip Height Slider */}
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ margin: 0 }}>Reporter Strip Height (उंची)</label>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#D97706' }}>{reporterHeight}px</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {[
+                  { label: 'Compact (42px)', size: 42 },
+                  { label: 'Standard (54px)', size: 54 },
+                  { label: 'Tall (68px)', size: 68 },
+                  { label: 'Max (86px)', size: 86 },
+                ].map((preset) => (
+                  <button
+                    key={preset.size}
+                    type="button"
+                    className={`composer-mode-btn ${reporterHeight === preset.size ? 'active' : ''}`}
+                    style={{ padding: '6px 12px', fontSize: 12 }}
+                    onClick={() => setReporterHeight(preset.size)}>
+                    {preset.label}
+                  </button>
+                ))}
+                <input
+                  type="range"
+                  min="32"
+                  max="120"
+                  step="2"
+                  value={reporterHeight}
+                  onChange={(e) => setReporterHeight(Number(e.target.value))}
+                  style={{ flex: 1, minWidth: 100, accentColor: '#D97706', margin: 0 }}
+                />
+              </div>
+            </div>
+
+            {/* Reporter Text Size Slider */}
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ margin: 0 }}>Reporter Text Size (फॉन्ट आकार)</label>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#D97706' }}>{reporterFontSize}px</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {[
+                  { label: 'Small (18px)', size: 18 },
+                  { label: 'Normal (24px)', size: 24 },
+                  { label: 'Large (30px)', size: 30 },
+                  { label: 'Extra Large (36px)', size: 36 },
+                ].map((preset) => (
+                  <button
+                    key={preset.size}
+                    type="button"
+                    className={`composer-mode-btn ${reporterFontSize === preset.size ? 'active' : ''}`}
+                    style={{ padding: '6px 12px', fontSize: 12 }}
+                    onClick={() => setReporterFontSize(preset.size)}>
+                    {preset.label}
+                  </button>
+                ))}
+                <input
+                  type="range"
+                  min="14"
+                  max="44"
+                  step="2"
+                  value={reporterFontSize}
+                  onChange={(e) => setReporterFontSize(Number(e.target.value))}
+                  style={{ flex: 1, minWidth: 100, accentColor: '#D97706', margin: 0 }}
+                />
+              </div>
             </div>
           </div>
 
@@ -1151,6 +1273,24 @@ export function VideoStudioPage() {
                   }}>
                   {headline || 'Enter headline to preview...'}
                 </div>
+                {description ? (
+                  <div
+                    style={{
+                      marginTop: 4,
+                      color: '#FEF08A',
+                      fontSize: `${Math.max(11, Math.round(descriptionSize * 0.36))}px`,
+                      fontWeight: 700,
+                      lineHeight: 1.25,
+                      fontFamily: "'DM Sans', 'Mukta', sans-serif",
+                      textShadow: '0 2px 4px rgba(0,0,0,0.85)',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}>
+                    {description}
+                  </div>
+                ) : null}
               </div>
 
               {/* OVERLAY: Running Short News Ticker Marquee */}
@@ -1159,8 +1299,8 @@ export function VideoStudioPage() {
                   style={{
                     position: 'absolute',
                     ...(tickerPosition === 'below_headline'
-                      ? { top: '80px' }
-                      : { bottom: `${previewFooterH + (reporterName || reporterPhone ? 28 : 0)}px` }),
+                      ? { top: description ? '104px' : '80px' }
+                      : { bottom: `${previewFooterH + (reporterName || reporterPhone ? previewReporterH : 0)}px` }),
                     left: 0,
                     right: 0,
                     height: `${tickerHeight}px`,
@@ -1234,16 +1374,19 @@ export function VideoStudioPage() {
                     bottom: `${previewFooterH}px`,
                     left: `${footerLeftPct}%`,
                     width: `${footerWidth}%`,
+                    height: `${previewReporterH}px`,
                     background: 'rgba(15, 15, 15, 0.92)',
                     borderLeft: '4px solid #FFD700',
-                    padding: '5px 12px',
-                    fontSize: 12,
+                    padding: '0 12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    fontSize: `${Math.max(11, Math.round(reporterFontSize * 0.55))}px`,
                     color: 'white',
                     fontWeight: 700,
                     pointerEvents: 'none',
                     zIndex: 2,
                     boxSizing: 'border-box',
-                    transition: 'bottom 0.15s ease-out, width 0.15s ease-out, left 0.15s ease-out',
+                    transition: 'bottom 0.15s ease-out, width 0.15s ease-out, left 0.15s ease-out, height 0.15s ease-out',
                   }}>
                   बातमीदार: {reporterName} {reporterPhone ? ` | संपर्क: ${reporterPhone}` : ''}
                 </div>

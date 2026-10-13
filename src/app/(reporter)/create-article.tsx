@@ -441,7 +441,11 @@ export default function CreateArticleScreen() {
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
           {isAdminEditing ? 'Edit Article' : editingDraft ? 'Edit Article' : 'New Article'}
         </Text>
-        <View style={{ width: 40 }} />
+        <IconButton
+          icon="eye-outline"
+          onPress={() => setPreviewVisible(true)}
+          accessibilityLabel="Preview newspaper layout"
+        />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -1055,7 +1059,7 @@ export default function CreateArticleScreen() {
             <View style={{ width: 40 }} />
           </View>
           <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent}>
-            <ArticleNewspaperLayout article={previewArticle} />
+            <ArticleNewspaperLayout article={previewArticle} reporterPhone={authorPhone} />
           </ScrollView>
           <View style={styles.previewFooter}>
             <Button
@@ -1154,7 +1158,9 @@ const styles = StyleSheet.create({
   },
   previewScrollContent: {
     width: '100%',
-    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
   previewFooter: {
     paddingHorizontal: 20,

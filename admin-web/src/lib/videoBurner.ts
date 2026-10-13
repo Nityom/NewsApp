@@ -396,6 +396,9 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
       }
 
       // Draw Headline Text (Bold, High Contrast, Marathi-ready)
+      const headlineStartY = badgeY + badgeHeight + Math.round(16 * scaleFactor);
+      let currentTextY = headlineStartY;
+
       if (headlineLines.length > 0) {
         ctx.font = headlineFont;
         ctx.fillStyle = '#FFFFFF';
@@ -403,13 +406,12 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
         ctx.shadowBlur = 8;
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
-
-        const headlineStartY = badgeY + badgeHeight + Math.round(16 * scaleFactor);
         ctx.textBaseline = 'top';
 
         headlineLines.forEach((line, idx) => {
-          ctx.fillText(line, Math.round(24 * scaleFactor), headlineStartY + idx * lineHeight);
+          ctx.fillText(line, Math.round(24 * scaleFactor), currentTextY + idx * lineHeight);
         });
+        currentTextY += headlineLines.length * lineHeight;
 
         // Reset shadow
         ctx.shadowColor = 'transparent';
@@ -428,7 +430,7 @@ export async function burnAndExportVideo(config: VideoBurnerConfig): Promise<Blo
         ctx.shadowOffsetY = 1;
         ctx.textBaseline = 'top';
 
-        const descStartY = headlineStartY + (headlineLines.length * lineHeight) + Math.round(8 * scaleFactor);
+        const descStartY = currentTextY + (headlineLines.length > 0 ? Math.round(8 * scaleFactor) : 0);
         descLines.forEach((line, idx) => {
           ctx.fillText(line, Math.round(24 * scaleFactor), descStartY + idx * descLineHeight);
         });

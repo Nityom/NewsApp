@@ -30,11 +30,20 @@ interface RichTextEditorProps {
   minHeight?: number;
   variant?: 'body' | 'title';
   maxWords?: number;
+  toolbarPosition?: 'top' | 'bottom';
 }
 
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu;
 
-export function RichTextEditor({ value, onChange, placeholder, minHeight = 260, variant = 'body', maxWords }: RichTextEditorProps) {
+export function RichTextEditor({
+  value,
+  onChange,
+  placeholder,
+  minHeight = 260,
+  variant = 'body',
+  maxWords,
+  toolbarPosition = 'top',
+}: RichTextEditorProps) {
   const lastAcceptedHtml = useRef(value);
   const maxWordsRef = useRef(maxWords);
   const editor = useEditor({
@@ -122,8 +131,8 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 260, 
   ];
 
   return (
-    <div className="rich-text-editor">
-      <div className="rich-text-toolbar" role="toolbar" aria-label="Text formatting">
+    <div className={`rich-text-editor ${toolbarPosition === 'bottom' ? 'toolbar-bottom' : ''}`}>
+      {toolbarPosition === 'top' && <div className="rich-text-toolbar" role="toolbar" aria-label="Text formatting">
         {[...inlineTools, ...(variant === 'body' ? bodyTools : []), ...historyTools].map((tool) => {
           const Icon = tool.icon;
           return (
@@ -149,8 +158,35 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 260, 
             onInput={(event) => editor.chain().focus().setColor(event.currentTarget.value).run()}
           />
         </label>
-      </div>
+      </div>}
       <EditorContent editor={editor} />
+      {toolbarPosition === 'bottom' && <div className="rich-text-toolbar" role="toolbar" aria-label="Text formatting">
+        {[...inlineTools, ...(variant === 'body' ? bodyTools : []), ...historyTools].map((tool) => {
+          const Icon = tool.icon;
+          return (
+            <button
+              key={tool.label}
+              type="button"
+              className={tool.active ? 'active' : ''}
+              disabled={Boolean('disabled' in tool && tool.disabled)}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={tool.action}
+              aria-label={tool.label}
+              title={tool.label}
+            >
+              <Icon size={16} />
+            </button>
+          );
+        })}
+        <label className="rich-text-color" title="Text color" aria-label="Text color">
+          <Palette size={16} />
+          <input
+            type="color"
+            value={editor.getAttributes('textStyle').color ?? '#bd3029'}
+            onInput={(event) => editor.chain().focus().setColor(event.currentTarget.value).run()}
+          />
+        </label>
+      </div>}
     </div>
   );
 }

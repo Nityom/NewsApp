@@ -50,7 +50,7 @@ export function ArticleCard({ article, onPress, showStatus = true, showAuthor = 
           {plainArticleText(article.title)}
         </Text>
         <Text style={[styles.summary, { color: theme.colors.textSecondary }]} numberOfLines={2}>
-          {article.summary}
+          {article.summary || 'Continue writing this draft'}
         </Text>
         <View style={styles.metaRow}>
           {showAuthor ? (

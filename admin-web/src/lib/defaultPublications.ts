@@ -13,6 +13,7 @@ export const defaultPublications: Publication[] = [
       publicationName: 'Education News',
       tagline: '॥ कुटुंबाचा सोबती ॥',
       editionTitle: 'आरती संग्रह',
+      headerImageUrl: '/logoBanner.jpeg',
       cityLocation: 'वर्धा',
       issueDate: 'ऑक्टोबर २०२०',
       themeColor: 'festive-red',

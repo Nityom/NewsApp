@@ -207,6 +207,7 @@ textarea { resize: vertical; }
 .rich-text-editor { border: 1px solid var(--line); border-radius: 3px; background: white; overflow: hidden; }
 .rich-text-editor:focus-within { border-color: #77736a; box-shadow: 0 0 0 3px rgba(27,27,25,.07); }
 .rich-text-toolbar { display: flex; flex-wrap: wrap; gap: 2px; padding: 5px; border-bottom: 1px solid var(--line); background: #f4f2ed; }
+.rich-text-editor.toolbar-bottom .rich-text-toolbar { border-top: 1px solid var(--line); border-bottom: 0; }
 .rich-text-toolbar button { width: 31px; height: 31px; border: 0; border-radius: 2px; display: grid; place-items: center; background: transparent; color: #58564f; }
 .rich-text-toolbar button:hover { background: white; color: var(--ink); }
 .rich-text-toolbar button.active { background: var(--ink); color: white; }
@@ -1064,7 +1065,6 @@ input[type="range"].range-slider-red::-moz-range-thumb:hover {
   height: max-content;
   animation: marquee-vertical 14s linear infinite;
 }
-
 
 
 

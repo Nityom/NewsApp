@@ -46,6 +46,28 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
 
   const isAdFree = page.adMode === 'free';
   const isFeatureFree = page.featureImagePosition === 'free' || page.featureImageX !== undefined || !page.featureImagePosition;
+  const textAreaTop = isCover ? 0 : 100;
+  const textAreaBottom = isCover ? 0 : 620;
+  const imageOverlapsText = !isCover
+    && isFeatureFree
+    && !!page.featureImageUrl
+    && featY + featH > textAreaTop
+    && featY < textAreaBottom;
+  const imageWrap = imageOverlapsText
+    ? (lineIndex: number): React.CSSProperties => {
+        const lineHeight = (page.fontSize || 14) * (page.lineHeight || 1.6);
+        const lineTop = textAreaTop + lineIndex * lineHeight;
+        const lineBottom = lineTop + lineHeight;
+        if (lineBottom <= featY || lineTop >= featY + featH) return {};
+
+        const rightInset = Math.max(0, 595 - featX);
+        const leftInset = Math.max(0, featX + featW);
+        const imageCenter = featX + featW / 2;
+        if (imageCenter > 297) return { marginRight: `${rightInset + 10}px` };
+        if (imageCenter < 297) return { marginLeft: `${leftInset + 10}px` };
+        return { marginLeft: `${Math.max(0, featX - 10)}px`, marginRight: `${Math.max(0, 595 - featX - featW - 10)}px` };
+      }
+    : () => ({});
 
   return (
     <div
@@ -68,43 +90,54 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
         )}
 
         <div className="pub-page-inner w-full h-full flex flex-col relative z-[1]">
+          <img
+            src={masterHeader.headerImageUrl || '/logoBanner.jpeg'}
+            alt={masterHeader.publicationName || 'Publication header'}
+            className="w-full h-[86px] object-fill bg-yellow-300 rounded mb-1 shrink-0"
+            crossOrigin="anonymous"
+          />
           {/* ================= COVER PAGE ================= */}
           {isCover ? (
             <div className="pub-cover-layout flex flex-col h-full bg-gradient-to-b from-yellow-200 via-amber-50 to-white box-border">
               <div className="flex-1 flex flex-col px-2 pt-2 min-h-0 overflow-hidden">
-                {/* Cover Top Masthead */}
-                <div className="pub-cover-masthead text-center px-3 py-1.5 bg-gradient-to-b from-orange-700 to-red-800 text-white rounded shadow-md mb-1.5 overflow-hidden shrink-0">
-                  {masterHeader.tagline && (
-                    <div className="pub-cover-tagline font-serif text-[11px] font-bold tracking-widest text-yellow-200 mb-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
-                      {masterHeader.tagline}
-                    </div>
-                  )}
-                  <h1 className="pub-cover-pubname font-serif text-[30px] leading-tight font-black text-white whitespace-nowrap overflow-hidden text-ellipsis m-0 drop-shadow-sm">
-                    {masterHeader.publicationName || 'Education News'}
-                  </h1>
-                  {(page.subtitle || masterHeader.editionTitle) && (
-                    <div className="pub-cover-badge inline-block mt-1 bg-yellow-400 text-red-950 font-serif font-extrabold text-[14px] px-4 py-0.5 rounded-full shadow tracking-wide">
-                      <span>{page.subtitle || masterHeader.editionTitle}</span>
-                    </div>
-                  )}
-                </div>
-
                 {/* Cover Fixed Background Art (if not free dragging) */}
                 {!isFeatureFree && page.featureImageUrl && (
-                  <div className="pub-cover-hero-wrap flex-1 flex flex-col items-center justify-center relative overflow-hidden my-1">
+                  <div className="pub-cover-hero-wrap flex-none max-h-[480px] flex flex-col items-center justify-center relative overflow-hidden my-1">
                     <img
                       src={page.featureImageUrl}
                       crossOrigin={page.featureImageUrl.startsWith('data:') ? undefined : 'anonymous'}
                       alt="Cover Feature"
                       className="pub-cover-hero-img max-w-full max-h-[480px] w-auto h-auto object-contain drop-shadow-md block m-auto"
                     />
-                    {page.greetingText && (
-                      <div className="pub-cover-greeting-ribbon mt-2 bg-gradient-to-r from-blue-700 via-blue-600 to-blue-700 px-6 py-1.5 rounded-md shadow-md border border-blue-400">
-                        <span className="pub-greeting-text font-serif text-[18px] text-white font-extrabold tracking-wide drop-shadow">
-                          {page.greetingText}
-                        </span>
-                      </div>
-                    )}
+                  </div>
+                )}
+                {page.greetingText?.trim() && (
+                  <div className="pub-cover-greeting-ribbon relative z-30 mx-auto mt-2 max-w-[90%] bg-gradient-to-r from-blue-700 via-blue-600 to-blue-700 px-6 py-1.5 rounded-md shadow-md border border-blue-400">
+                    <span className="pub-greeting-text font-serif text-[18px] text-white font-extrabold tracking-wide drop-shadow">
+                      {page.greetingText}
+                    </span>
+                  </div>
+                )}
+                {page.content.trim() && (
+                  <div
+                    className="relative z-30 flex-1 min-h-0 overflow-hidden px-3 py-2 text-stone-900 bg-white/10"
+                    style={{
+                      fontSize: `${page.fontSize || 16}px`,
+                      lineHeight: page.lineHeight || 1.6,
+                      textAlign: page.textAlign || 'center',
+                    }}
+                  >
+                    <div
+                      className="pub-cover-content-rich"
+                      dangerouslySetInnerHTML={{
+                        __html: page.content.includes('<')
+                          ? page.content
+                          : page.content
+                              .split('\n')
+                              .map((line) => `<p>${line.trim() || '&nbsp;'}</p>`)
+                              .join(''),
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -122,41 +155,6 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
           ) : (
             /* ================= INNER & BACK PAGES ================= */
             <div className="pub-inner-layout flex flex-col h-full box-border">
-              {/* Running Header Bar */}
-              <div className="pub-running-header flex items-stretch bg-yellow-100 border-2 border-red-700 rounded overflow-hidden h-[44px] shadow-sm mb-2 w-full box-border shrink-0">
-                <div className="pub-header-left w-[32%] shrink-0 bg-yellow-300 px-2 flex flex-col justify-center border-r-2 border-red-700 box-border">
-                  <span className="pub-hl-tagline text-[9px] font-bold text-red-900 leading-tight m-0">
-                    {masterHeader.tagline || 'Family Companion'}
-                  </span>
-                  <strong className="pub-hl-title font-serif text-[15px] font-black text-red-600 leading-tight m-0">
-                    {masterHeader.publicationName || 'Education News'}
-                  </strong>
-                </div>
-
-                <div className="pub-header-center w-[38%] shrink-0 bg-red-700 text-white flex items-center justify-center gap-2 px-2 box-border">
-                  <span className="pub-hc-title font-serif text-[18px] font-extrabold tracking-wide drop-shadow-sm leading-tight m-0">
-                    {page.customHeaderTitle || masterHeader.editionTitle || 'Special Edition'}
-                  </span>
-                  {masterHeader.centerLogoUrl ? (
-                    <img src={masterHeader.centerLogoUrl} crossOrigin="anonymous" alt="Logo" className="pub-hc-logo w-7 h-7 object-contain rounded-full bg-white" />
-                  ) : (
-                    <div className="pub-hc-badge-icon text-[16px] leading-none">🪔</div>
-                  )}
-                </div>
-
-                <div className="pub-header-right w-[30%] shrink-0 bg-yellow-300 border-l-2 border-red-700 flex items-center justify-between px-2 box-border">
-                  <span className="pub-hr-meta font-serif text-[13px] font-extrabold text-red-600 leading-tight m-0">
-                    {page.customHeaderRight || `${masterHeader.cityLocation || 'Wardha'} ${masterHeader.issueDate || 'October 2026'}`}
-                  </span>
-                  <div
-                    className="pub-page-number-pill w-[28px] h-[28px] min-w-[28px] min-h-[28px] rounded-full bg-red-800 text-white flex items-center justify-center text-[14px] font-extrabold font-sans text-center leading-none shrink-0 p-0 m-0"
-                    aria-label={`Page ${page.pageNumber}`}
-                  >
-                    {page.pageNumber}
-                  </div>
-                </div>
-              </div>
-
               {/* Page Matter / Editorial Content */}
               <div className="pub-matter-section flex-1 min-h-0 flex flex-col px-3 py-1 overflow-hidden">
                 {/* Title */}
@@ -202,7 +200,12 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                       textAlign: page.textAlign || 'center',
                     }}
                   >
-                    {page.content.split('\n').map((line, idx) => {
+                    {page.content.includes('<') ? (
+                      <div
+                        className="pub-rich-page-content"
+                        dangerouslySetInnerHTML={{ __html: page.content }}
+                      />
+                    ) : page.content.split('\n').map((line, idx) => {
                       const trimmed = line.trim();
                       if (trimmed.startsWith('❖') || trimmed.startsWith('✿') || trimmed.startsWith('---')) {
                         return (
@@ -219,7 +222,11 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                         );
                       }
                       return (
-                        <p key={idx} className={trimmed === '' ? 'pub-empty-paragraph h-2' : 'pub-verse-line m-0 py-0.5 leading-relaxed font-medium'}>
+                        <p
+                          key={idx}
+                          className={trimmed === '' ? 'pub-empty-paragraph h-2' : 'pub-verse-line m-0 py-0.5 leading-relaxed font-medium'}
+                          style={imageWrap(idx)}
+                        >
                           {trimmed || '\u00A0'}
                         </p>
                       );

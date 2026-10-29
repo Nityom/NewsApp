@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -68,8 +68,31 @@ export default function CreateArticleScreen() {
 
   const [submitting, setSubmitting] = useState<'draft' | 'submit' | 'save' | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
+  const [draftId, setDraftId] = useState(params.id);
+  const [autoSaveState, setAutoSaveState] = useState<'saving' | 'saved' | 'error' | null>(null);
+  const hydratedDraftId = useRef<string | undefined>(undefined);
   const authorPhone = resolvedAuthorPhone;
   const authorName = editingDraft?.reporterName ?? user?.name ?? 'Unknown Reporter';
+
+  useEffect(() => {
+    if (!editingDraft || hydratedDraftId.current === editingDraft.id) return;
+    hydratedDraftId.current = editingDraft.id;
+    setDraftId(editingDraft.id);
+    setArticleMode(editingDraft.sections && editingDraft.sections.length > 0 ? 'two' : 'single');
+    setBanner(editingDraft.banner || undefined);
+    setTitle(editingDraft.title);
+    setContent(editingDraft.content);
+    setImages(editingDraft.images);
+    setAdvertisements(editingDraft.advertisements);
+    setSections(editingDraft.sections ?? []);
+    setHasPage2(!!editingDraft.page2);
+    setPage2Mode(editingDraft.page2?.mode ?? 'single');
+    setPage2Banner(editingDraft.page2?.banner || undefined);
+    setPage2Title(editingDraft.page2?.title ?? '');
+    setPage2Content(editingDraft.page2?.content ?? '');
+    setPage2Sections(editingDraft.page2?.sections ?? []);
+    setPage2Advertisements(editingDraft.page2?.advertisements ?? []);
+  }, [editingDraft]);
 
   const pickImage = async (mode: 'banner' | 'page2Banner' | 'gallery' | 'ad' | 'page2Ad') => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -243,6 +266,93 @@ export default function CreateArticleScreen() {
     };
   };
 
+  const buildArticle = (id: string, now: string, status: Article['status']): Article => ({
+      id,
+      title: title.trim() || 'Untitled draft',
+      summary: content.slice(0, 140),
+      content,
+      banner: banner ?? '',
+      images,
+      advertisements,
+      sections: sections.filter((s) => s.title.trim() || s.content.trim() || s.image),
+      page2: buildPage2Payload(),
+      status,
+      reporterId: editingDraft?.reporterId ?? user?.id ?? 'unknown',
+      reporterName: editingDraft?.reporterName ?? user?.name ?? 'Unknown Reporter',
+      reporterAvatar: editingDraft?.reporterAvatar ?? user?.avatar ?? '',
+      reporterPhone: authorPhone,
+      createdAt: editingDraft?.createdAt ?? now,
+      updatedAt: now,
+      submittedAt: editingDraft?.submittedAt,
+      reviewedAt: editingDraft?.reviewedAt,
+      views: editingDraft?.views ?? 0,
+      likes: editingDraft?.likes ?? 0,
+      readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
+  });
+
+  useEffect(() => {
+    const hasContent = Boolean(
+      title.trim()
+      || content.trim()
+      || banner
+      || images.length
+      || advertisements.length
+      || sections.some((section) => section.title.trim() || section.content.trim() || section.image)
+      || page2Title.trim()
+      || page2Content.trim()
+      || page2Banner
+      || page2Sections.some((section) => section.title.trim() || section.content.trim() || section.image),
+    );
+    if (!hasContent || submitting) return;
+
+    const timeout = setTimeout(async () => {
+      const now = new Date().toISOString();
+      const id = draftId ?? editingDraft?.id ?? `art-${Date.now()}`;
+      setAutoSaveState('saving');
+      try {
+        const article = buildArticle(id, now, editingDraft?.status ?? 'draft');
+        if (draftId ?? editingDraft?.id) {
+          await updateArticle(id, article);
+        } else {
+          await addArticle(article);
+          setDraftId(id);
+        }
+        setAutoSaveState('saved');
+      } catch {
+        setAutoSaveState('error');
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeout);
+  }, [
+    title,
+    content,
+    banner,
+    images,
+    advertisements,
+    sections,
+    hasPage2,
+    page2Title,
+    page2Content,
+    page2Banner,
+    page2Sections,
+    page2Advertisements,
+    draftId,
+    editingDraft?.id,
+    editingDraft?.status,
+    editingDraft?.createdAt,
+    editingDraft?.submittedAt,
+    editingDraft?.reviewedAt,
+    editingDraft?.reporterId,
+    editingDraft?.reporterName,
+    editingDraft?.reporterAvatar,
+    submitting,
+    addArticle,
+    updateArticle,
+    authorPhone,
+    user,
+  ]);
+
   const validateArticle = (): boolean => {
     if (!title.trim()) {
       Alert.alert('Page 1 Title required', 'Please enter an article title for Page 1.');
@@ -312,10 +422,11 @@ export default function CreateArticleScreen() {
   };
 
   const handleSave = async (kind: 'draft' | 'submit' | 'save') => {
-    if (!validateArticle()) return;
+    if (kind !== 'draft' && !validateArticle()) return;
 
     setSubmitting(kind);
     const now = new Date().toISOString();
+    const existingId = draftId ?? editingDraft?.id;
     const status = kind === 'draft'
       ? 'draft'
       : kind === 'submit'
@@ -325,8 +436,8 @@ export default function CreateArticleScreen() {
     const page2Data = buildPage2Payload();
 
     try {
-      if (editingDraft) {
-        await updateArticle(editingDraft.id, {
+      if (existingId) {
+        await updateArticle(existingId, {
           title,
           summary: content.slice(0, 140),
           content,
@@ -338,8 +449,8 @@ export default function CreateArticleScreen() {
           reporterPhone: authorPhone,
           status,
           updatedAt: now,
-          submittedAt: kind === 'submit' ? now : editingDraft.submittedAt,
-          reviewedAt: kind === 'submit' && isAdmin ? now : editingDraft.reviewedAt,
+          submittedAt: kind === 'submit' ? now : editingDraft?.submittedAt,
+          reviewedAt: kind === 'submit' && isAdmin ? now : editingDraft?.reviewedAt,
         });
       } else {
         const newArticle: Article = {
@@ -366,6 +477,7 @@ export default function CreateArticleScreen() {
           readTimeMinutes: Math.max(1, Math.round(content.split(/\s+/).length / 200)),
         };
         await addArticle(newArticle);
+        setDraftId(newArticle.id);
       }
 
       setSubmitting(null);
@@ -441,6 +553,11 @@ export default function CreateArticleScreen() {
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
           {isAdminEditing ? 'Edit Article' : editingDraft ? 'Edit Article' : 'New Article'}
         </Text>
+        {autoSaveState ? (
+          <Text style={[styles.autoSaveText, { color: autoSaveState === 'error' ? '#DC2626' : theme.colors.textMuted }]}>
+            {autoSaveState === 'saving' ? 'Saving...' : autoSaveState === 'error' ? 'Not saved' : 'Saved'}
+          </Text>
+        ) : null}
         <IconButton
           icon="eye-outline"
           onPress={() => setPreviewVisible(true)}
@@ -1085,6 +1202,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  autoSaveText: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 11,
+    fontWeight: '600',
   },
   pageBarContainer: {
     flexDirection: 'row',

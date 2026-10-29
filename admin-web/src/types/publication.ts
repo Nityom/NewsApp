@@ -30,6 +30,9 @@ export interface PublicationPage {
   fontSize: number;
   lineHeight: number;
   textAlign: 'left' | 'center' | 'justify';
+  continueOnNextPage?: boolean;
+  continuationPageId?: string;
+  continuationSourceContent?: string;
 
   // Feature image (e.g. Deity, guest, event photo)
   featureImageUrl?: string;
@@ -68,6 +71,7 @@ export interface PublicationMasterHeader {
   tagline: string; // e.g. "Family Companion"
   editionTitle: string; // e.g. "Special Edition"
   centerLogoUrl?: string; // Emblem or logo icon
+  headerImageUrl?: string;
   cityLocation: string; // e.g. "Wardha"
   issueDate: string; // e.g. "October 2026"
   themeColor: 'festive-red' | 'saffron-orange' | 'royal-blue' | 'maroon-gold' | 'custom';

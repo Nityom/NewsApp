@@ -111,8 +111,13 @@ export const CalendarSheet: React.FC<CalendarSheetProps> = ({
             className="absolute left-0 top-0 bg-white border-b border-stone-200 flex items-center justify-center pointer-events-none"
             style={{ width: totalW, height: bTop }}
           >
+            <img
+              src="/logoBanner.jpeg"
+              alt="Education News"
+              className="w-full h-full object-contain bg-yellow-300"
+            />
             {interactive && (
-              <span className="text-[10px] uppercase font-bold tracking-wider text-stone-400 select-none">
+              <span className="absolute text-[10px] uppercase font-bold tracking-wider text-stone-400 select-none opacity-0">
                 Top Ad Strip ({bTop}px)
               </span>
             )}
@@ -426,4 +431,3 @@ const AdContent: React.FC<AdContentProps> = ({ ad, fit, interactive = false }) =
     </div>
   );
 };
-

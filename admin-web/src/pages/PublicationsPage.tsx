@@ -30,6 +30,7 @@ import {
 } from '../lib/publicationsStorage';
 import { exportBookletPDF, exportPageAsImage, type ExportProgress } from '../lib/publicationExport';
 import { PublicationPageSheet } from '../components/publications/PublicationPageSheet';
+import { RichTextEditor } from '../components/RichTextEditor';
 import { AdPresetModal } from '../components/publications/AdPresetModal';
 import { CalendarStudio } from '../components/calendar/CalendarStudio';
 
@@ -69,7 +70,15 @@ export function PublicationsPage() {
   const handleOpenEditor = async (pubId: string) => {
     const pub = await getPublication(pubId);
     if (pub) {
-      setActivePublication(pub);
+      setActivePublication({
+        ...pub,
+        pages: pub.pages.map((page) => {
+          const cleanTitle = page.title.replace(/\s*\(Continued\)\s*$/g, '').trim();
+          return cleanTitle === page.title
+            ? page
+            : { ...page, title: cleanTitle, subtitle: undefined };
+        }),
+      });
       setActivePageIndex(0);
       setSelectedElementId(null);
     }
@@ -88,6 +97,7 @@ export function PublicationsPage() {
         publicationName: 'Education News',
         tagline: 'Family Companion',
         editionTitle: 'Special Edition',
+        headerImageUrl: '/logoBanner.jpeg',
         cityLocation: 'Wardha',
         issueDate: 'October 2026',
         themeColor: 'festive-red',
@@ -173,6 +183,97 @@ export function PublicationsPage() {
       pages: updatedPages,
       updatedAt: Date.now(),
     });
+  };
+
+  const splitContentForContinuation = (page: PublicationPage) => {
+    const fontSize = page.fontSize || 14;
+    const lineHeight = page.lineHeight || 1.6;
+    const charactersPerLine = Math.max(12, Math.floor(500 / (fontSize * 0.55)));
+    const linesPerPage = Math.max(4, Math.floor(500 / (fontSize * lineHeight)));
+    const maxCharacters = charactersPerLine * linesPerPage;
+    if (page.content.length <= maxCharacters) {
+      return { firstPage: page.content, nextPage: '' };
+    }
+
+    const splitAt = page.content.lastIndexOf(' ', maxCharacters);
+    const boundary = splitAt > maxCharacters * 0.65 ? splitAt : maxCharacters;
+    return {
+      firstPage: page.content.slice(0, boundary).trimEnd(),
+      nextPage: page.content.slice(boundary).trimStart(),
+    };
+  };
+
+  const handleContinueOnNextPageChange = (enabled: boolean) => {
+    if (!activePublication || !activePage) return;
+    if (!enabled) {
+      const continuationId = activePage.continuationPageId;
+      const continuation = continuationId
+        ? activePublication.pages.find((page) => page.id === continuationId)
+        : undefined;
+      const restoredContent = activePage.continuationSourceContent
+        ?? (continuation ? `${activePage.content}\n${continuation.content}`.trim() : activePage.content);
+      setActivePublication((prev) => {
+        if (!prev) return prev;
+        const pages = continuationId
+          ? prev.pages.filter((page) => page.id !== continuationId)
+          : prev.pages;
+        return {
+          ...prev,
+          pages: pages.map((page) =>
+            page.id === activePage.id
+              ? { ...page, content: restoredContent, continueOnNextPage: false, continuationPageId: undefined, continuationSourceContent: undefined }
+              : page,
+          ),
+        };
+      });
+      return;
+    }
+
+    const { firstPage, nextPage } = splitContentForContinuation(activePage);
+    const existingContinuation = activePage.continuationPageId
+      ? activePublication.pages.find((page) => page.id === activePage.continuationPageId)
+      : undefined;
+    const nextPageNumber = activePage.pageNumber + 1;
+    const continuationPage: PublicationPage = {
+      ...(existingContinuation ?? {
+        id: `p_page_${Date.now()}_${nextPageNumber}`,
+        pageNumber: nextPageNumber,
+        type: 'inner',
+        title: activePage.title,
+        subtitle: activePage.subtitle,
+        content: '',
+        fontSize: activePage.fontSize,
+        lineHeight: activePage.lineHeight,
+        textAlign: activePage.textAlign,
+        featureImagePosition: 'right',
+        decorativeBorder: true,
+        ad: { type: 'none' },
+      }),
+      content: nextPage,
+    };
+
+    setActivePublication((prev) => {
+      if (!prev) return prev;
+      const continuationIndex = prev.pages.findIndex((page) => page.id === continuationPage.id);
+      const pages = [...prev.pages];
+      if (continuationIndex >= 0) {
+        pages[continuationIndex] = continuationPage;
+      } else {
+        pages.splice(activePageIndex + 1, 0, continuationPage);
+      }
+      pages[activePageIndex] = {
+        ...pages[activePageIndex],
+        content: firstPage,
+        continueOnNextPage: true,
+        continuationPageId: continuationPage.id,
+        continuationSourceContent: pages[activePageIndex].continuationSourceContent ?? activePage.content,
+      };
+      pages.forEach((page, index) => {
+        page.pageNumber = index + 1;
+      });
+      return { ...prev, pages };
+    });
+    setActivePageIndex(activePageIndex + 1);
   };
 
   const handleAddPage = () => {
@@ -953,14 +1054,14 @@ export function PublicationsPage() {
                       </button>
                     ))}
                   </div>
-                  <textarea
-                    className="pub-textarea"
-                    rows={9}
-                    placeholder="Type verses, article text, or news matter here..."
+                  <RichTextEditor
                     value={activePage.content}
-                    onChange={(e) =>
-                      updateActivePage((prev) => ({ ...prev, content: e.target.value }))
+                    onChange={(content) =>
+                      updateActivePage((prev) => ({ ...prev, content }))
                     }
+                    placeholder="Type verses, article text, or news matter here..."
+                    minHeight={220}
+                    toolbarPosition="bottom"
                   />
                 </div>
 
@@ -1016,6 +1117,21 @@ export function PublicationsPage() {
                     ))}
                   </div>
                 </div>
+
+                <label className="flex items-start gap-2 p-2.5 rounded border border-amber-200 bg-amber-50 text-xs font-semibold text-stone-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(activePage.continueOnNextPage)}
+                    onChange={(e) => handleContinueOnNextPageChange(e.target.checked)}
+                    className="mt-0.5 accent-red-700"
+                  />
+                  <span>
+                    Continue content on next page
+                    <span className="block mt-0.5 text-[11px] font-normal text-stone-500">
+                      Creates or opens the next page so this article can continue without being cut off.
+                    </span>
+                  </span>
+                </label>
 
                 {/* Feature Image Section */}
                 <div className="border-t border-stone-200 pt-3 mt-1">

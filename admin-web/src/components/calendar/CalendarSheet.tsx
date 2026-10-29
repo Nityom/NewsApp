@@ -114,7 +114,7 @@ export const CalendarSheet: React.FC<CalendarSheetProps> = ({
             <img
               src="/logoBanner.jpeg"
               alt="Education News"
-              className="w-full h-full object-contain bg-yellow-300"
+              className="w-full h-full object-fill bg-yellow-300"
             />
             {interactive && (
               <span className="absolute text-[10px] uppercase font-bold tracking-wider text-stone-400 select-none opacity-0">

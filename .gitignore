@@ -45,3 +45,4 @@ example
 
 # Android release artifacts
 *.apk
+/admin-web/public/bhalerao calender A4.pdf

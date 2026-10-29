@@ -8,9 +8,10 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Newspaper,
   Settings,
   Users,
-  Video,
+  Video
 } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -22,6 +23,7 @@ import { AdminActionPopup } from './AdminActionPopup';
 const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/articles', label: 'Articles', icon: BookOpenText },
+  { to: '/publications', label: 'Other Publications', icon: Newspaper },
   { to: '/video-studio', label: 'Video Studio', icon: Video },
   { to: '/reporters', label: 'Reporters', icon: Users },
   { to: '/payments', label: 'Payments', icon: CreditCard },

@@ -15,11 +15,13 @@ const CreateArticlePage = lazy(() => import('./pages/CreateArticlePage').then((m
 const ReportersPage = lazy(() => import('./pages/ReportersPage').then((module) => ({ default: module.ReportersPage })));
 const ReporterDetailPage = lazy(() => import('./pages/ReporterDetailPage').then((module) => ({ default: module.ReporterDetailPage })));
 const PublicReporterCardPage = lazy(() => import('./pages/PublicReporterCardPage').then((module) => ({ default: module.PublicReporterCardPage })));
+const PublicCalendarPage = lazy(() => import('./pages/PublicCalendarPage').then((module) => ({ default: module.PublicCalendarPage })));
 const PaymentsPage = lazy(() => import('./pages/PaymentsPage').then((module) => ({ default: module.PaymentsPage })));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage').then((module) => ({ default: module.NotificationsPage })));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then((module) => ({ default: module.AnalyticsPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })));
 const VideoStudioPage = lazy(() => import('./pages/VideoStudioPage').then((module) => ({ default: module.VideoStudioPage })));
+const PublicationsPage = lazy(() => import('./pages/PublicationsPage').then((module) => ({ default: module.PublicationsPage })));
 
 function AdminProtectedLayout({ user }: { user: User | null }) {
   if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL) {
@@ -46,6 +48,10 @@ function App() {
         <Route path="/reporter-card/:id" element={<PublicReporterCardPage />} />
         <Route path="/id-card/:id" element={<PublicReporterCardPage />} />
 
+        {/* Publicly accessible Calendar with Device-Local Reminders */}
+        <Route path="/calendar" element={<PublicCalendarPage />} />
+        <Route path="/calendar/:id" element={<PublicCalendarPage />} />
+
         {/* Protected Admin Routes */}
         <Route element={<AdminProtectedLayout user={user} />}>
           <Route index element={<DashboardPage />} />
@@ -53,6 +59,7 @@ function App() {
           <Route path="articles/new" element={<CreateArticlePage />} />
           <Route path="articles/:id/edit" element={<CreateArticlePage />} />
           <Route path="articles/:id" element={<ArticleDetailPage />} />
+          <Route path="publications" element={<PublicationsPage />} />
           <Route path="video-studio" element={<VideoStudioPage />} />
           <Route path="reporters" element={<ReportersPage />} />
           <Route path="reporters/:id" element={<ReporterDetailPage />} />

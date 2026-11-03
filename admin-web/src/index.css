@@ -980,6 +980,36 @@ textarea { resize: vertical; }
   @apply bg-white rounded-xl shadow-2xl overflow-hidden border border-stone-200 max-w-xl w-full;
 }
 
+/* Publication Page Sheet Rich Content Typography */
+.pub-rich-page-content p {
+  margin: 0 0 6px;
+}
+.pub-rich-page-content h2,
+.pub-rich-page-content h3 {
+  margin: 8px 0 4px;
+  font-family: inherit;
+  font-weight: 800;
+}
+.pub-rich-page-content h2 {
+  font-size: 1.15em;
+  color: #b91c1c;
+}
+.pub-rich-page-content h3 {
+  font-size: 1.05em;
+  color: #92400e;
+}
+.pub-rich-page-content ul,
+.pub-rich-page-content ol {
+  padding-left: 20px;
+  margin: 0 0 6px;
+}
+.pub-rich-page-content blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid #dc2626;
+  font-style: italic;
+}
+
 /* Red Range Slider Styling */
 input[type="range"].range-slider-red {
   -webkit-appearance: none !important;

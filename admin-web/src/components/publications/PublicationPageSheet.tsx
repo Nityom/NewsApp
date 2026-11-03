@@ -46,28 +46,37 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
 
   const isAdFree = page.adMode === 'free';
   const isFeatureFree = page.featureImagePosition === 'free' || page.featureImageX !== undefined || !page.featureImagePosition;
-  const textAreaTop = isCover ? 0 : 100;
-  const textAreaBottom = isCover ? 0 : 620;
+
+  // Header banner is 86px tall + 4px margin = 90px
+  // .pub-matter-section has py-1 (4px padding top)
+  // Title is ~28px if present, subtitle is ~18px if present
+  const headerHeight = 90;
+  const titleHeight = page.title ? 28 : 0;
+  const subtitleHeight = page.subtitle ? 18 : 0;
+  const textTop = isCover ? 0 : (headerHeight + 4 + titleHeight + subtitleHeight);
+  const adSlotHeight = (!isCover && hasAd && !isAdFree) ? (page.adHeight || 175) : 0;
+  const textBottom = isCover ? 0 : (842 - 16 - adSlotHeight);
+
   const imageOverlapsText = !isCover
     && isFeatureFree
     && !!page.featureImageUrl
-    && featY + featH > textAreaTop
-    && featY < textAreaBottom;
-  const imageWrap = imageOverlapsText
-    ? (lineIndex: number): React.CSSProperties => {
-        const lineHeight = (page.fontSize || 14) * (page.lineHeight || 1.6);
-        const lineTop = textAreaTop + lineIndex * lineHeight;
-        const lineBottom = lineTop + lineHeight;
-        if (lineBottom <= featY || lineTop >= featY + featH) return {};
+    && featY + featH > textTop
+    && featY < textBottom;
 
-        const rightInset = Math.max(0, 595 - featX);
-        const leftInset = Math.max(0, featX + featW);
-        const imageCenter = featX + featW / 2;
-        if (imageCenter > 297) return { marginRight: `${rightInset + 10}px` };
-        if (imageCenter < 297) return { marginLeft: `${leftInset + 10}px` };
-        return { marginLeft: `${Math.max(0, featX - 10)}px`, marginRight: `${Math.max(0, 595 - featX - featW - 10)}px` };
-      }
-    : () => ({});
+  const imageCenter = featX + featW / 2;
+  const isLeft = imageCenter <= 297;
+
+  // Clear width: how wide the spacer needs to be to clear the image
+  // Text content area spans from X=20px to X=575px (width 555px)
+  const clearWidth = isLeft
+    ? Math.max(40, Math.min(500, Math.round((featX + featW) - 20 + 12)))
+    : Math.max(40, Math.min(500, Math.round((575 - featX) + 12)));
+
+  const topOffset = Math.max(0, Math.round(featY - textTop));
+  const bottomInText = Math.min(textBottom, featY + featH);
+  const effectiveTopInText = Math.max(textTop, featY);
+  const overlapHeight = Math.max(0, Math.round(bottomInText - effectiveTopInText));
+  const totalSpacerHeight = topOffset + overlapHeight + 8;
 
   return (
     <div
@@ -200,6 +209,28 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                       textAlign: page.textAlign || 'center',
                     }}
                   >
+                    {/* Auto-wrapping Float Spacer for Canva Free-drag Image */}
+                    {imageOverlapsText && overlapHeight > 0 && (
+                      <div
+                        className="pub-feature-wrap-spacer select-none"
+                        aria-hidden="true"
+                        style={{
+                          float: isLeft ? 'left' : 'right',
+                          width: `${clearWidth}px`,
+                          height: `${totalSpacerHeight}px`,
+                          shapeOutside: topOffset > 6
+                            ? `polygon(0 ${topOffset}px, ${clearWidth}px ${topOffset}px, ${clearWidth}px ${totalSpacerHeight}px, 0 ${totalSpacerHeight}px)`
+                            : undefined,
+                          clipPath: topOffset > 6
+                            ? `polygon(0 ${topOffset}px, 100% ${topOffset}px, 100% ${totalSpacerHeight}px, 0 ${totalSpacerHeight}px)`
+                            : undefined,
+                          pointerEvents: 'none',
+                          opacity: 0,
+                          clear: 'none',
+                        }}
+                      />
+                    )}
+
                     {page.content.includes('<') ? (
                       <div
                         className="pub-rich-page-content"
@@ -225,7 +256,6 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                         <p
                           key={idx}
                           className={trimmed === '' ? 'pub-empty-paragraph h-2' : 'pub-verse-line m-0 py-0.5 leading-relaxed font-medium'}
-                          style={imageWrap(idx)}
                         >
                           {trimmed || '\u00A0'}
                         </p>

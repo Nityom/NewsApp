@@ -7,6 +7,9 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import {
     AlignCenter,
+    AlignJustify,
+    AlignLeft,
+    AlignRight,
     Bold,
     Heading2,
     Italic,
@@ -28,7 +31,7 @@ interface RichTextEditorProps {
   onChange: (value: string) => void;
   placeholder?: string;
   minHeight?: number;
-  variant?: 'body' | 'title';
+  variant?: 'body' | 'title' | 'subtitle';
   maxWords?: number;
   toolbarPosition?: 'top' | 'bottom';
 }
@@ -58,7 +61,9 @@ export function RichTextEditor({
     content: value,
     editorProps: {
       attributes: {
-        class: `rich-text-surface ${variant === 'title' ? 'rich-title-surface' : ''}`,
+        class: `rich-text-surface ${
+          variant === 'title' ? 'rich-title-surface' : variant === 'subtitle' ? 'rich-subtitle-surface' : ''
+        }`,
         'data-placeholder': placeholder ?? 'Write the article body...',
         style: `min-height: ${minHeight}px`,
       },
@@ -101,22 +106,37 @@ export function RichTextEditor({
   const inlineTools = [
     { label: 'Bold', icon: Bold, active: editor.isActive('bold'), disabled: false, action: () => editor.chain().focus().toggleBold().run() },
     { label: 'Italic', icon: Italic, active: editor.isActive('italic'), disabled: false, action: () => editor.chain().focus().toggleItalic().run() },
+    { label: 'Underline', icon: UnderlineIcon, active: editor.isActive('underline'), disabled: false, action: () => editor.chain().focus().toggleUnderline().run() },
     {
-      label: 'Center align',
+      label: 'Align Left',
+      icon: AlignLeft,
+      active: editor.isActive({ textAlign: 'left' }),
+      disabled: false,
+      action: () => editor.chain().focus().setTextAlign('left').run(),
+    },
+    {
+      label: 'Align Center',
       icon: AlignCenter,
       active: editor.isActive({ textAlign: 'center' }),
       disabled: false,
-      action: () => {
-        if (editor.isActive({ textAlign: 'center' })) {
-          editor.chain().focus().setTextAlign('left').run();
-        } else {
-          editor.chain().focus().setTextAlign('center').run();
-        }
-      },
+      action: () => editor.chain().focus().setTextAlign('center').run(),
+    },
+    {
+      label: 'Align Right',
+      icon: AlignRight,
+      active: editor.isActive({ textAlign: 'right' }),
+      disabled: false,
+      action: () => editor.chain().focus().setTextAlign('right').run(),
     },
   ];
   const bodyTools = [
-    { label: 'Underline', icon: UnderlineIcon, active: editor.isActive('underline'), action: () => editor.chain().focus().toggleUnderline().run() },
+    {
+      label: 'Justify',
+      icon: AlignJustify,
+      active: editor.isActive({ textAlign: 'justify' }),
+      disabled: false,
+      action: () => editor.chain().focus().setTextAlign('justify').run(),
+    },
     { label: 'Strikethrough', icon: Strikethrough, active: editor.isActive('strike'), action: () => editor.chain().focus().toggleStrike().run() },
     { label: 'Subheading', icon: Heading2, active: editor.isActive('heading', { level: 2 }), action: () => editor.chain().focus().toggleHeading({ level: 2 }).run() },
     { label: 'Bulleted list', icon: List, active: editor.isActive('bulletList'), action: () => editor.chain().focus().toggleBulletList().run() },

@@ -215,8 +215,12 @@ textarea { resize: vertical; }
 .rich-text-color { position: relative; width: 31px; height: 31px; display: grid; place-items: center; color: #58564f; cursor: pointer; }
 .rich-text-color input { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; opacity: 0; cursor: pointer; }
 .rich-text-surface { padding: 12px; outline: none; color: var(--ink); font-size: 14px; font-weight: 400; line-height: 1.65; }
-.rich-title-surface { font-size: 18px; font-weight: 700; line-height: 1.35; }
+.rich-title-surface { padding: 8px 10px; font-size: 17px; font-weight: 800; line-height: 1.35; }
 .rich-title-surface p { margin-bottom: 0; }
+.rich-subtitle-surface { padding: 6px 10px; font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.rich-subtitle-surface p { margin-bottom: 0; }
+.pub-rich-title p, .pub-rich-subtitle p { margin: 0; display: block; }
+.pub-reporter-byline { font-family: 'Newsreader', serif; font-style: italic; font-weight: 600; letter-spacing: 0.02em; }
 .rich-text-surface p { margin: 0 0 10px; }
 .rich-text-surface h2, .rich-text-surface h3 { margin: 18px 0 8px; font-family: 'Newsreader', serif; }
 .rich-text-surface ul, .rich-text-surface ol { padding-left: 24px; }

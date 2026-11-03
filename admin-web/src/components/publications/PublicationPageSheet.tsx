@@ -131,6 +131,86 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
     });
   };
 
+  const renderTitle = (
+    titleStr?: string,
+    color?: string,
+    align?: 'left' | 'center' | 'right',
+    size: 'lg' | 'md' | 'sm' = 'lg'
+  ) => {
+    if (!titleStr || !titleStr.trim()) return null;
+    const isHtml = titleStr.includes('<');
+    const sizeClass = size === 'lg' ? 'text-[18px]' : size === 'md' ? 'text-[17px]' : 'text-[16px]';
+    return (
+      <h2
+        className={`pub-matter-title font-serif ${sizeClass} font-black tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1 shrink-0`}
+        style={{
+          color: color || '#b91c1c',
+          textAlign: align || 'center',
+        }}
+      >
+        {isHtml ? (
+          <span
+            className="pub-rich-title inline-block w-full"
+            dangerouslySetInnerHTML={{ __html: titleStr }}
+          />
+        ) : (
+          titleStr
+        )}
+      </h2>
+    );
+  };
+
+  const renderSubtitle = (
+    subtitleStr?: string,
+    color?: string,
+    align?: 'left' | 'center' | 'right',
+    size: 'lg' | 'md' | 'sm' = 'lg'
+  ) => {
+    if (!subtitleStr || !subtitleStr.trim()) return null;
+    const isHtml = subtitleStr.includes('<');
+    const sizeClass = size === 'lg' ? 'text-[13px]' : 'text-[12px]';
+    return (
+      <h3
+        className={`pub-matter-subtitle font-serif ${sizeClass} font-bold m-0 mb-1 shrink-0`}
+        style={{
+          color: color || '#92400e',
+          textAlign: align || 'center',
+        }}
+      >
+        {isHtml ? (
+          <span
+            className="pub-rich-subtitle inline-block w-full"
+            dangerouslySetInnerHTML={{ __html: subtitleStr }}
+          />
+        ) : (
+          subtitleStr
+        )}
+      </h3>
+    );
+  };
+
+  const renderReporterByline = (
+    name?: string,
+    fontSize?: number,
+    color?: string,
+    align?: 'left' | 'center' | 'right'
+  ) => {
+    if (!name || !name.trim()) return null;
+    return (
+      <div
+        className="pub-reporter-byline select-none mt-1.5 shrink-0"
+        style={{
+          fontSize: `${fontSize || 11.5}px`,
+          color: color || '#57534e',
+          textAlign: align || 'right',
+          lineHeight: 1.25,
+        }}
+      >
+        — {name.trim()}
+      </div>
+    );
+  };
+
   return (
     <div
       id={id}
@@ -200,6 +280,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                               .join(''),
                       }}
                     />
+                    {renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                   </div>
                 )}
               </div>
@@ -224,16 +305,8 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                   <div className="pub-matter-split-columns flex-1 min-h-0 flex flex-row overflow-hidden gap-2.5">
                     {/* Story 1 (Left Column) */}
                     <div className="pub-split-col flex-1 min-w-0 flex flex-col overflow-hidden">
-                      {page.title && (
-                        <h2 className="pub-matter-title font-serif text-[16px] font-black text-red-700 text-center tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1 shrink-0">
-                          {page.title}
-                        </h2>
-                      )}
-                      {page.subtitle && (
-                        <h3 className="pub-matter-subtitle font-serif text-[12px] font-bold text-amber-800 text-center m-0 mb-1 shrink-0">
-                          {page.subtitle}
-                        </h3>
-                      )}
+                      {renderTitle(page.title, page.titleColor, page.titleAlign, 'sm')}
+                      {renderSubtitle(page.subtitle, page.subtitleColor, page.subtitleAlign, 'sm')}
                       <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
                         <div
                           className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
@@ -265,6 +338,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                           )}
                           {renderContentBody(page.content)}
                         </div>
+                        {renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                       </div>
                     </div>
 
@@ -277,16 +351,8 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
 
                     {/* Story 2 (Right Column) */}
                     <div className="pub-split-col flex-1 min-w-0 flex flex-col overflow-hidden">
-                      {page.section2Title && (
-                        <h2 className="pub-matter-title font-serif text-[16px] font-black text-red-700 text-center tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1 shrink-0">
-                          {page.section2Title}
-                        </h2>
-                      )}
-                      {page.section2Subtitle && (
-                        <h3 className="pub-matter-subtitle font-serif text-[12px] font-bold text-amber-800 text-center m-0 mb-1 shrink-0">
-                          {page.section2Subtitle}
-                        </h3>
-                      )}
+                      {renderTitle(page.section2Title, page.section2TitleColor, page.section2TitleAlign, 'sm')}
+                      {renderSubtitle(page.section2Subtitle, page.section2SubtitleColor, page.section2SubtitleAlign, 'sm')}
                       <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
                         <div
                           className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
@@ -318,6 +384,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                           )}
                           {renderContentBody(page.section2Content || '')}
                         </div>
+                        {renderReporterByline(page.section2ReporterName, page.section2ReporterNameSize, page.section2ReporterNameColor, page.section2ReporterNameAlign)}
                       </div>
                     </div>
                   </div>
@@ -326,16 +393,8 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                   <div className="pub-matter-split-wrap flex-1 min-h-0 flex flex-col overflow-hidden">
                     {/* Story 1 (Top Section) */}
                     <div className="pub-split-section flex-1 min-h-0 flex flex-col overflow-hidden pb-1">
-                      {page.title && (
-                        <h2 className="pub-matter-title font-serif text-[17px] font-black text-red-700 text-center tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1 shrink-0">
-                          {page.title}
-                        </h2>
-                      )}
-                      {page.subtitle && (
-                        <h3 className="pub-matter-subtitle font-serif text-[12px] font-bold text-amber-800 text-center m-0 mb-1 shrink-0">
-                          {page.subtitle}
-                        </h3>
-                      )}
+                      {renderTitle(page.title, page.titleColor, page.titleAlign, 'md')}
+                      {renderSubtitle(page.subtitle, page.subtitleColor, page.subtitleAlign, 'md')}
                       <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
                         <div
                           className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
@@ -367,6 +426,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                           )}
                           {renderContentBody(page.content)}
                         </div>
+                        {renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                       </div>
                     </div>
 
@@ -379,16 +439,8 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
 
                     {/* Story 2 (Bottom Section) */}
                     <div className="pub-split-section flex-1 min-h-0 flex flex-col overflow-hidden pt-0.5">
-                      {page.section2Title && (
-                        <h2 className="pub-matter-title font-serif text-[17px] font-black text-red-700 text-center tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1 shrink-0">
-                          {page.section2Title}
-                        </h2>
-                      )}
-                      {page.section2Subtitle && (
-                        <h3 className="pub-matter-subtitle font-serif text-[12px] font-bold text-amber-800 text-center m-0 mb-1 shrink-0">
-                          {page.section2Subtitle}
-                        </h3>
-                      )}
+                      {renderTitle(page.section2Title, page.section2TitleColor, page.section2TitleAlign, 'md')}
+                      {renderSubtitle(page.section2Subtitle, page.section2SubtitleColor, page.section2SubtitleAlign, 'md')}
                       <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
                         <div
                           className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
@@ -420,6 +472,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                           )}
                           {renderContentBody(page.section2Content || '')}
                         </div>
+                        {renderReporterByline(page.section2ReporterName, page.section2ReporterNameSize, page.section2ReporterNameColor, page.section2ReporterNameAlign)}
                       </div>
                     </div>
                   </div>
@@ -427,18 +480,10 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                   /* ===== SINGLE SECTION (FULL PAGE ARTICLE) ===== */
                   <>
                     {/* Title */}
-                    {page.title && (
-                      <h2 className="pub-matter-title font-serif text-[18px] font-black text-red-700 text-center tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1">
-                        {page.title}
-                      </h2>
-                    )}
+                    {renderTitle(page.title, page.titleColor, page.titleAlign, 'lg')}
 
                     {/* Subtitle */}
-                    {page.subtitle && (
-                      <h3 className="pub-matter-subtitle font-serif text-[13px] font-bold text-amber-800 text-center m-0 mb-1">
-                        {page.subtitle}
-                      </h3>
-                    )}
+                    {renderSubtitle(page.subtitle, page.subtitleColor, page.subtitleAlign, 'lg')}
 
                     {/* Text Body */}
                     <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
@@ -462,7 +507,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                       )}
 
                       <div
-                        className="pub-matter-text font-serif text-stone-900 overflow-hidden"
+                        className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
                         style={{
                           fontSize: `${page.fontSize || 14}px`,
                           lineHeight: page.lineHeight || 1.6,
@@ -493,6 +538,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
 
                         {renderContentBody(page.content)}
                       </div>
+                      {renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                     </div>
                   </>
                 )}

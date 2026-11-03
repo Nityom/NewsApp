@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   ArrowDown,
   ArrowLeft,
   ArrowUp,
@@ -17,6 +20,7 @@ import {
   Plus,
   Trash2,
   Upload,
+  User,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
@@ -33,6 +37,11 @@ import { PublicationPageSheet } from '../components/publications/PublicationPage
 import { RichTextEditor } from '../components/RichTextEditor';
 import { AdPresetModal } from '../components/publications/AdPresetModal';
 import { CalendarStudio } from '../components/calendar/CalendarStudio';
+
+const stripHtml = (html?: string) => {
+  if (!html) return '';
+  return html.replace(/<[^>]+>/g, '').trim();
+};
 
 export function PublicationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -240,7 +249,14 @@ export function PublicationsPage() {
         pageNumber: nextPageNumber,
         type: 'inner',
         title: activePage.title,
+        titleColor: activePage.titleColor,
         subtitle: activePage.subtitle,
+        subtitleColor: activePage.subtitleColor,
+        subtitleAlign: activePage.subtitleAlign,
+        reporterName: activePage.reporterName,
+        reporterNameSize: activePage.reporterNameSize,
+        reporterNameColor: activePage.reporterNameColor,
+        reporterNameAlign: activePage.reporterNameAlign,
         content: '',
         fontSize: activePage.fontSize,
         lineHeight: activePage.lineHeight,
@@ -824,13 +840,13 @@ export function PublicationsPage() {
                 {p.isSplitPage ? (
                   p.splitDirection === 'vertical' ? (
                     <>
-                      <div className="pub-mini-title">{p.title || 'Story 1'}</div>
+                      <div className="pub-mini-title">{stripHtml(p.title) || 'Story 1'}</div>
                       <div className="pub-mini-lines">
                         <div className="pub-mini-line w-4/5" />
                         <div className="pub-mini-line w-11/12" />
                       </div>
                       <div className="border-b border-dashed border-red-300 my-1" />
-                      <div className="pub-mini-title">{p.section2Title || 'Story 2'}</div>
+                      <div className="pub-mini-title">{stripHtml(p.section2Title) || 'Story 2'}</div>
                       <div className="pub-mini-lines">
                         <div className="pub-mini-line w-3/4" />
                         <div className="pub-mini-line w-5/6" />
@@ -839,7 +855,7 @@ export function PublicationsPage() {
                   ) : (
                     <div className="flex gap-1 flex-1 w-full overflow-hidden mt-0.5">
                       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-                        <div className="pub-mini-title truncate text-[9px]">{p.title || 'Story 1'}</div>
+                        <div className="pub-mini-title truncate text-[9px]">{stripHtml(p.title) || 'Story 1'}</div>
                         <div className="pub-mini-lines">
                           <div className="pub-mini-line w-full" />
                           <div className="pub-mini-line w-4/5" />
@@ -848,7 +864,7 @@ export function PublicationsPage() {
                       </div>
                       <div className="w-[1px] border-r border-dashed border-red-300 self-stretch shrink-0" />
                       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-                        <div className="pub-mini-title truncate text-[9px]">{p.section2Title || 'Story 2'}</div>
+                        <div className="pub-mini-title truncate text-[9px]">{stripHtml(p.section2Title) || 'Story 2'}</div>
                         <div className="pub-mini-lines">
                           <div className="pub-mini-line w-full" />
                           <div className="pub-mini-line w-4/5" />
@@ -859,7 +875,7 @@ export function PublicationsPage() {
                   )
                 ) : (
                   <>
-                    <div className="pub-mini-title">{p.title || 'Untitled Page'}</div>
+                    <div className="pub-mini-title">{stripHtml(p.title) || 'Untitled Page'}</div>
                     <div className="pub-mini-lines">
                       <div className="pub-mini-line w-4/5" />
                       <div className="pub-mini-line w-11/12" />
@@ -1116,28 +1132,52 @@ export function PublicationsPage() {
                         </span>
                       </div>
 
+                      {/* Story 1 Heading / Title */}
                       <div className="pub-control-group">
-                        <label>Heading 1 / Title</label>
-                        <input
-                          type="text"
-                          className="pub-input"
-                          placeholder="e.g. Primary Story / Morning News"
+                        <label className="text-xs font-semibold text-stone-700 mb-1 block">Heading 1 / Title</label>
+                        <RichTextEditor
                           value={activePage.title}
-                          onChange={(e) => updateActivePage((prev) => ({ ...prev, title: e.target.value }))}
+                          onChange={(title) => updateActivePage((prev) => ({ ...prev, title }))}
+                          placeholder="e.g. Primary Story / Morning News"
+                          variant="title"
+                          toolbarPosition="top"
+                          minHeight={42}
                         />
                       </div>
 
+                      {/* Story 1 Subtitle */}
                       <div className="pub-control-group">
-                        <label>Subtitle 1 (Optional)</label>
-                        <input
-                          type="text"
-                          className="pub-input"
-                          placeholder="e.g. Special Report"
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                          <label className="text-xs font-semibold text-stone-700 m-0">Subtitle 1 (Optional)</label>
+                          <div className="flex items-center bg-stone-100 p-0.5 rounded border border-stone-200">
+                            {(['left', 'center', 'right'] as const).map((align) => (
+                              <button
+                                key={align}
+                                type="button"
+                                className={`p-1 rounded transition-all ${
+                                  (activePage.subtitleAlign || 'center') === align
+                                    ? 'bg-white shadow text-amber-900 font-bold'
+                                    : 'text-stone-400 hover:text-stone-700'
+                                }`}
+                                onClick={() => updateActivePage((prev) => ({ ...prev, subtitleAlign: align }))}
+                                title={`Align ${align}`}
+                              >
+                                {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <RichTextEditor
                           value={activePage.subtitle || ''}
-                          onChange={(e) => updateActivePage((prev) => ({ ...prev, subtitle: e.target.value }))}
+                          onChange={(subtitle) => updateActivePage((prev) => ({ ...prev, subtitle }))}
+                          placeholder="e.g. Special Report"
+                          variant="subtitle"
+                          toolbarPosition="top"
+                          minHeight={38}
                         />
                       </div>
 
+                      {/* Story 1 Content */}
                       <div className="pub-control-group">
                         <label>Story 1 Content</label>
                         <div className="pub-symbols-bar">
@@ -1167,6 +1207,68 @@ export function PublicationsPage() {
                           toolbarPosition="bottom"
                         />
                       </div>
+
+                      {/* Story 1 Reporter Name */}
+                      <div className="p-2.5 bg-white/80 border border-red-200 rounded-lg space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-red-900 uppercase tracking-wider flex items-center gap-1.5 m-0">
+                            <User size={13} className="text-red-700" />
+                            Reporter 1 Name (बातमीदार / प्रतिनिधी)
+                          </label>
+                          <span className="text-[11px] text-stone-500 font-medium">
+                            {activePage.reporterNameSize || 12}px
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          className="pub-input text-xs"
+                          placeholder="e.g. विशेष प्रतिनिधी / राहुल शर्मा"
+                          value={activePage.reporterName || ''}
+                          onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterName: e.target.value }))}
+                        />
+                        {Boolean(activePage.reporterName?.trim()) && (
+                          <div className="flex items-center justify-between gap-3 pt-1 border-t border-red-100">
+                            <div className="flex-1 flex items-center gap-2">
+                              <span className="text-[10px] text-stone-500 font-medium whitespace-nowrap">Size</span>
+                              <input
+                                type="range"
+                                min={9}
+                                max={20}
+                                step={0.5}
+                                value={activePage.reporterNameSize || 12}
+                                onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameSize: parseFloat(e.target.value) }))}
+                                className="w-full accent-red-700 h-1.5"
+                              />
+                            </div>
+                            <div className="flex items-center gap-0.5 bg-stone-100 p-0.5 rounded border border-stone-200">
+                              {(['left', 'center', 'right'] as const).map((align) => (
+                                <button
+                                  key={align}
+                                  type="button"
+                                  className={`p-1 rounded text-xs transition-all ${
+                                    (activePage.reporterNameAlign || 'right') === align
+                                      ? 'bg-white text-red-900 font-bold shadow-sm'
+                                      : 'text-stone-400 hover:text-stone-700'
+                                  }`}
+                                  onClick={() => updateActivePage((prev) => ({ ...prev, reporterNameAlign: align }))}
+                                  title={`Align ${align}`}
+                                >
+                                  {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                                </button>
+                              ))}
+                            </div>
+                            <label className="relative w-4 h-4 rounded-full border border-stone-300 overflow-hidden cursor-pointer shrink-0" title="Color">
+                              <input
+                                type="color"
+                                value={activePage.reporterNameColor || '#57534e'}
+                                onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameColor: e.target.value }))}
+                                className="absolute -top-2 -left-2 w-8 h-8 cursor-pointer opacity-0"
+                              />
+                              <span className="block w-full h-full rounded-full" style={{ backgroundColor: activePage.reporterNameColor || '#57534e' }} />
+                            </label>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* ===== STORY 2 ===== */}
@@ -1180,28 +1282,52 @@ export function PublicationsPage() {
                         </span>
                       </div>
 
+                      {/* Story 2 Heading / Title */}
                       <div className="pub-control-group">
-                        <label>Heading 2 / Title</label>
-                        <input
-                          type="text"
-                          className="pub-input"
-                          placeholder="e.g. Secondary Story / Community News"
+                        <label className="text-xs font-semibold text-stone-700 mb-1 block">Heading 2 / Title</label>
+                        <RichTextEditor
                           value={activePage.section2Title || ''}
-                          onChange={(e) => updateActivePage((prev) => ({ ...prev, section2Title: e.target.value }))}
+                          onChange={(section2Title) => updateActivePage((prev) => ({ ...prev, section2Title }))}
+                          placeholder="e.g. Secondary Story / Community News"
+                          variant="title"
+                          toolbarPosition="top"
+                          minHeight={42}
                         />
                       </div>
 
+                      {/* Story 2 Subtitle */}
                       <div className="pub-control-group">
-                        <label>Subtitle 2 (Optional)</label>
-                        <input
-                          type="text"
-                          className="pub-input"
-                          placeholder="e.g. Wardha Edition"
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                          <label className="text-xs font-semibold text-stone-700 m-0">Subtitle 2 (Optional)</label>
+                          <div className="flex items-center bg-stone-100 p-0.5 rounded border border-stone-200">
+                            {(['left', 'center', 'right'] as const).map((align) => (
+                              <button
+                                key={align}
+                                type="button"
+                                className={`p-1 rounded transition-all ${
+                                  (activePage.section2SubtitleAlign || 'center') === align
+                                    ? 'bg-white shadow text-amber-900 font-bold'
+                                    : 'text-stone-400 hover:text-stone-700'
+                                }`}
+                                onClick={() => updateActivePage((prev) => ({ ...prev, section2SubtitleAlign: align }))}
+                                title={`Align ${align}`}
+                              >
+                                {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <RichTextEditor
                           value={activePage.section2Subtitle || ''}
-                          onChange={(e) => updateActivePage((prev) => ({ ...prev, section2Subtitle: e.target.value }))}
+                          onChange={(section2Subtitle) => updateActivePage((prev) => ({ ...prev, section2Subtitle }))}
+                          placeholder="e.g. Wardha Edition"
+                          variant="subtitle"
+                          toolbarPosition="top"
+                          minHeight={38}
                         />
                       </div>
 
+                      {/* Story 2 Content */}
                       <div className="pub-control-group">
                         <label>Story 2 Content</label>
                         <div className="pub-symbols-bar">
@@ -1231,33 +1357,114 @@ export function PublicationsPage() {
                           toolbarPosition="bottom"
                         />
                       </div>
+
+                      {/* Story 2 Reporter Name */}
+                      <div className="p-2.5 bg-white/80 border border-amber-200 rounded-lg space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5 m-0">
+                            <User size={13} className="text-amber-700" />
+                            Reporter 2 Name (बातमीदार / प्रतिनिधी)
+                          </label>
+                          <span className="text-[11px] text-stone-500 font-medium">
+                            {activePage.section2ReporterNameSize || 12}px
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          className="pub-input text-xs"
+                          placeholder="e.g. विशेष प्रतिनिधी / राहुल शर्मा"
+                          value={activePage.section2ReporterName || ''}
+                          onChange={(e) => updateActivePage((prev) => ({ ...prev, section2ReporterName: e.target.value }))}
+                        />
+                        {Boolean(activePage.section2ReporterName?.trim()) && (
+                          <div className="flex items-center justify-between gap-3 pt-1 border-t border-amber-100">
+                            <div className="flex-1 flex items-center gap-2">
+                              <span className="text-[10px] text-stone-500 font-medium whitespace-nowrap">Size</span>
+                              <input
+                                type="range"
+                                min={9}
+                                max={20}
+                                step={0.5}
+                                value={activePage.section2ReporterNameSize || 12}
+                                onChange={(e) => updateActivePage((prev) => ({ ...prev, section2ReporterNameSize: parseFloat(e.target.value) }))}
+                                className="w-full accent-amber-700 h-1.5"
+                              />
+                            </div>
+                            <div className="flex items-center gap-0.5 bg-stone-100 p-0.5 rounded border border-stone-200">
+                              {(['left', 'center', 'right'] as const).map((align) => (
+                                <button
+                                  key={align}
+                                  type="button"
+                                  className={`p-1 rounded text-xs transition-all ${
+                                    (activePage.section2ReporterNameAlign || 'right') === align
+                                      ? 'bg-white text-amber-900 font-bold shadow-sm'
+                                      : 'text-stone-400 hover:text-stone-700'
+                                  }`}
+                                  onClick={() => updateActivePage((prev) => ({ ...prev, section2ReporterNameAlign: align }))}
+                                  title={`Align ${align}`}
+                                >
+                                  {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                                </button>
+                              ))}
+                            </div>
+                            <label className="relative w-4 h-4 rounded-full border border-stone-300 overflow-hidden cursor-pointer shrink-0" title="Color">
+                              <input
+                                type="color"
+                                value={activePage.section2ReporterNameColor || '#57534e'}
+                                onChange={(e) => updateActivePage((prev) => ({ ...prev, section2ReporterNameColor: e.target.value }))}
+                                className="absolute -top-2 -left-2 w-8 h-8 cursor-pointer opacity-0"
+                              />
+                              <span className="block w-full h-full rounded-full" style={{ backgroundColor: activePage.section2ReporterNameColor || '#57534e' }} />
+                            </label>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <>
+                    {/* Page Headline / Title */}
                     <div className="pub-control-group">
-                      <label>Page Title</label>
-                      <input
-                        type="text"
-                        className="pub-input"
-                        placeholder="e.g. Daily Aarti Collection"
+                      <label className="text-xs font-semibold text-stone-700 mb-1 block">Page Title / Headline</label>
+                      <RichTextEditor
                         value={activePage.title}
-                        onChange={(e) =>
-                          updateActivePage((prev) => ({ ...prev, title: e.target.value }))
-                        }
+                        onChange={(title) => updateActivePage((prev) => ({ ...prev, title }))}
+                        placeholder="e.g. Daily Aarti Collection / Main News"
+                        variant="title"
+                        toolbarPosition="top"
+                        minHeight={42}
                       />
                     </div>
 
+                    {/* Page Subtitle */}
                     <div className="pub-control-group">
-                      <label>Page Subtitle (Optional)</label>
-                      <input
-                        type="text"
-                        className="pub-input"
-                        placeholder="e.g. Devotional Special"
+                      <div className="flex items-center justify-between mb-1 gap-2">
+                        <label className="text-xs font-semibold text-stone-700 m-0">Page Subtitle (Optional)</label>
+                        <div className="flex items-center bg-stone-100 p-0.5 rounded border border-stone-200">
+                          {(['left', 'center', 'right'] as const).map((align) => (
+                            <button
+                              key={align}
+                              type="button"
+                              className={`p-1 rounded transition-all ${
+                                (activePage.subtitleAlign || 'center') === align
+                                  ? 'bg-white shadow text-amber-900 font-bold'
+                                  : 'text-stone-400 hover:text-stone-700'
+                              }`}
+                              onClick={() => updateActivePage((prev) => ({ ...prev, subtitleAlign: align }))}
+                              title={`Align ${align}`}
+                            >
+                              {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <RichTextEditor
                         value={activePage.subtitle || ''}
-                        onChange={(e) =>
-                          updateActivePage((prev) => ({ ...prev, subtitle: e.target.value }))
-                        }
+                        onChange={(subtitle) => updateActivePage((prev) => ({ ...prev, subtitle }))}
+                        placeholder="e.g. Devotional Special / Wardha Edition"
+                        variant="subtitle"
+                        toolbarPosition="top"
+                        minHeight={38}
                       />
                     </div>
 
@@ -1312,6 +1519,71 @@ export function PublicationsPage() {
                         minHeight={220}
                         toolbarPosition="bottom"
                       />
+                    </div>
+
+                    {/* Single Story Reporter Name */}
+                    <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5 m-0">
+                          <User size={13} className="text-stone-500" />
+                          Reporter Name / Byline (बातमीदार / प्रतिनिधी)
+                        </label>
+                        <span className="text-[11px] text-stone-500 font-medium">
+                          Size: {activePage.reporterNameSize || 12}px
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        className="pub-input text-xs"
+                        placeholder="e.g. विशेष प्रतिनिधी / राहुल शर्मा"
+                        value={activePage.reporterName || ''}
+                        onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterName: e.target.value }))}
+                      />
+                      {Boolean(activePage.reporterName?.trim()) && (
+                        <div className="flex items-center justify-between gap-3 pt-1 border-t border-stone-200/60">
+                          <div className="flex-1 flex items-center gap-2">
+                            <span className="text-[10px] text-stone-500 font-medium whitespace-nowrap">Size</span>
+                            <input
+                              type="range"
+                              min={9}
+                              max={20}
+                              step={0.5}
+                              value={activePage.reporterNameSize || 12}
+                              onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameSize: parseFloat(e.target.value) }))}
+                              className="w-full accent-amber-700 h-1.5"
+                            />
+                          </div>
+                          <div className="flex items-center gap-0.5 bg-white p-0.5 rounded border border-stone-200">
+                            {(['left', 'center', 'right'] as const).map((align) => (
+                              <button
+                                key={align}
+                                type="button"
+                                className={`p-1 rounded text-xs transition-all ${
+                                  (activePage.reporterNameAlign || 'right') === align
+                                    ? 'bg-amber-100 text-amber-900 font-bold'
+                                    : 'text-stone-400 hover:text-stone-700'
+                                }`}
+                                onClick={() => updateActivePage((prev) => ({ ...prev, reporterNameAlign: align }))}
+                                title={`Align ${align}`}
+                              >
+                                {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                              </button>
+                            ))}
+                          </div>
+                          <label className="relative w-4 h-4 rounded-full border border-stone-300 overflow-hidden cursor-pointer shrink-0" title="Reporter text color">
+                            <input
+                              type="color"
+                              value={activePage.reporterNameColor || '#57534e'}
+                              onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameColor: e.target.value }))}
+                              className="absolute -top-2 -left-2 w-8 h-8 cursor-pointer opacity-0"
+                            />
+                            <span
+                              className="block w-full h-full rounded-full"
+                              style={{ backgroundColor: activePage.reporterNameColor || '#57534e' }}
+                            />
+                          </label>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

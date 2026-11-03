@@ -25,7 +25,15 @@ export interface PublicationPage {
   pageNumber: number;
   type: PageType;
   title: string;
+  titleColor?: string;
+  titleAlign?: 'left' | 'center' | 'right';
   subtitle?: string;
+  subtitleColor?: string;
+  subtitleAlign?: 'left' | 'center' | 'right';
+  reporterName?: string;
+  reporterNameSize?: number;
+  reporterNameColor?: string;
+  reporterNameAlign?: 'left' | 'center' | 'right';
   content: string; // Devotional verses, news matter, editorial text
   fontSize: number;
   lineHeight: number;
@@ -38,8 +46,16 @@ export interface PublicationPage {
   isSplitPage?: boolean;
   splitDirection?: 'horizontal' | 'vertical'; // 'horizontal' = side-by-side (2 columns), 'vertical' = top-and-bottom (2 rows)
   section2Title?: string;
+  section2TitleColor?: string;
+  section2TitleAlign?: 'left' | 'center' | 'right';
   section2Subtitle?: string;
+  section2SubtitleColor?: string;
+  section2SubtitleAlign?: 'left' | 'center' | 'right';
   section2Content?: string;
+  section2ReporterName?: string;
+  section2ReporterNameSize?: number;
+  section2ReporterNameColor?: string;
+  section2ReporterNameAlign?: 'left' | 'center' | 'right';
 
   // Feature image (e.g. Deity, guest, event photo)
   featureImageUrl?: string;

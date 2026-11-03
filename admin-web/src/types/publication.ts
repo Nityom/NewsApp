@@ -34,6 +34,13 @@ export interface PublicationPage {
   continuationPageId?: string;
   continuationSourceContent?: string;
 
+  // Two-section / split page support (divide page into 2 stories with 2 headings and 2 contents)
+  isSplitPage?: boolean;
+  splitDirection?: 'horizontal' | 'vertical'; // 'horizontal' = side-by-side (2 columns), 'vertical' = top-and-bottom (2 rows)
+  section2Title?: string;
+  section2Subtitle?: string;
+  section2Content?: string;
+
   // Feature image (e.g. Deity, guest, event photo)
   featureImageUrl?: string;
   featureImagePosition?: 'right' | 'center' | 'left' | 'hero' | 'free';

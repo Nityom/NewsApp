@@ -821,13 +821,53 @@ export function PublicationsPage() {
 
               <div className="pub-thumb-preview-mini">
                 <div className="pub-mini-header" />
-                <div className="pub-mini-title">{p.title || 'Untitled Page'}</div>
-                <div className="pub-mini-lines">
-                  <div className="pub-mini-line w-4/5" />
-                  <div className="pub-mini-line w-11/12" />
-                  <div className="pub-mini-line w-3/4" />
-                  <div className="pub-mini-line w-5/6" />
-                </div>
+                {p.isSplitPage ? (
+                  p.splitDirection === 'vertical' ? (
+                    <>
+                      <div className="pub-mini-title">{p.title || 'Story 1'}</div>
+                      <div className="pub-mini-lines">
+                        <div className="pub-mini-line w-4/5" />
+                        <div className="pub-mini-line w-11/12" />
+                      </div>
+                      <div className="border-b border-dashed border-red-300 my-1" />
+                      <div className="pub-mini-title">{p.section2Title || 'Story 2'}</div>
+                      <div className="pub-mini-lines">
+                        <div className="pub-mini-line w-3/4" />
+                        <div className="pub-mini-line w-5/6" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex gap-1 flex-1 w-full overflow-hidden mt-0.5">
+                      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                        <div className="pub-mini-title truncate text-[9px]">{p.title || 'Story 1'}</div>
+                        <div className="pub-mini-lines">
+                          <div className="pub-mini-line w-full" />
+                          <div className="pub-mini-line w-4/5" />
+                          <div className="pub-mini-line w-3/4" />
+                        </div>
+                      </div>
+                      <div className="w-[1px] border-r border-dashed border-red-300 self-stretch shrink-0" />
+                      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                        <div className="pub-mini-title truncate text-[9px]">{p.section2Title || 'Story 2'}</div>
+                        <div className="pub-mini-lines">
+                          <div className="pub-mini-line w-full" />
+                          <div className="pub-mini-line w-4/5" />
+                          <div className="pub-mini-line w-3/4" />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <>
+                    <div className="pub-mini-title">{p.title || 'Untitled Page'}</div>
+                    <div className="pub-mini-lines">
+                      <div className="pub-mini-line w-4/5" />
+                      <div className="pub-mini-line w-11/12" />
+                      <div className="pub-mini-line w-3/4" />
+                      <div className="pub-mini-line w-5/6" />
+                    </div>
+                  </>
+                )}
                 {p.ad?.imageUrl && (
                   <div className="pub-mini-ad">
                     Ad Banner
@@ -999,71 +1039,282 @@ export function PublicationsPage() {
                   </select>
                 </div>
 
-                <div className="pub-control-group">
-                  <label>Page Title</label>
-                  <input
-                    type="text"
-                    className="pub-input"
-                    placeholder="e.g. Daily Aarti Collection"
-                    value={activePage.title}
-                    onChange={(e) =>
-                      updateActivePage((prev) => ({ ...prev, title: e.target.value }))
-                    }
-                  />
-                </div>
+                {/* Split Page Checkbox Card (for Inner & Back Pages) */}
+                {activePage.type !== 'cover' && (
+                  <div className="rounded-lg border border-amber-300 bg-amber-50/70 hover:bg-amber-50/90 p-3 shadow-sm transition-colors mb-3">
+                    <label className="!flex !flex-row !items-center !justify-start gap-2.5 cursor-pointer select-none m-0">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(activePage.isSplitPage)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          updateActivePage((prev) => ({
+                            ...prev,
+                            isSplitPage: checked,
+                            section2Title: prev.section2Title || 'Story 2 / Headline 2',
+                            section2Content: prev.section2Content ?? '',
+                          }));
+                        }}
+                        className="w-4 h-4 rounded accent-red-700 cursor-pointer shrink-0 m-0 !w-4 !h-4"
+                      />
+                      <span className="font-bold text-stone-900 text-[13px] flex items-center gap-2 flex-1">
+                        Divide Page in 2
+                        <span className="bg-red-100 text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                          2 Stories
+                        </span>
+                      </span>
+                    </label>
 
-                {activePage.type === 'cover' && (
-                  <div className="pub-control-group">
-                    <label>Greeting Banner / Ribbon</label>
-                    <input
-                      type="text"
-                      className="pub-input"
-                      placeholder="e.g. Warm Greetings & Best Wishes"
-                      value={activePage.greetingText || ''}
-                      onChange={(e) =>
-                        updateActivePage((prev) => ({
-                          ...prev,
-                          greetingText: e.target.value,
-                        }))
-                      }
-                    />
+                    <p className="mt-1 ml-6.5 text-[11px] text-stone-600 leading-normal m-0 pl-0.5">
+                      Divide this page into two separate stories with 2 headings and 2 contents on the same page.
+                    </p>
+
+                    {activePage.isSplitPage && (
+                      <div className="mt-2.5 pt-2.5 border-t border-amber-200/80">
+                        <span className="text-[11px] font-bold text-stone-700 block mb-1.5">
+                          Arrangement:
+                        </span>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            className={`pub-btn flex-1 text-xs py-1.5 px-2 ${
+                              (activePage.splitDirection === 'horizontal' || !activePage.splitDirection)
+                                ? 'pub-btn-primary'
+                                : 'pub-btn-secondary'
+                            }`}
+                            onClick={() => updateActivePage((prev) => ({ ...prev, splitDirection: 'horizontal' }))}
+                          >
+                            ◫ Horizontal (Side-by-Side)
+                          </button>
+                          <button
+                            type="button"
+                            className={`pub-btn flex-1 text-xs py-1.5 px-2 ${
+                              activePage.splitDirection === 'vertical'
+                                ? 'pub-btn-primary'
+                                : 'pub-btn-secondary'
+                            }`}
+                            onClick={() => updateActivePage((prev) => ({ ...prev, splitDirection: 'vertical' }))}
+                          >
+                            ⬓ Vertical (Top & Bottom)
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                <div className="pub-control-group">
-                  <label>
-                    <span>Article / Verse Text</span>
-                    <span className="text-[11px] text-stone-500 font-normal">
-                      Font: {activePage.fontSize}px
-                    </span>
-                  </label>
-                  <div className="pub-symbols-bar">
-                    {['॥', '।।', '!', '❖', '✿', '★', 'ॐ'].map((sym) => (
-                      <button
-                        key={sym}
-                        type="button"
-                        className="pub-symbol-chip"
-                        onClick={() =>
-                          updateActivePage((prev) => ({
-                            ...prev,
-                            content: `${prev.content} ${sym}`,
-                          }))
-                        }
-                      >
-                        {sym}
-                      </button>
-                    ))}
+                {activePage.isSplitPage ? (
+                  <div className="space-y-4">
+                    {/* ===== STORY 1 ===== */}
+                    <div className="p-3 bg-red-50/50 border border-red-200 rounded-lg space-y-3">
+                      <div className="flex items-center justify-between border-b border-red-200/60 pb-1.5">
+                        <span className="font-bold text-xs text-red-800 flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] font-mono">1</span>
+                          {(activePage.splitDirection === 'horizontal' || !activePage.splitDirection)
+                            ? 'Story 1 (Left Column)'
+                            : 'Story 1 (Top Section)'}
+                        </span>
+                      </div>
+
+                      <div className="pub-control-group">
+                        <label>Heading 1 / Title</label>
+                        <input
+                          type="text"
+                          className="pub-input"
+                          placeholder="e.g. Primary Story / Morning News"
+                          value={activePage.title}
+                          onChange={(e) => updateActivePage((prev) => ({ ...prev, title: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="pub-control-group">
+                        <label>Subtitle 1 (Optional)</label>
+                        <input
+                          type="text"
+                          className="pub-input"
+                          placeholder="e.g. Special Report"
+                          value={activePage.subtitle || ''}
+                          onChange={(e) => updateActivePage((prev) => ({ ...prev, subtitle: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="pub-control-group">
+                        <label>Story 1 Content</label>
+                        <div className="pub-symbols-bar">
+                          {['॥', '।।', '!', '❖', '✿', '★', 'ॐ'].map((sym) => (
+                            <button
+                              key={sym}
+                              type="button"
+                              className="pub-symbol-chip"
+                              onClick={() =>
+                                updateActivePage((prev) => ({
+                                  ...prev,
+                                  content: `${prev.content} ${sym}`,
+                                }))
+                              }
+                            >
+                              {sym}
+                            </button>
+                          ))}
+                        </div>
+                        <RichTextEditor
+                          value={activePage.content}
+                          onChange={(content) =>
+                            updateActivePage((prev) => ({ ...prev, content }))
+                          }
+                          placeholder="Type story 1 content here..."
+                          minHeight={150}
+                          toolbarPosition="bottom"
+                        />
+                      </div>
+                    </div>
+
+                    {/* ===== STORY 2 ===== */}
+                    <div className="p-3 bg-amber-50/50 border border-amber-200 rounded-lg space-y-3">
+                      <div className="flex items-center justify-between border-b border-amber-200/60 pb-1.5">
+                        <span className="font-bold text-xs text-amber-800 flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-full bg-amber-700 text-white flex items-center justify-center text-[10px] font-mono">2</span>
+                          {(activePage.splitDirection === 'horizontal' || !activePage.splitDirection)
+                            ? 'Story 2 (Right Column)'
+                            : 'Story 2 (Bottom Section)'}
+                        </span>
+                      </div>
+
+                      <div className="pub-control-group">
+                        <label>Heading 2 / Title</label>
+                        <input
+                          type="text"
+                          className="pub-input"
+                          placeholder="e.g. Secondary Story / Community News"
+                          value={activePage.section2Title || ''}
+                          onChange={(e) => updateActivePage((prev) => ({ ...prev, section2Title: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="pub-control-group">
+                        <label>Subtitle 2 (Optional)</label>
+                        <input
+                          type="text"
+                          className="pub-input"
+                          placeholder="e.g. Wardha Edition"
+                          value={activePage.section2Subtitle || ''}
+                          onChange={(e) => updateActivePage((prev) => ({ ...prev, section2Subtitle: e.target.value }))}
+                        />
+                      </div>
+
+                      <div className="pub-control-group">
+                        <label>Story 2 Content</label>
+                        <div className="pub-symbols-bar">
+                          {['॥', '।।', '!', '❖', '✿', '★', 'ॐ'].map((sym) => (
+                            <button
+                              key={sym}
+                              type="button"
+                              className="pub-symbol-chip"
+                              onClick={() =>
+                                updateActivePage((prev) => ({
+                                  ...prev,
+                                  section2Content: `${prev.section2Content || ''} ${sym}`,
+                                }))
+                              }
+                            >
+                              {sym}
+                            </button>
+                          ))}
+                        </div>
+                        <RichTextEditor
+                          value={activePage.section2Content || ''}
+                          onChange={(section2Content) =>
+                            updateActivePage((prev) => ({ ...prev, section2Content }))
+                          }
+                          placeholder="Type story 2 content here..."
+                          minHeight={150}
+                          toolbarPosition="bottom"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <RichTextEditor
-                    value={activePage.content}
-                    onChange={(content) =>
-                      updateActivePage((prev) => ({ ...prev, content }))
-                    }
-                    placeholder="Type verses, article text, or news matter here..."
-                    minHeight={220}
-                    toolbarPosition="bottom"
-                  />
-                </div>
+                ) : (
+                  <>
+                    <div className="pub-control-group">
+                      <label>Page Title</label>
+                      <input
+                        type="text"
+                        className="pub-input"
+                        placeholder="e.g. Daily Aarti Collection"
+                        value={activePage.title}
+                        onChange={(e) =>
+                          updateActivePage((prev) => ({ ...prev, title: e.target.value }))
+                        }
+                      />
+                    </div>
+
+                    <div className="pub-control-group">
+                      <label>Page Subtitle (Optional)</label>
+                      <input
+                        type="text"
+                        className="pub-input"
+                        placeholder="e.g. Devotional Special"
+                        value={activePage.subtitle || ''}
+                        onChange={(e) =>
+                          updateActivePage((prev) => ({ ...prev, subtitle: e.target.value }))
+                        }
+                      />
+                    </div>
+
+                    {activePage.type === 'cover' && (
+                      <div className="pub-control-group">
+                        <label>Greeting Banner / Ribbon</label>
+                        <input
+                          type="text"
+                          className="pub-input"
+                          placeholder="e.g. Warm Greetings & Best Wishes"
+                          value={activePage.greetingText || ''}
+                          onChange={(e) =>
+                            updateActivePage((prev) => ({
+                              ...prev,
+                              greetingText: e.target.value,
+                            }))
+                          }
+                        />
+                      </div>
+                    )}
+
+                    <div className="pub-control-group">
+                      <label>
+                        <span>Article / Verse Text</span>
+                        <span className="text-[11px] text-stone-500 font-normal">
+                          Font: {activePage.fontSize}px
+                        </span>
+                      </label>
+                      <div className="pub-symbols-bar">
+                        {['॥', '।।', '!', '❖', '✿', '★', 'ॐ'].map((sym) => (
+                          <button
+                            key={sym}
+                            type="button"
+                            className="pub-symbol-chip"
+                            onClick={() =>
+                              updateActivePage((prev) => ({
+                                ...prev,
+                                content: `${prev.content} ${sym}`,
+                              }))
+                            }
+                          >
+                            {sym}
+                          </button>
+                        ))}
+                      </div>
+                      <RichTextEditor
+                        value={activePage.content}
+                        onChange={(content) =>
+                          updateActivePage((prev) => ({ ...prev, content }))
+                        }
+                        placeholder="Type verses, article text, or news matter here..."
+                        minHeight={220}
+                        toolbarPosition="bottom"
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="pub-control-group">

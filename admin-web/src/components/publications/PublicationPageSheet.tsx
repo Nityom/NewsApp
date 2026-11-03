@@ -78,6 +78,59 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
   const overlapHeight = Math.max(0, Math.round(bottomInText - effectiveTopInText));
   const totalSpacerHeight = topOffset + overlapHeight + 8;
 
+  // Split-page (2 stories) calculations
+  const isSplitHorizontal = Boolean(page.isSplitPage && (page.splitDirection === 'horizontal' || !page.splitDirection));
+  const splitMidY = textTop + (textBottom - textTop) / 2;
+  const imageOverlapsSection1 = Boolean(page.isSplitPage && imageOverlapsText && featY < splitMidY && featY + featH > textTop);
+  const imageOverlapsSection2 = Boolean(page.isSplitPage && imageOverlapsText && featY + featH > splitMidY && featY < textBottom);
+
+  const sec1TopOffset = Math.max(0, Math.round(featY - textTop));
+  const sec1Bottom = Math.min(splitMidY, featY + featH);
+  const sec1Overlap = Math.max(0, Math.round(sec1Bottom - Math.max(textTop, featY)));
+  const sec1SpacerHeight = sec1TopOffset + sec1Overlap + 6;
+
+  const sec2TopOffset = Math.max(0, Math.round(featY - splitMidY));
+  const sec2Bottom = Math.min(textBottom, featY + featH);
+  const sec2Overlap = Math.max(0, Math.round(sec2Bottom - Math.max(splitMidY, featY)));
+  const sec2SpacerHeight = sec2TopOffset + sec2Overlap + 6;
+
+  const renderContentBody = (contentStr?: string) => {
+    if (!contentStr || !contentStr.trim()) return null;
+    if (contentStr.includes('<')) {
+      return (
+        <div
+          className="pub-rich-page-content"
+          dangerouslySetInnerHTML={{ __html: contentStr }}
+        />
+      );
+    }
+    return contentStr.split('\n').map((line, idx) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('❖') || trimmed.startsWith('✿') || trimmed.startsWith('---')) {
+        return (
+          <div key={idx} className="pub-ornamental-divider text-center text-[14px] text-green-700 tracking-widest my-1.5 select-none">
+            {trimmed}
+          </div>
+        );
+      }
+      if (trimmed.startsWith('!!') && trimmed.endsWith('!!')) {
+        return (
+          <h4 key={idx} className="pub-inline-subheading font-serif text-[16px] font-extrabold text-red-600 text-center my-1.5">
+            {trimmed}
+          </h4>
+        );
+      }
+      return (
+        <p
+          key={idx}
+          className={trimmed === '' ? 'pub-empty-paragraph h-2' : 'pub-verse-line m-0 py-0.5 leading-relaxed font-medium'}
+        >
+          {trimmed || '\u00A0'}
+        </p>
+      );
+    });
+  };
+
   return (
     <div
       id={id}
@@ -166,103 +219,283 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
             <div className="pub-inner-layout flex flex-col h-full box-border">
               {/* Page Matter / Editorial Content */}
               <div className="pub-matter-section flex-1 min-h-0 flex flex-col px-3 py-1 overflow-hidden">
-                {/* Title */}
-                {page.title && (
-                  <h2 className="pub-matter-title font-serif text-[18px] font-black text-red-700 text-center tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1">
-                    {page.title}
-                  </h2>
-                )}
-
-                {/* Subtitle */}
-                {page.subtitle && (
-                  <h3 className="pub-matter-subtitle font-serif text-[13px] font-bold text-amber-800 text-center m-0 mb-1">
-                    {page.subtitle}
-                  </h3>
-                )}
-
-                {/* Text Body */}
-                <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
-                  {/* If feature image is in fixed float mode (not free) */}
-                  {!isFeatureFree && page.featureImageUrl && page.featureImagePosition === 'right' && (
-                    <div
-                      className="pub-matter-float-image right float-right ml-3 mb-2 max-h-[160px] overflow-hidden rounded border border-amber-300 shadow-sm"
-                      style={{ width: page.featureImageWidth ? `${page.featureImageWidth}%` : '28%' }}
-                    >
-                      <img src={page.featureImageUrl} crossOrigin="anonymous" alt="Illustration" className="w-full h-full object-contain" />
+                {isSplitHorizontal ? (
+                  /* ===== HORIZONTAL (SIDE-BY-SIDE / 2 COLUMNS) ===== */
+                  <div className="pub-matter-split-columns flex-1 min-h-0 flex flex-row overflow-hidden gap-2.5">
+                    {/* Story 1 (Left Column) */}
+                    <div className="pub-split-col flex-1 min-w-0 flex flex-col overflow-hidden">
+                      {page.title && (
+                        <h2 className="pub-matter-title font-serif text-[16px] font-black text-red-700 text-center tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1 shrink-0">
+                          {page.title}
+                        </h2>
+                      )}
+                      {page.subtitle && (
+                        <h3 className="pub-matter-subtitle font-serif text-[12px] font-bold text-amber-800 text-center m-0 mb-1 shrink-0">
+                          {page.subtitle}
+                        </h3>
+                      )}
+                      <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
+                        <div
+                          className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
+                          style={{
+                            fontSize: `${page.fontSize || 13.5}px`,
+                            lineHeight: page.lineHeight || 1.6,
+                            textAlign: page.textAlign || 'center',
+                          }}
+                        >
+                          {imageOverlapsText && isLeft && (
+                            <div
+                              className="pub-feature-wrap-spacer select-none"
+                              aria-hidden="true"
+                              style={{
+                                float: featX > 140 ? 'right' : 'left',
+                                width: `${Math.min(230, Math.max(40, featW + 8))}px`,
+                                height: `${totalSpacerHeight}px`,
+                                shapeOutside: topOffset > 6
+                                  ? `polygon(0 ${topOffset}px, ${Math.min(230, Math.max(40, featW + 8))}px ${topOffset}px, ${Math.min(230, Math.max(40, featW + 8))}px ${totalSpacerHeight}px, 0 ${totalSpacerHeight}px)`
+                                  : undefined,
+                                clipPath: topOffset > 6
+                                  ? `polygon(0 ${topOffset}px, 100% ${topOffset}px, 100% ${totalSpacerHeight}px, 0 ${totalSpacerHeight}px)`
+                                  : undefined,
+                                pointerEvents: 'none',
+                                opacity: 0,
+                                clear: 'none',
+                              }}
+                            />
+                          )}
+                          {renderContentBody(page.content)}
+                        </div>
+                      </div>
                     </div>
-                  )}
 
-                  {!isFeatureFree && page.featureImageUrl && page.featureImagePosition === 'center' && (
-                    <div
-                      className="pub-matter-center-image mx-auto mb-2 max-h-[160px] overflow-hidden rounded border border-amber-300 shadow-sm"
-                      style={{ width: page.featureImageWidth ? `${page.featureImageWidth}%` : '40%' }}
-                    >
-                      <img src={page.featureImageUrl} crossOrigin="anonymous" alt="Illustration" className="w-full h-full object-contain" />
+                    {/* Vertical Column Dividing Line */}
+                    <div className="pub-col-divider flex flex-col items-center justify-center shrink-0 select-none px-0.5">
+                      <div className="flex-1 w-[1px] border-r border-dashed border-red-300" />
+                      <span className="text-[10px] text-amber-800 my-1 font-serif font-bold">❖</span>
+                      <div className="flex-1 w-[1px] border-r border-dashed border-red-300" />
                     </div>
-                  )}
 
-                  <div
-                    className="pub-matter-text font-serif text-stone-900 overflow-hidden"
-                    style={{
-                      fontSize: `${page.fontSize || 14}px`,
-                      lineHeight: page.lineHeight || 1.6,
-                      textAlign: page.textAlign || 'center',
-                    }}
-                  >
-                    {/* Auto-wrapping Float Spacer for Canva Free-drag Image */}
-                    {imageOverlapsText && overlapHeight > 0 && (
-                      <div
-                        className="pub-feature-wrap-spacer select-none"
-                        aria-hidden="true"
-                        style={{
-                          float: isLeft ? 'left' : 'right',
-                          width: `${clearWidth}px`,
-                          height: `${totalSpacerHeight}px`,
-                          shapeOutside: topOffset > 6
-                            ? `polygon(0 ${topOffset}px, ${clearWidth}px ${topOffset}px, ${clearWidth}px ${totalSpacerHeight}px, 0 ${totalSpacerHeight}px)`
-                            : undefined,
-                          clipPath: topOffset > 6
-                            ? `polygon(0 ${topOffset}px, 100% ${topOffset}px, 100% ${totalSpacerHeight}px, 0 ${totalSpacerHeight}px)`
-                            : undefined,
-                          pointerEvents: 'none',
-                          opacity: 0,
-                          clear: 'none',
-                        }}
-                      />
+                    {/* Story 2 (Right Column) */}
+                    <div className="pub-split-col flex-1 min-w-0 flex flex-col overflow-hidden">
+                      {page.section2Title && (
+                        <h2 className="pub-matter-title font-serif text-[16px] font-black text-red-700 text-center tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1 shrink-0">
+                          {page.section2Title}
+                        </h2>
+                      )}
+                      {page.section2Subtitle && (
+                        <h3 className="pub-matter-subtitle font-serif text-[12px] font-bold text-amber-800 text-center m-0 mb-1 shrink-0">
+                          {page.section2Subtitle}
+                        </h3>
+                      )}
+                      <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
+                        <div
+                          className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
+                          style={{
+                            fontSize: `${page.fontSize || 13.5}px`,
+                            lineHeight: page.lineHeight || 1.6,
+                            textAlign: page.textAlign || 'center',
+                          }}
+                        >
+                          {imageOverlapsText && !isLeft && (
+                            <div
+                              className="pub-feature-wrap-spacer select-none"
+                              aria-hidden="true"
+                              style={{
+                                float: featX < 430 ? 'left' : 'right',
+                                width: `${Math.min(230, Math.max(40, featW + 8))}px`,
+                                height: `${totalSpacerHeight}px`,
+                                shapeOutside: topOffset > 6
+                                  ? `polygon(0 ${topOffset}px, ${Math.min(230, Math.max(40, featW + 8))}px ${topOffset}px, ${Math.min(230, Math.max(40, featW + 8))}px ${totalSpacerHeight}px, 0 ${totalSpacerHeight}px)`
+                                  : undefined,
+                                clipPath: topOffset > 6
+                                  ? `polygon(0 ${topOffset}px, 100% ${topOffset}px, 100% ${totalSpacerHeight}px, 0 ${totalSpacerHeight}px)`
+                                  : undefined,
+                                pointerEvents: 'none',
+                                opacity: 0,
+                                clear: 'none',
+                              }}
+                            />
+                          )}
+                          {renderContentBody(page.section2Content || '')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : page.isSplitPage ? (
+                  /* ===== VERTICAL (TOP & BOTTOM / 2 ROWS) ===== */
+                  <div className="pub-matter-split-wrap flex-1 min-h-0 flex flex-col overflow-hidden">
+                    {/* Story 1 (Top Section) */}
+                    <div className="pub-split-section flex-1 min-h-0 flex flex-col overflow-hidden pb-1">
+                      {page.title && (
+                        <h2 className="pub-matter-title font-serif text-[17px] font-black text-red-700 text-center tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1 shrink-0">
+                          {page.title}
+                        </h2>
+                      )}
+                      {page.subtitle && (
+                        <h3 className="pub-matter-subtitle font-serif text-[12px] font-bold text-amber-800 text-center m-0 mb-1 shrink-0">
+                          {page.subtitle}
+                        </h3>
+                      )}
+                      <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
+                        <div
+                          className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
+                          style={{
+                            fontSize: `${Math.max(11, (page.fontSize || 14) * 0.92)}px`,
+                            lineHeight: page.lineHeight || 1.55,
+                            textAlign: page.textAlign || 'center',
+                          }}
+                        >
+                          {imageOverlapsSection1 && (
+                            <div
+                              className="pub-feature-wrap-spacer select-none"
+                              aria-hidden="true"
+                              style={{
+                                float: isLeft ? 'left' : 'right',
+                                width: `${clearWidth}px`,
+                                height: `${sec1SpacerHeight}px`,
+                                shapeOutside: sec1TopOffset > 6
+                                  ? `polygon(0 ${sec1TopOffset}px, ${clearWidth}px ${sec1TopOffset}px, ${clearWidth}px ${sec1SpacerHeight}px, 0 ${sec1SpacerHeight}px)`
+                                  : undefined,
+                                clipPath: sec1TopOffset > 6
+                                  ? `polygon(0 ${sec1TopOffset}px, 100% ${sec1TopOffset}px, 100% ${sec1SpacerHeight}px, 0 ${sec1SpacerHeight}px)`
+                                  : undefined,
+                                pointerEvents: 'none',
+                                opacity: 0,
+                                clear: 'none',
+                              }}
+                            />
+                          )}
+                          {renderContentBody(page.content)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Newspaper Story Separator */}
+                    <div className="pub-split-divider my-1.5 py-0.5 flex items-center justify-center gap-2 select-none shrink-0">
+                      <div className="flex-1 border-b border-dashed border-red-300" />
+                      <span className="text-[11px] text-amber-800 tracking-widest font-serif font-bold">❖ ❖ ❖</span>
+                      <div className="flex-1 border-b border-dashed border-red-300" />
+                    </div>
+
+                    {/* Story 2 (Bottom Section) */}
+                    <div className="pub-split-section flex-1 min-h-0 flex flex-col overflow-hidden pt-0.5">
+                      {page.section2Title && (
+                        <h2 className="pub-matter-title font-serif text-[17px] font-black text-red-700 text-center tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1 shrink-0">
+                          {page.section2Title}
+                        </h2>
+                      )}
+                      {page.section2Subtitle && (
+                        <h3 className="pub-matter-subtitle font-serif text-[12px] font-bold text-amber-800 text-center m-0 mb-1 shrink-0">
+                          {page.section2Subtitle}
+                        </h3>
+                      )}
+                      <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
+                        <div
+                          className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
+                          style={{
+                            fontSize: `${Math.max(11, (page.fontSize || 14) * 0.92)}px`,
+                            lineHeight: page.lineHeight || 1.55,
+                            textAlign: page.textAlign || 'center',
+                          }}
+                        >
+                          {imageOverlapsSection2 && (
+                            <div
+                              className="pub-feature-wrap-spacer select-none"
+                              aria-hidden="true"
+                              style={{
+                                float: isLeft ? 'left' : 'right',
+                                width: `${clearWidth}px`,
+                                height: `${sec2SpacerHeight}px`,
+                                shapeOutside: sec2TopOffset > 6
+                                  ? `polygon(0 ${sec2TopOffset}px, ${clearWidth}px ${sec2TopOffset}px, ${clearWidth}px ${sec2SpacerHeight}px, 0 ${sec2SpacerHeight}px)`
+                                  : undefined,
+                                clipPath: sec2TopOffset > 6
+                                  ? `polygon(0 ${sec2TopOffset}px, 100% ${sec2TopOffset}px, 100% ${sec2SpacerHeight}px, 0 ${sec2SpacerHeight}px)`
+                                  : undefined,
+                                pointerEvents: 'none',
+                                opacity: 0,
+                                clear: 'none',
+                              }}
+                            />
+                          )}
+                          {renderContentBody(page.section2Content || '')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* ===== SINGLE SECTION (FULL PAGE ARTICLE) ===== */
+                  <>
+                    {/* Title */}
+                    {page.title && (
+                      <h2 className="pub-matter-title font-serif text-[18px] font-black text-red-700 text-center tracking-wide leading-tight m-0 mb-1 border-b border-dashed border-red-200 pb-1">
+                        {page.title}
+                      </h2>
                     )}
 
-                    {page.content.includes('<') ? (
-                      <div
-                        className="pub-rich-page-content"
-                        dangerouslySetInnerHTML={{ __html: page.content }}
-                      />
-                    ) : page.content.split('\n').map((line, idx) => {
-                      const trimmed = line.trim();
-                      if (trimmed.startsWith('❖') || trimmed.startsWith('✿') || trimmed.startsWith('---')) {
-                        return (
-                          <div key={idx} className="pub-ornamental-divider text-center text-[14px] text-green-700 tracking-widest my-1.5 select-none">
-                            {trimmed}
-                          </div>
-                        );
-                      }
-                      if (trimmed.startsWith('!!') && trimmed.endsWith('!!')) {
-                        return (
-                          <h4 key={idx} className="pub-inline-subheading font-serif text-[16px] font-extrabold text-red-600 text-center my-1.5">
-                            {trimmed}
-                          </h4>
-                        );
-                      }
-                      return (
-                        <p
-                          key={idx}
-                          className={trimmed === '' ? 'pub-empty-paragraph h-2' : 'pub-verse-line m-0 py-0.5 leading-relaxed font-medium'}
+                    {/* Subtitle */}
+                    {page.subtitle && (
+                      <h3 className="pub-matter-subtitle font-serif text-[13px] font-bold text-amber-800 text-center m-0 mb-1">
+                        {page.subtitle}
+                      </h3>
+                    )}
+
+                    {/* Text Body */}
+                    <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
+                      {/* If feature image is in fixed float mode (not free) */}
+                      {!isFeatureFree && page.featureImageUrl && page.featureImagePosition === 'right' && (
+                        <div
+                          className="pub-matter-float-image right float-right ml-3 mb-2 max-h-[160px] overflow-hidden rounded border border-amber-300 shadow-sm"
+                          style={{ width: page.featureImageWidth ? `${page.featureImageWidth}%` : '28%' }}
                         >
-                          {trimmed || '\u00A0'}
-                        </p>
-                      );
-                    })}
-                  </div>
-                </div>
+                          <img src={page.featureImageUrl} crossOrigin="anonymous" alt="Illustration" className="w-full h-full object-contain" />
+                        </div>
+                      )}
+
+                      {!isFeatureFree && page.featureImageUrl && page.featureImagePosition === 'center' && (
+                        <div
+                          className="pub-matter-center-image mx-auto mb-2 max-h-[160px] overflow-hidden rounded border border-amber-300 shadow-sm"
+                          style={{ width: page.featureImageWidth ? `${page.featureImageWidth}%` : '40%' }}
+                        >
+                          <img src={page.featureImageUrl} crossOrigin="anonymous" alt="Illustration" className="w-full h-full object-contain" />
+                        </div>
+                      )}
+
+                      <div
+                        className="pub-matter-text font-serif text-stone-900 overflow-hidden"
+                        style={{
+                          fontSize: `${page.fontSize || 14}px`,
+                          lineHeight: page.lineHeight || 1.6,
+                          textAlign: page.textAlign || 'center',
+                        }}
+                      >
+                        {/* Auto-wrapping Float Spacer for Canva Free-drag Image */}
+                        {imageOverlapsText && overlapHeight > 0 && (
+                          <div
+                            className="pub-feature-wrap-spacer select-none"
+                            aria-hidden="true"
+                            style={{
+                              float: isLeft ? 'left' : 'right',
+                              width: `${clearWidth}px`,
+                              height: `${totalSpacerHeight}px`,
+                              shapeOutside: topOffset > 6
+                                ? `polygon(0 ${topOffset}px, ${clearWidth}px ${topOffset}px, ${clearWidth}px ${totalSpacerHeight}px, 0 ${totalSpacerHeight}px)`
+                                : undefined,
+                              clipPath: topOffset > 6
+                                ? `polygon(0 ${topOffset}px, 100% ${topOffset}px, 100% ${totalSpacerHeight}px, 0 ${totalSpacerHeight}px)`
+                                : undefined,
+                              pointerEvents: 'none',
+                              opacity: 0,
+                              clear: 'none',
+                            }}
+                          />
+                        )}
+
+                        {renderContentBody(page.content)}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Bottom Advertisement Slot (if in classic fixed mode) */}

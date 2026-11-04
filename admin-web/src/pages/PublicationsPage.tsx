@@ -1250,20 +1250,19 @@ export function PublicationsPage() {
 
                       {/* Story 1 Reporter Name */}
                       <div
-                        className={`p-2.5 rounded-lg space-y-2 transition-all ${
+                        className={`p-3 rounded-lg space-y-2.5 transition-all ${
                           selectedElementId === 'reporter_name'
                             ? 'bg-blue-50/70 border-2 border-blue-400 ring-2 ring-blue-100 shadow-sm'
                             : 'bg-white/80 border border-red-200'
                         }`}
-                        onClick={() => setSelectedElementId('reporter_name')}
                       >
                         <div className="flex items-center justify-between">
                           <label className="text-[11px] font-bold text-red-900 uppercase tracking-wider flex items-center gap-1.5 m-0">
                             <User size={13} className="text-red-700" />
                             Reporter 1 Name (बातमीदार / प्रतिनिधी)
                           </label>
-                          <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
-                            ✦ Draggable on Canvas
+                          <span className="text-[11px] text-stone-500 font-medium">
+                            Size: {activePage.reporterNameSize || 12}px
                           </span>
                         </div>
                         <input
@@ -1273,48 +1272,103 @@ export function PublicationsPage() {
                           value={activePage.reporterName || ''}
                           onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterName: e.target.value }))}
                         />
-                        {Boolean(activePage.reporterName?.trim()) && (
-                          <div className="flex items-center justify-between gap-3 pt-1 border-t border-red-100">
-                            <div className="flex-1 flex items-center gap-2">
-                              <span className="text-[10px] text-stone-500 font-medium whitespace-nowrap">Size</span>
-                              <input
-                                type="range"
-                                min={9}
-                                max={20}
-                                step={0.5}
-                                value={activePage.reporterNameSize || 12}
-                                onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameSize: parseFloat(e.target.value) }))}
-                                className="w-full accent-red-700 h-1.5"
-                              />
-                            </div>
-                            <div className="flex items-center gap-0.5 bg-stone-100 p-0.5 rounded border border-stone-200">
-                              {(['left', 'center', 'right'] as const).map((align) => (
-                                <button
-                                  key={align}
-                                  type="button"
-                                  className={`p-1 rounded text-xs transition-all ${
-                                    (activePage.reporterNameAlign || 'right') === align
-                                      ? 'bg-white text-red-900 font-bold shadow-sm'
-                                      : 'text-stone-400 hover:text-stone-700'
-                                  }`}
-                                  onClick={() => updateActivePage((prev) => ({ ...prev, reporterNameAlign: align }))}
-                                  title={`Align ${align}`}
-                                >
-                                  {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
-                                </button>
-                              ))}
-                            </div>
-                            <label className="relative w-4 h-4 rounded-full border border-stone-300 overflow-hidden cursor-pointer shrink-0" title="Color">
-                              <input
-                                type="color"
-                                value={activePage.reporterNameColor || '#57534e'}
-                                onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameColor: e.target.value }))}
-                                className="absolute -top-2 -left-2 w-8 h-8 cursor-pointer opacity-0"
-                              />
-                              <span className="block w-full h-full rounded-full" style={{ backgroundColor: activePage.reporterNameColor || '#57534e' }} />
-                            </label>
+
+                        {/* Story 1 Drag & Positioning Option */}
+                        <div className="pt-1 border-t border-red-100">
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Layout & Drag Option
+                          </label>
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                                (activePage.reporterMode || 'free') === 'free'
+                                  ? 'pub-btn-primary'
+                                  : 'pub-btn-secondary'
+                              }`}
+                              onClick={() => {
+                                setSelectedElementId('reporter_name');
+                                updateActivePage((prev) => ({
+                                  ...prev,
+                                  reporterMode: 'free',
+                                  reporterX: prev.reporterX ?? 75,
+                                  reporterY: prev.reporterY ?? 740,
+                                }));
+                              }}
+                            >
+                              ✋ Canva Free Drag
+                            </button>
+                            <button
+                              type="button"
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                                activePage.reporterMode === 'bottom'
+                                  ? 'pub-btn-primary'
+                                  : 'pub-btn-secondary'
+                              }`}
+                              onClick={() => {
+                                updateActivePage((prev) => ({ ...prev, reporterMode: 'bottom' }));
+                                if (selectedElementId === 'reporter_name') setSelectedElementId(null);
+                              }}
+                            >
+                              ⬇ Fixed Bottom
+                            </button>
                           </div>
-                        )}
+
+                          {(activePage.reporterMode || 'free') === 'free' && (
+                            <div className="flex items-center justify-between bg-sky-50 border border-sky-200 text-sky-800 text-[11px] px-2 py-1 rounded mt-1.5">
+                              <span>💡 Freely move & resize anywhere on sheet</span>
+                              <button
+                                type="button"
+                                className="text-[10px] font-bold text-sky-900 bg-sky-200/90 hover:bg-sky-300 px-1.5 py-0.5 rounded transition-colors"
+                                onClick={() => setSelectedElementId('reporter_name')}
+                              >
+                                🎯 Focus on Canvas
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Size, Alignment, Color toolbar */}
+                        <div className="flex items-center justify-between gap-3 pt-1 border-t border-red-100">
+                          <div className="flex-1 flex items-center gap-2">
+                            <span className="text-[10px] text-stone-500 font-medium whitespace-nowrap">Size</span>
+                            <input
+                              type="range"
+                              min={9}
+                              max={20}
+                              step={0.5}
+                              value={activePage.reporterNameSize || 12}
+                              onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameSize: parseFloat(e.target.value) }))}
+                              className="w-full accent-red-700 h-1.5"
+                            />
+                          </div>
+                          <div className="flex items-center gap-0.5 bg-stone-100 p-0.5 rounded border border-stone-200">
+                            {(['left', 'center', 'right'] as const).map((align) => (
+                              <button
+                                key={align}
+                                type="button"
+                                className={`p-1 rounded text-xs transition-all ${
+                                  (activePage.reporterNameAlign || 'right') === align
+                                    ? 'bg-white text-red-900 font-bold shadow-sm'
+                                    : 'text-stone-400 hover:text-stone-700'
+                                }`}
+                                onClick={() => updateActivePage((prev) => ({ ...prev, reporterNameAlign: align }))}
+                                title={`Align ${align}`}
+                              >
+                                {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                              </button>
+                            ))}
+                          </div>
+                          <label className="relative w-4 h-4 rounded-full border border-stone-300 overflow-hidden cursor-pointer shrink-0" title="Color">
+                            <input
+                              type="color"
+                              value={activePage.reporterNameColor || '#57534e'}
+                              onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameColor: e.target.value }))}
+                              className="absolute -top-2 -left-2 w-8 h-8 cursor-pointer opacity-0"
+                            />
+                            <span className="block w-full h-full rounded-full" style={{ backgroundColor: activePage.reporterNameColor || '#57534e' }} />
+                          </label>
+                        </div>
                       </div>
                     </div>
 
@@ -1407,20 +1461,19 @@ export function PublicationsPage() {
 
                       {/* Story 2 Reporter Name */}
                       <div
-                        className={`p-2.5 rounded-lg space-y-2 transition-all ${
+                        className={`p-3 rounded-lg space-y-2.5 transition-all ${
                           selectedElementId === 'section2_reporter_name'
                             ? 'bg-blue-50/70 border-2 border-blue-400 ring-2 ring-blue-100 shadow-sm'
                             : 'bg-white/80 border border-amber-200'
                         }`}
-                        onClick={() => setSelectedElementId('section2_reporter_name')}
                       >
                         <div className="flex items-center justify-between">
                           <label className="text-[11px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5 m-0">
                             <User size={13} className="text-amber-700" />
                             Reporter 2 Name (बातमीदार / प्रतिनिधी)
                           </label>
-                          <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
-                            ✦ Draggable on Canvas
+                          <span className="text-[11px] text-stone-500 font-medium">
+                            Size: {activePage.section2ReporterNameSize || 12}px
                           </span>
                         </div>
                         <input
@@ -1430,48 +1483,103 @@ export function PublicationsPage() {
                           value={activePage.section2ReporterName || ''}
                           onChange={(e) => updateActivePage((prev) => ({ ...prev, section2ReporterName: e.target.value }))}
                         />
-                        {Boolean(activePage.section2ReporterName?.trim()) && (
-                          <div className="flex items-center justify-between gap-3 pt-1 border-t border-amber-100">
-                            <div className="flex-1 flex items-center gap-2">
-                              <span className="text-[10px] text-stone-500 font-medium whitespace-nowrap">Size</span>
-                              <input
-                                type="range"
-                                min={9}
-                                max={20}
-                                step={0.5}
-                                value={activePage.section2ReporterNameSize || 12}
-                                onChange={(e) => updateActivePage((prev) => ({ ...prev, section2ReporterNameSize: parseFloat(e.target.value) }))}
-                                className="w-full accent-amber-700 h-1.5"
-                              />
-                            </div>
-                            <div className="flex items-center gap-0.5 bg-stone-100 p-0.5 rounded border border-stone-200">
-                              {(['left', 'center', 'right'] as const).map((align) => (
-                                <button
-                                  key={align}
-                                  type="button"
-                                  className={`p-1 rounded text-xs transition-all ${
-                                    (activePage.section2ReporterNameAlign || 'right') === align
-                                      ? 'bg-white text-amber-900 font-bold shadow-sm'
-                                      : 'text-stone-400 hover:text-stone-700'
-                                  }`}
-                                  onClick={() => updateActivePage((prev) => ({ ...prev, section2ReporterNameAlign: align }))}
-                                  title={`Align ${align}`}
-                                >
-                                  {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
-                                </button>
-                              ))}
-                            </div>
-                            <label className="relative w-4 h-4 rounded-full border border-stone-300 overflow-hidden cursor-pointer shrink-0" title="Color">
-                              <input
-                                type="color"
-                                value={activePage.section2ReporterNameColor || '#57534e'}
-                                onChange={(e) => updateActivePage((prev) => ({ ...prev, section2ReporterNameColor: e.target.value }))}
-                                className="absolute -top-2 -left-2 w-8 h-8 cursor-pointer opacity-0"
-                              />
-                              <span className="block w-full h-full rounded-full" style={{ backgroundColor: activePage.section2ReporterNameColor || '#57534e' }} />
-                            </label>
+
+                        {/* Story 2 Drag & Positioning Option */}
+                        <div className="pt-1 border-t border-amber-100">
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                            Layout & Drag Option
+                          </label>
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                                (activePage.section2ReporterMode || 'free') === 'free'
+                                  ? 'pub-btn-primary'
+                                  : 'pub-btn-secondary'
+                              }`}
+                              onClick={() => {
+                                setSelectedElementId('section2_reporter_name');
+                                updateActivePage((prev) => ({
+                                  ...prev,
+                                  section2ReporterMode: 'free',
+                                  section2ReporterX: prev.section2ReporterX ?? 365,
+                                  section2ReporterY: prev.section2ReporterY ?? 740,
+                                }));
+                              }}
+                            >
+                              ✋ Canva Free Drag
+                            </button>
+                            <button
+                              type="button"
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                                activePage.section2ReporterMode === 'bottom'
+                                  ? 'pub-btn-primary'
+                                  : 'pub-btn-secondary'
+                              }`}
+                              onClick={() => {
+                                updateActivePage((prev) => ({ ...prev, section2ReporterMode: 'bottom' }));
+                                if (selectedElementId === 'section2_reporter_name') setSelectedElementId(null);
+                              }}
+                            >
+                              ⬇ Fixed Bottom
+                            </button>
                           </div>
-                        )}
+
+                          {(activePage.section2ReporterMode || 'free') === 'free' && (
+                            <div className="flex items-center justify-between bg-sky-50 border border-sky-200 text-sky-800 text-[11px] px-2 py-1 rounded mt-1.5">
+                              <span>💡 Freely move & resize anywhere on sheet</span>
+                              <button
+                                type="button"
+                                className="text-[10px] font-bold text-sky-900 bg-sky-200/90 hover:bg-sky-300 px-1.5 py-0.5 rounded transition-colors"
+                                onClick={() => setSelectedElementId('section2_reporter_name')}
+                              >
+                                🎯 Focus on Canvas
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Size, Alignment, Color toolbar */}
+                        <div className="flex items-center justify-between gap-3 pt-1 border-t border-amber-100">
+                          <div className="flex-1 flex items-center gap-2">
+                            <span className="text-[10px] text-stone-500 font-medium whitespace-nowrap">Size</span>
+                            <input
+                              type="range"
+                              min={9}
+                              max={20}
+                              step={0.5}
+                              value={activePage.section2ReporterNameSize || 12}
+                              onChange={(e) => updateActivePage((prev) => ({ ...prev, section2ReporterNameSize: parseFloat(e.target.value) }))}
+                              className="w-full accent-amber-700 h-1.5"
+                            />
+                          </div>
+                          <div className="flex items-center gap-0.5 bg-stone-100 p-0.5 rounded border border-stone-200">
+                            {(['left', 'center', 'right'] as const).map((align) => (
+                              <button
+                                key={align}
+                                type="button"
+                                className={`p-1 rounded text-xs transition-all ${
+                                  (activePage.section2ReporterNameAlign || 'right') === align
+                                    ? 'bg-white text-amber-900 font-bold shadow-sm'
+                                    : 'text-stone-400 hover:text-stone-700'
+                                }`}
+                                onClick={() => updateActivePage((prev) => ({ ...prev, section2ReporterNameAlign: align }))}
+                                title={`Align ${align}`}
+                              >
+                                {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                              </button>
+                            ))}
+                          </div>
+                          <label className="relative w-4 h-4 rounded-full border border-stone-300 overflow-hidden cursor-pointer shrink-0" title="Color">
+                            <input
+                              type="color"
+                              value={activePage.section2ReporterNameColor || '#57534e'}
+                              onChange={(e) => updateActivePage((prev) => ({ ...prev, section2ReporterNameColor: e.target.value }))}
+                              className="absolute -top-2 -left-2 w-8 h-8 cursor-pointer opacity-0"
+                            />
+                            <span className="block w-full h-full rounded-full" style={{ backgroundColor: activePage.section2ReporterNameColor || '#57534e' }} />
+                          </label>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1577,20 +1685,19 @@ export function PublicationsPage() {
 
                     {/* Single Story Reporter Name */}
                     <div
-                      className={`p-2.5 rounded-lg space-y-2 transition-all ${
+                      className={`p-3 rounded-lg space-y-2.5 transition-all ${
                         selectedElementId === 'reporter_name'
                           ? 'bg-blue-50/70 border-2 border-blue-400 ring-2 ring-blue-100 shadow-sm'
                           : 'bg-stone-50 border border-stone-200'
                       }`}
-                      onClick={() => setSelectedElementId('reporter_name')}
                     >
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5 m-0">
                           <User size={13} className="text-stone-500" />
                           Reporter Name / Byline (बातमीदार / प्रतिनिधी)
                         </label>
-                        <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
-                          ✦ Draggable on Canvas
+                        <span className="text-[11px] text-stone-500 font-medium">
+                          Size: {activePage.reporterNameSize || 12}px
                         </span>
                       </div>
                       <input
@@ -1600,51 +1707,98 @@ export function PublicationsPage() {
                         value={activePage.reporterName || ''}
                         onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterName: e.target.value }))}
                       />
-                      {Boolean(activePage.reporterName?.trim()) && (
-                        <div className="flex items-center justify-between gap-3 pt-1 border-t border-stone-200/60">
-                          <div className="flex-1 flex items-center gap-2">
-                            <span className="text-[10px] text-stone-500 font-medium whitespace-nowrap">Size</span>
-                            <input
-                              type="range"
-                              min={9}
-                              max={20}
-                              step={0.5}
-                              value={activePage.reporterNameSize || 12}
-                              onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameSize: parseFloat(e.target.value) }))}
-                              className="w-full accent-amber-700 h-1.5"
-                            />
-                          </div>
-                          <div className="flex items-center gap-0.5 bg-white p-0.5 rounded border border-stone-200">
-                            {(['left', 'center', 'right'] as const).map((align) => (
-                              <button
-                                key={align}
-                                type="button"
-                                className={`p-1 rounded text-xs transition-all ${
-                                  (activePage.reporterNameAlign || 'right') === align
-                                    ? 'bg-amber-100 text-amber-900 font-bold'
-                                    : 'text-stone-400 hover:text-stone-700'
-                                }`}
-                                onClick={() => updateActivePage((prev) => ({ ...prev, reporterNameAlign: align }))}
-                                title={`Align ${align}`}
-                              >
-                                {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
-                              </button>
-                            ))}
-                          </div>
-                          <label className="relative w-4 h-4 rounded-full border border-stone-300 overflow-hidden cursor-pointer shrink-0" title="Reporter text color">
-                            <input
-                              type="color"
-                              value={activePage.reporterNameColor || '#57534e'}
-                              onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameColor: e.target.value }))}
-                              className="absolute -top-2 -left-2 w-8 h-8 cursor-pointer opacity-0"
-                            />
-                            <span
-                              className="block w-full h-full rounded-full"
-                              style={{ backgroundColor: activePage.reporterNameColor || '#57534e' }}
-                            />
-                          </label>
+
+                      {/* Drag & Positioning Option */}
+                      <div className="pt-1 border-t border-stone-200/60">
+                        <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                          Layout & Drag Option
+                        </label>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                              (activePage.reporterMode || 'free') === 'free'
+                                ? 'pub-btn-primary'
+                                : 'pub-btn-ghost border border-stone-200'
+                            }`}
+                            onClick={() => {
+                              updateActivePage((prev) => ({ ...prev, reporterMode: 'free' }));
+                              setSelectedElementId('reporter_name');
+                            }}
+                          >
+                            ✋ Canva Free Drag
+                          </button>
+                          <button
+                            type="button"
+                            className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                              activePage.reporterMode === 'bottom'
+                                ? 'pub-btn-primary'
+                                : 'pub-btn-ghost border border-stone-200'
+                            }`}
+                            onClick={() => updateActivePage((prev) => ({ ...prev, reporterMode: 'bottom' }))}
+                          >
+                            ⬇ Fixed Bottom
+                          </button>
                         </div>
-                      )}
+
+                        {(activePage.reporterMode || 'free') === 'free' && (
+                          <div className="flex items-center justify-between bg-sky-50 border border-sky-200 text-sky-800 text-[11px] px-2 py-1 rounded mt-1.5">
+                            <span>💡 Freely move & resize anywhere on sheet</span>
+                            <button
+                              type="button"
+                              className="text-[10px] font-bold text-sky-900 bg-sky-200/90 hover:bg-sky-300 px-1.5 py-0.5 rounded transition-colors"
+                              onClick={() => setSelectedElementId('reporter_name')}
+                            >
+                              🎯 Focus on Canvas
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Size, Alignment, Color toolbar */}
+                      <div className="flex items-center justify-between gap-3 pt-1 border-t border-stone-200/60">
+                        <div className="flex-1 flex items-center gap-2">
+                          <span className="text-[10px] text-stone-500 font-medium whitespace-nowrap">Size</span>
+                          <input
+                            type="range"
+                            min={9}
+                            max={20}
+                            step={0.5}
+                            value={activePage.reporterNameSize || 12}
+                            onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameSize: parseFloat(e.target.value) }))}
+                            className="w-full accent-amber-700 h-1.5"
+                          />
+                        </div>
+                        <div className="flex items-center gap-0.5 bg-white p-0.5 rounded border border-stone-200">
+                          {(['left', 'center', 'right'] as const).map((align) => (
+                            <button
+                              key={align}
+                              type="button"
+                              className={`p-1 rounded text-xs transition-all ${
+                                (activePage.reporterNameAlign || 'right') === align
+                                  ? 'bg-amber-100 text-amber-900 font-bold'
+                                  : 'text-stone-400 hover:text-stone-700'
+                              }`}
+                              onClick={() => updateActivePage((prev) => ({ ...prev, reporterNameAlign: align }))}
+                              title={`Align ${align}`}
+                            >
+                              {align === 'left' ? <AlignLeft size={12} /> : align === 'center' ? <AlignCenter size={12} /> : <AlignRight size={12} />}
+                            </button>
+                          ))}
+                        </div>
+                        <label className="relative w-4 h-4 rounded-full border border-stone-300 overflow-hidden cursor-pointer shrink-0" title="Reporter text color">
+                          <input
+                            type="color"
+                            value={activePage.reporterNameColor || '#57534e'}
+                            onChange={(e) => updateActivePage((prev) => ({ ...prev, reporterNameColor: e.target.value }))}
+                            className="absolute -top-2 -left-2 w-8 h-8 cursor-pointer opacity-0"
+                          />
+                          <span
+                            className="block w-full h-full rounded-full"
+                            style={{ backgroundColor: activePage.reporterNameColor || '#57534e' }}
+                          />
+                        </label>
+                      </div>
                     </div>
                   </>
                 )}

@@ -31,6 +31,7 @@ export interface PublicationPage {
   subtitleColor?: string;
   subtitleAlign?: 'left' | 'center' | 'right';
   reporterName?: string;
+  reporterMode?: 'free' | 'bottom';
   reporterNameSize?: number;
   reporterNameColor?: string;
   reporterNameAlign?: 'left' | 'center' | 'right';
@@ -57,6 +58,7 @@ export interface PublicationPage {
   section2SubtitleAlign?: 'left' | 'center' | 'right';
   section2Content?: string;
   section2ReporterName?: string;
+  section2ReporterMode?: 'free' | 'bottom';
   section2ReporterNameSize?: number;
   section2ReporterNameColor?: string;
   section2ReporterNameAlign?: 'left' | 'center' | 'right';

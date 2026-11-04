@@ -257,6 +257,10 @@ export function PublicationsPage() {
         reporterNameSize: activePage.reporterNameSize,
         reporterNameColor: activePage.reporterNameColor,
         reporterNameAlign: activePage.reporterNameAlign,
+        reporterX: activePage.reporterX,
+        reporterY: activePage.reporterY,
+        reporterWidth: activePage.reporterWidth,
+        reporterHeight: activePage.reporterHeight,
         content: '',
         fontSize: activePage.fontSize,
         lineHeight: activePage.lineHeight,
@@ -961,7 +965,7 @@ export function PublicationsPage() {
               selectedElementId={selectedElementId}
               onSelectElementId={(id) => {
                 setSelectedElementId(id);
-                if (id === 'feature_image') {
+                if (id === 'feature_image' || id === 'reporter_name' || id === 'section2_reporter_name') {
                   setActiveTab('matter');
                 } else if (id === 'main_ad' || id?.startsWith('elem_ad_')) {
                   setActiveTab('ad');
@@ -986,6 +990,22 @@ export function PublicationsPage() {
                     adWidth: coords.width,
                     adHeight: coords.height,
                   }));
+                } else if (type === 'reporter_name') {
+                  updateActivePage((prev) => ({
+                    ...prev,
+                    reporterX: coords.x,
+                    reporterY: coords.y,
+                    reporterWidth: coords.width,
+                    reporterHeight: coords.height,
+                  }));
+                } else if (type === 'section2_reporter_name') {
+                  updateActivePage((prev) => ({
+                    ...prev,
+                    section2ReporterX: coords.x,
+                    section2ReporterY: coords.y,
+                    section2ReporterWidth: coords.width,
+                    section2ReporterHeight: coords.height,
+                  }));
                 } else if (type === 'canvas_element' && elemId) {
                   updateActivePage((prev) => ({
                     ...prev,
@@ -996,10 +1016,30 @@ export function PublicationsPage() {
                 }
               }}
               onDeleteElement={(elemId) => {
-                updateActivePage((prev) => ({
-                  ...prev,
-                  canvasElements: (prev.canvasElements || []).filter((el) => el.id !== elemId),
-                }));
+                if (elemId === 'reporter_name') {
+                  updateActivePage((prev) => ({
+                    ...prev,
+                    reporterName: '',
+                    reporterX: undefined,
+                    reporterY: undefined,
+                    reporterWidth: undefined,
+                    reporterHeight: undefined,
+                  }));
+                } else if (elemId === 'section2_reporter_name') {
+                  updateActivePage((prev) => ({
+                    ...prev,
+                    section2ReporterName: '',
+                    section2ReporterX: undefined,
+                    section2ReporterY: undefined,
+                    section2ReporterWidth: undefined,
+                    section2ReporterHeight: undefined,
+                  }));
+                } else {
+                  updateActivePage((prev) => ({
+                    ...prev,
+                    canvasElements: (prev.canvasElements || []).filter((el) => el.id !== elemId),
+                  }));
+                }
                 if (selectedElementId === elemId) setSelectedElementId(null);
               }}
             />
@@ -1209,14 +1249,21 @@ export function PublicationsPage() {
                       </div>
 
                       {/* Story 1 Reporter Name */}
-                      <div className="p-2.5 bg-white/80 border border-red-200 rounded-lg space-y-2">
+                      <div
+                        className={`p-2.5 rounded-lg space-y-2 transition-all ${
+                          selectedElementId === 'reporter_name'
+                            ? 'bg-blue-50/70 border-2 border-blue-400 ring-2 ring-blue-100 shadow-sm'
+                            : 'bg-white/80 border border-red-200'
+                        }`}
+                        onClick={() => setSelectedElementId('reporter_name')}
+                      >
                         <div className="flex items-center justify-between">
                           <label className="text-[11px] font-bold text-red-900 uppercase tracking-wider flex items-center gap-1.5 m-0">
                             <User size={13} className="text-red-700" />
                             Reporter 1 Name (बातमीदार / प्रतिनिधी)
                           </label>
-                          <span className="text-[11px] text-stone-500 font-medium">
-                            {activePage.reporterNameSize || 12}px
+                          <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
+                            ✦ Draggable on Canvas
                           </span>
                         </div>
                         <input
@@ -1359,14 +1406,21 @@ export function PublicationsPage() {
                       </div>
 
                       {/* Story 2 Reporter Name */}
-                      <div className="p-2.5 bg-white/80 border border-amber-200 rounded-lg space-y-2">
+                      <div
+                        className={`p-2.5 rounded-lg space-y-2 transition-all ${
+                          selectedElementId === 'section2_reporter_name'
+                            ? 'bg-blue-50/70 border-2 border-blue-400 ring-2 ring-blue-100 shadow-sm'
+                            : 'bg-white/80 border border-amber-200'
+                        }`}
+                        onClick={() => setSelectedElementId('section2_reporter_name')}
+                      >
                         <div className="flex items-center justify-between">
                           <label className="text-[11px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5 m-0">
                             <User size={13} className="text-amber-700" />
                             Reporter 2 Name (बातमीदार / प्रतिनिधी)
                           </label>
-                          <span className="text-[11px] text-stone-500 font-medium">
-                            {activePage.section2ReporterNameSize || 12}px
+                          <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
+                            ✦ Draggable on Canvas
                           </span>
                         </div>
                         <input
@@ -1522,14 +1576,21 @@ export function PublicationsPage() {
                     </div>
 
                     {/* Single Story Reporter Name */}
-                    <div className="p-2.5 bg-stone-50 border border-stone-200 rounded-lg space-y-2">
+                    <div
+                      className={`p-2.5 rounded-lg space-y-2 transition-all ${
+                        selectedElementId === 'reporter_name'
+                          ? 'bg-blue-50/70 border-2 border-blue-400 ring-2 ring-blue-100 shadow-sm'
+                          : 'bg-stone-50 border border-stone-200'
+                      }`}
+                      onClick={() => setSelectedElementId('reporter_name')}
+                    >
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5 m-0">
                           <User size={13} className="text-stone-500" />
                           Reporter Name / Byline (बातमीदार / प्रतिनिधी)
                         </label>
-                        <span className="text-[11px] text-stone-500 font-medium">
-                          Size: {activePage.reporterNameSize || 12}px
+                        <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200 font-medium">
+                          ✦ Draggable on Canvas
                         </span>
                       </div>
                       <input

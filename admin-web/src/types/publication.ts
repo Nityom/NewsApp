@@ -34,6 +34,10 @@ export interface PublicationPage {
   reporterNameSize?: number;
   reporterNameColor?: string;
   reporterNameAlign?: 'left' | 'center' | 'right';
+  reporterX?: number;
+  reporterY?: number;
+  reporterWidth?: number;
+  reporterHeight?: number;
   content: string; // Devotional verses, news matter, editorial text
   fontSize: number;
   lineHeight: number;
@@ -56,6 +60,10 @@ export interface PublicationPage {
   section2ReporterNameSize?: number;
   section2ReporterNameColor?: string;
   section2ReporterNameAlign?: 'left' | 'center' | 'right';
+  section2ReporterX?: number;
+  section2ReporterY?: number;
+  section2ReporterWidth?: number;
+  section2ReporterHeight?: number;
 
   // Feature image (e.g. Deity, guest, event photo)
   featureImageUrl?: string;

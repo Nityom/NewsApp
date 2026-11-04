@@ -10,7 +10,7 @@ interface PublicationPageSheetProps {
   selectedElementId?: string | null;
   onSelectElementId?: (id: string | null) => void;
   onUpdateElement?: (
-    type: 'feature_image' | 'main_ad' | 'canvas_element',
+    type: 'feature_image' | 'main_ad' | 'canvas_element' | 'reporter_name' | 'section2_reporter_name',
     coords: { x: number; y: number; width: number; height: number },
     elementId?: string
   ) => void;
@@ -46,6 +46,25 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
 
   const isAdFree = page.adMode === 'free';
   const isFeatureFree = page.featureImagePosition === 'free' || page.featureImageX !== undefined || !page.featureImagePosition;
+
+  // Reporter Name Coordinates (defaults if not yet set)
+  const isSplitCol1 = page.isSplitPage && (page.splitDirection === 'horizontal' || !page.splitDirection);
+  const repW = page.reporterWidth ?? (isSplitCol1 ? 180 : 190);
+  const repH = page.reporterHeight ?? 28;
+  const repX = page.reporterX ?? (isSplitCol1 ? 75 : 365);
+  const repY = page.reporterY ?? (
+    page.isSplitPage && page.splitDirection === 'vertical'
+      ? 355
+      : (!isCover && hasAd && !isAdFree ? Math.max(350, 814 - (page.adHeight || 175) - 34) : 765)
+  );
+
+  // Story 2 Reporter Name Coordinates (defaults if not yet set)
+  const sec2RepW = page.section2ReporterWidth ?? (isSplitCol1 ? 180 : 190);
+  const sec2RepH = page.section2ReporterHeight ?? 28;
+  const sec2RepX = page.section2ReporterX ?? 365;
+  const sec2RepY = page.section2ReporterY ?? (
+    !isCover && hasAd && !isAdFree ? Math.max(350, 814 - (page.adHeight || 175) - 34) : 765
+  );
 
   // Header banner is 86px tall + 4px margin = 90px
   // .pub-matter-section has py-1 (4px padding top)
@@ -189,28 +208,6 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
     );
   };
 
-  const renderReporterByline = (
-    name?: string,
-    fontSize?: number,
-    color?: string,
-    align?: 'left' | 'center' | 'right'
-  ) => {
-    if (!name || !name.trim()) return null;
-    return (
-      <div
-        className="pub-reporter-byline select-none mt-1.5 shrink-0"
-        style={{
-          fontSize: `${fontSize || 11.5}px`,
-          color: color || '#57534e',
-          textAlign: align || 'right',
-          lineHeight: 1.25,
-        }}
-      >
-        — {name.trim()}
-      </div>
-    );
-  };
-
   return (
     <div
       id={id}
@@ -280,7 +277,6 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                               .join(''),
                       }}
                     />
-                    {renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                   </div>
                 )}
               </div>
@@ -338,7 +334,6 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                           )}
                           {renderContentBody(page.content)}
                         </div>
-                        {renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                       </div>
                     </div>
 
@@ -384,7 +379,6 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                           )}
                           {renderContentBody(page.section2Content || '')}
                         </div>
-                        {renderReporterByline(page.section2ReporterName, page.section2ReporterNameSize, page.section2ReporterNameColor, page.section2ReporterNameAlign)}
                       </div>
                     </div>
                   </div>
@@ -426,7 +420,6 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                           )}
                           {renderContentBody(page.content)}
                         </div>
-                        {renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                       </div>
                     </div>
 
@@ -472,7 +465,6 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                           )}
                           {renderContentBody(page.section2Content || '')}
                         </div>
-                        {renderReporterByline(page.section2ReporterName, page.section2ReporterNameSize, page.section2ReporterNameColor, page.section2ReporterNameAlign)}
                       </div>
                     </div>
                   </div>
@@ -538,7 +530,6 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
 
                         {renderContentBody(page.content)}
                       </div>
-                      {renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                     </div>
                   </>
                 )}
@@ -651,6 +642,102 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
               </div>
             </DraggableResizableBox>
           ))}
+
+          {/* 4. Reporter Name Byline (Free Draggable & Resizable) */}
+          {page.reporterName?.trim() && (
+            <DraggableResizableBox
+              id="reporter_name_box"
+              x={repX}
+              y={repY}
+              width={repW}
+              height={repH}
+              scale={scale}
+              interactive={interactive}
+              isSelected={selectedElementId === 'reporter_name'}
+              label="Reporter Name"
+              onSelect={() => onSelectElementId?.('reporter_name')}
+              onChange={(coords) => onUpdateElement?.('reporter_name', coords)}
+              onDelete={() => onDeleteElement?.('reporter_name')}
+              minWidth={60}
+              minHeight={20}
+              zIndex={26}
+            >
+              <div
+                className="w-full h-full flex items-center px-1 overflow-hidden"
+                style={{
+                  justifyContent:
+                    page.reporterNameAlign === 'center'
+                      ? 'center'
+                      : page.reporterNameAlign === 'left'
+                      ? 'flex-start'
+                      : 'flex-end',
+                }}
+              >
+                <span
+                  className="pub-reporter-byline font-serif italic select-none block truncate"
+                  style={{
+                    fontSize: `${page.reporterNameSize || 12}px`,
+                    color: page.reporterNameColor || '#57534e',
+                    textAlign: page.reporterNameAlign || 'right',
+                    lineHeight: 1.25,
+                  }}
+                  title={page.reporterName}
+                >
+                  {page.reporterName.trim().startsWith('—') || page.reporterName.trim().startsWith('-')
+                    ? page.reporterName.trim()
+                    : `— ${page.reporterName.trim()}`}
+                </span>
+              </div>
+            </DraggableResizableBox>
+          )}
+
+          {/* 5. Section 2 Reporter Name Byline (Free Draggable & Resizable) */}
+          {page.isSplitPage && page.section2ReporterName?.trim() && (
+            <DraggableResizableBox
+              id="section2_reporter_name_box"
+              x={sec2RepX}
+              y={sec2RepY}
+              width={sec2RepW}
+              height={sec2RepH}
+              scale={scale}
+              interactive={interactive}
+              isSelected={selectedElementId === 'section2_reporter_name'}
+              label="Story 2 Reporter"
+              onSelect={() => onSelectElementId?.('section2_reporter_name')}
+              onChange={(coords) => onUpdateElement?.('section2_reporter_name', coords)}
+              onDelete={() => onDeleteElement?.('section2_reporter_name')}
+              minWidth={60}
+              minHeight={20}
+              zIndex={26}
+            >
+              <div
+                className="w-full h-full flex items-center px-1 overflow-hidden"
+                style={{
+                  justifyContent:
+                    page.section2ReporterNameAlign === 'center'
+                      ? 'center'
+                      : page.section2ReporterNameAlign === 'left'
+                      ? 'flex-start'
+                      : 'flex-end',
+                }}
+              >
+                <span
+                  className="pub-reporter-byline font-serif italic select-none block truncate"
+                  style={{
+                    fontSize: `${page.section2ReporterNameSize || 12}px`,
+                    color: page.section2ReporterNameColor || '#57534e',
+                    textAlign: page.section2ReporterNameAlign || 'right',
+                    lineHeight: 1.25,
+                  }}
+                  title={page.section2ReporterName}
+                >
+                  {page.section2ReporterName.trim().startsWith('—') || page.section2ReporterName.trim().startsWith('-')
+                    ? page.section2ReporterName.trim()
+                    : `— ${page.section2ReporterName.trim()}`}
+                </span>
+              </div>
+            </DraggableResizableBox>
+          )}
         </div>
       </div>
     </div>

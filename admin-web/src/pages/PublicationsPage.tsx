@@ -13,12 +13,15 @@ import {
   FileText,
   HardDrive,
   Image as ImageIcon,
+  Link2,
   Newspaper,
   Palette,
   Plus,
+  Scissors,
   Trash2,
   Upload,
   User,
+  X,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
@@ -43,6 +46,140 @@ const stripHtml = (html?: string) => {
   return html.replace(/<[^>]+>/g, '').trim();
 };
 
+interface ContentBlock {
+  id: number;
+  snippet: string;
+  wordCount: number;
+  raw: string;
+}
+
+const extractContentBlocks = (content: string): ContentBlock[] => {
+  if (!content || !content.trim()) return [];
+
+  if (/<[a-z][\s\S]*>/i.test(content)) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, 'text/html');
+    const children = Array.from(doc.body.children);
+
+    if (children.length > 1) {
+      return children.map((el, idx) => {
+        const text = el.textContent?.trim() || '';
+        return {
+          id: idx,
+          snippet: text.length > 80 ? text.slice(0, 77) + '...' : text,
+          wordCount: text.split(/\s+/).filter(Boolean).length,
+          raw: el.outerHTML,
+        };
+      });
+    }
+
+    const singleEl = children[0] || doc.body;
+    const innerHtml = singleEl.innerHTML;
+    const brSplit = innerHtml.split(/<br\s*\/?>/i);
+    if (brSplit.length > 1) {
+      const tag = singleEl.tagName.toLowerCase() === 'body' ? 'p' : singleEl.tagName.toLowerCase();
+      return brSplit
+        .filter((c) => c.trim().length > 0)
+        .map((chunk, idx) => {
+          const temp = document.createElement('div');
+          temp.innerHTML = chunk;
+          const text = temp.textContent?.trim() || '';
+          return {
+            id: idx,
+            snippet: text.length > 80 ? text.slice(0, 77) + '...' : text,
+            wordCount: text.split(/\s+/).filter(Boolean).length,
+            raw: `<${tag}>${chunk}</${tag}>`,
+          };
+        });
+    }
+
+    const text = singleEl.textContent?.trim() || '';
+    const sentences = text.match(/[^।॥.?!]+[।॥.?!]*/g) || [text];
+    if (sentences.length > 1) {
+      const tag = singleEl.tagName.toLowerCase() === 'body' ? 'p' : singleEl.tagName.toLowerCase();
+      return sentences
+        .filter((s) => s.trim().length > 0)
+        .map((sent, idx) => {
+          const sTrim = sent.trim();
+          return {
+            id: idx,
+            snippet: sTrim.length > 80 ? sTrim.slice(0, 77) + '...' : sTrim,
+            wordCount: sTrim.split(/\s+/).filter(Boolean).length,
+            raw: `<${tag}>${sent}</${tag}>`,
+          };
+        });
+    }
+
+    return [
+      {
+        id: 0,
+        snippet: text.length > 80 ? text.slice(0, 77) + '...' : text,
+        wordCount: text.split(/\s+/).filter(Boolean).length,
+        raw: singleEl.outerHTML,
+      },
+    ];
+  }
+
+  // Plain text
+  const paragraphs = content.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+  if (paragraphs.length > 1) {
+    return paragraphs.map((para, idx) => {
+      const text = para.trim();
+      return {
+        id: idx,
+        snippet: text.length > 80 ? text.slice(0, 77) + '...' : text,
+        wordCount: text.split(/\s+/).filter(Boolean).length,
+        raw: para,
+      };
+    });
+  }
+
+  const lines = content.split(/\n/).filter((l) => l.trim().length > 0);
+  if (lines.length > 1) {
+    return lines.map((line, idx) => {
+      const text = line.trim();
+      return {
+        id: idx,
+        snippet: text.length > 80 ? text.slice(0, 77) + '...' : text,
+        wordCount: text.split(/\s+/).filter(Boolean).length,
+        raw: line,
+      };
+    });
+  }
+
+  const trimmed = content.trim();
+  return [
+    {
+      id: 0,
+      snippet: trimmed.length > 80 ? trimmed.slice(0, 77) + '...' : trimmed,
+      wordCount: trimmed.split(/\s+/).filter(Boolean).length,
+      raw: content,
+    },
+  ];
+};
+
+const splitContentByBlockIndex = (
+  blocks: ContentBlock[],
+  cutIndex: number,
+  isHtml: boolean
+): { firstPage: string; nextPage: string } => {
+  if (blocks.length === 0) return { firstPage: '', nextPage: '' };
+  const safeCutIndex = Math.max(0, Math.min(cutIndex, blocks.length - 1));
+  const firstBlocks = blocks.slice(0, safeCutIndex + 1);
+  const nextBlocks = blocks.slice(safeCutIndex + 1);
+
+  if (isHtml) {
+    return {
+      firstPage: firstBlocks.map((b) => b.raw).join(''),
+      nextPage: nextBlocks.map((b) => b.raw).join(''),
+    };
+  }
+  return {
+    firstPage: firstBlocks.map((b) => b.raw).join('\n\n'),
+    nextPage: nextBlocks.map((b) => b.raw).join('\n\n'),
+  };
+};
+
 export function PublicationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentSection = searchParams.get('tab') === 'calendar' ? 'calendar' : 'publications';
@@ -54,6 +191,8 @@ export function PublicationsPage() {
   const [canvasZoom, setCanvasZoom] = useState<number>(0.85);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
+  const [isCutModalOpen, setIsCutModalOpen] = useState(false);
+  const [cutModalSourcePageId, setCutModalSourcePageId] = useState<string | null>(null);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>('');
 
@@ -182,6 +321,44 @@ export function PublicationsPage() {
   // Page Operations
   const activePage = activePublication?.pages[activePageIndex] || null;
 
+  const sourceContinuationPage = activePage
+    ? activePublication?.pages.find((p) => p.continuationPageId === activePage.id)
+    : undefined;
+  const targetContinuationPage = activePage?.continuationPageId
+    ? activePublication?.pages.find((p) => p.id === activePage.continuationPageId)
+    : undefined;
+
+  const sidebarSourceContent = activePage?.continuationSourceContent || (
+    targetContinuationPage
+      ? `${activePage?.content || ''}\n\n${targetContinuationPage.content}`.trim()
+      : activePage?.content || ''
+  );
+  const sidebarBlocks = extractContentBlocks(sidebarSourceContent);
+  const activeCutIndex = activePage?.continuationCutIndex !== undefined
+    ? activePage.continuationCutIndex
+    : Math.max(0, Math.floor(sidebarBlocks.length / 2) - 1);
+  const sidebarP1Words = sidebarBlocks.slice(0, activeCutIndex + 1).reduce((acc, b) => acc + b.wordCount, 0);
+  const sidebarP2Words = sidebarBlocks.slice(activeCutIndex + 1).reduce((acc, b) => acc + b.wordCount, 0);
+  const sidebarP1Snippet = sidebarBlocks[activeCutIndex]?.snippet || '';
+  const sidebarP2Snippet = sidebarBlocks[activeCutIndex + 1]?.snippet || '';
+
+  // For visual cut modal:
+  const modalSourcePage = activePublication?.pages.find((p) => p.id === (cutModalSourcePageId || activePage?.id)) || activePage;
+  const modalContinuationPage = modalSourcePage?.continuationPageId
+    ? activePublication?.pages.find((p) => p.id === modalSourcePage.continuationPageId)
+    : undefined;
+  const modalSourceContent = modalSourcePage?.continuationSourceContent || (
+    modalContinuationPage
+      ? `${modalSourcePage?.content || ''}\n\n${modalContinuationPage.content}`.trim()
+      : modalSourcePage?.content || ''
+  );
+  const modalBlocks = extractContentBlocks(modalSourceContent);
+  const modalCutIndex = modalSourcePage?.continuationCutIndex !== undefined
+    ? modalSourcePage.continuationCutIndex
+    : Math.max(0, Math.floor(modalBlocks.length / 2) - 1);
+  const modalP1Words = modalBlocks.slice(0, modalCutIndex + 1).reduce((acc, b) => acc + b.wordCount, 0);
+  const modalP2Words = modalBlocks.slice(modalCutIndex + 1).reduce((acc, b) => acc + b.wordCount, 0);
+
   const updateActivePage = (updater: (prev: PublicationPage) => PublicationPage) => {
     if (!activePublication || !activePage) return;
     const updatedPages = [...activePublication.pages];
@@ -194,51 +371,71 @@ export function PublicationsPage() {
     });
   };
 
-  const splitContentForContinuation = (page: PublicationPage) => {
-    const fontSize = page.fontSize || 14;
-    const lineHeight = page.lineHeight || 1.6;
-    const charactersPerLine = Math.max(12, Math.floor(500 / (fontSize * 0.55)));
-    const linesPerPage = Math.max(4, Math.floor(500 / (fontSize * lineHeight)));
-    const maxCharacters = charactersPerLine * linesPerPage;
-    if (page.content.length <= maxCharacters) {
-      return { firstPage: page.content, nextPage: '' };
-    }
+  const handleApplyCut = (cutIndex: number, targetSourcePageId?: string) => {
+    if (!activePublication) return;
+    const sId = targetSourcePageId || activePage?.id;
+    if (!sId) return;
 
-    const splitAt = page.content.lastIndexOf(' ', maxCharacters);
-    const boundary = splitAt > maxCharacters * 0.65 ? splitAt : maxCharacters;
-    return {
-      firstPage: page.content.slice(0, boundary).trimEnd(),
-      nextPage: page.content.slice(boundary).trimStart(),
-    };
+    const sourcePageIndex = activePublication.pages.findIndex((p) => p.id === sId);
+    if (sourcePageIndex < 0) return;
+    const sourcePage = activePublication.pages[sourcePageIndex];
+
+    const continuationId = sourcePage.continuationPageId;
+    const continuationIndex = continuationId
+      ? activePublication.pages.findIndex((p) => p.id === continuationId)
+      : -1;
+
+    const fullContent =
+      sourcePage.continuationSourceContent ||
+      (continuationIndex >= 0
+        ? `${sourcePage.content}\n\n${activePublication.pages[continuationIndex].content}`.trim()
+        : sourcePage.content);
+
+    const blocks = extractContentBlocks(fullContent);
+    const isHtml = fullContent.includes('<');
+    const { firstPage, nextPage } = splitContentByBlockIndex(blocks, cutIndex, isHtml);
+
+    setActivePublication((prev) => {
+      if (!prev) return prev;
+      const pages = [...prev.pages];
+      pages[sourcePageIndex] = {
+        ...pages[sourcePageIndex],
+        content: firstPage,
+        continuationCutIndex: cutIndex,
+        continueOnNextPage: true,
+        continuationSourceContent: fullContent,
+      };
+
+      if (continuationIndex >= 0) {
+        pages[continuationIndex] = {
+          ...pages[continuationIndex],
+          content: nextPage,
+          continuationFromPageId: sourcePage.id,
+        };
+      }
+      return { ...prev, pages };
+    });
   };
 
   const handleContinueOnNextPageChange = (enabled: boolean) => {
     if (!activePublication || !activePage) return;
     if (!enabled) {
-      const continuationId = activePage.continuationPageId;
-      const continuation = continuationId
-        ? activePublication.pages.find((page) => page.id === continuationId)
-        : undefined;
-      const restoredContent = activePage.continuationSourceContent
-        ?? (continuation ? `${activePage.content}\n${continuation.content}`.trim() : activePage.content);
-      setActivePublication((prev) => {
-        if (!prev) return prev;
-        const pages = continuationId
-          ? prev.pages.filter((page) => page.id !== continuationId)
-          : prev.pages;
-        return {
-          ...prev,
-          pages: pages.map((page) =>
-            page.id === activePage.id
-              ? { ...page, content: restoredContent, continueOnNextPage: false, continuationPageId: undefined, continuationSourceContent: undefined }
-              : page,
-          ),
-        };
-      });
+      handleMergeBack(activePage);
       return;
     }
 
-    const { firstPage, nextPage } = splitContentForContinuation(activePage);
+    const fullContent = activePage.continuationSourceContent || activePage.content;
+    const blocks = extractContentBlocks(fullContent);
+    const initialCutIndex =
+      activePage.continuationCutIndex !== undefined
+        ? activePage.continuationCutIndex
+        : blocks.length <= 2
+        ? 0
+        : Math.max(0, Math.floor(blocks.length / 2) - 1);
+
+    const isHtml = fullContent.includes('<');
+    const { firstPage, nextPage } = splitContentByBlockIndex(blocks, initialCutIndex, isHtml);
+
     const existingContinuation = activePage.continuationPageId
       ? activePublication.pages.find((page) => page.id === activePage.continuationPageId)
       : undefined;
@@ -270,6 +467,7 @@ export function PublicationsPage() {
         ad: { type: 'none' },
       }),
       content: nextPage,
+      continuationFromPageId: activePage.id,
     };
 
     setActivePublication((prev) => {
@@ -286,14 +484,53 @@ export function PublicationsPage() {
         content: firstPage,
         continueOnNextPage: true,
         continuationPageId: continuationPage.id,
-        continuationSourceContent: pages[activePageIndex].continuationSourceContent ?? activePage.content,
+        continuationSourceContent: fullContent,
+        continuationCutIndex: initialCutIndex,
       };
       pages.forEach((page, index) => {
         page.pageNumber = index + 1;
       });
       return { ...prev, pages };
     });
-    setActivePageIndex(activePageIndex + 1);
+  };
+
+  const handleMergeBack = (sourcePage: PublicationPage) => {
+    if (!activePublication) return;
+    const continuationId = sourcePage.continuationPageId;
+    const continuation = continuationId
+      ? activePublication.pages.find((page) => page.id === continuationId)
+      : undefined;
+    const restoredContent =
+      sourcePage.continuationSourceContent ??
+      (continuation ? `${sourcePage.content}\n\n${continuation.content}`.trim() : sourcePage.content);
+
+    setActivePublication((prev) => {
+      if (!prev) return prev;
+      const pages = continuationId
+        ? prev.pages.filter((page) => page.id !== continuationId)
+        : prev.pages;
+      const updated = pages.map((page) =>
+        page.id === sourcePage.id
+          ? {
+              ...page,
+              content: restoredContent,
+              continueOnNextPage: false,
+              continuationPageId: undefined,
+              continuationSourceContent: undefined,
+              continuationCutIndex: undefined,
+            }
+          : page
+      );
+      updated.forEach((page, index) => {
+        page.pageNumber = index + 1;
+      });
+      return { ...prev, pages: updated };
+    });
+
+    const sourceIdx = activePublication.pages.findIndex((page) => page.id === sourcePage.id);
+    if (sourceIdx >= 0) {
+      setActivePageIndex(sourceIdx);
+    }
   };
 
   const handleAddPage = () => {
@@ -1075,6 +1312,51 @@ export function PublicationsPage() {
             {/* TAB 1: CONTENT */}
             {activePage && activeTab === 'matter' && (
               <>
+                {sourceContinuationPage && (
+                  <div className="p-3 bg-amber-50/90 border border-amber-300 rounded-lg space-y-2 mb-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                        <Link2 size={13} className="text-amber-700" />
+                        Continuation from Page {sourceContinuationPage.pageNumber}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const sIdx = activePublication?.pages.findIndex((p) => p.id === sourceContinuationPage.id) ?? -1;
+                          if (sIdx >= 0) setActivePageIndex(sIdx);
+                        }}
+                        className="text-xs text-amber-900 font-bold hover:underline"
+                      >
+                        👈 Go to Page {sourceContinuationPage.pageNumber}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-amber-800 m-0">
+                      This page continues the story from Page {sourceContinuationPage.pageNumber}. You can decide where the cut happens between both pages.
+                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCutModalSourcePageId(sourceContinuationPage.id);
+                          setIsCutModalOpen(true);
+                        }}
+                        className="pub-btn pub-btn-primary flex-1 text-xs py-1.5 flex items-center justify-center gap-1 font-bold"
+                      >
+                        <Scissors size={13} />
+                        Decide / Adjust Cut Point
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMergeBack(sourceContinuationPage)}
+                        className="pub-btn pub-btn-secondary text-xs text-red-700 hover:bg-red-50 py-1.5"
+                        title="Merge entire story back into previous page"
+                      >
+                        Merge Back
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="pub-control-group">
                   <label>Page Type</label>
                   <select
@@ -1514,7 +1796,7 @@ export function PublicationsPage() {
 
                           {(activePage.section2ReporterMode || 'free') === 'free' && (
                             <div className="flex items-center justify-between bg-sky-50 border border-sky-200 text-sky-800 text-[11px] px-2 py-1 rounded mt-1.5">
-
+                              <span>💡 Freely move & resize anywhere on sheet</span>
                               <button
                                 type="button"
                                 className="text-[10px] font-bold text-sky-900 bg-sky-200/90 hover:bg-sky-300 px-1.5 py-0.5 rounded transition-colors"
@@ -1640,22 +1922,39 @@ export function PublicationsPage() {
                           Font: {activePage.fontSize}px
                         </span>
                       </label>
-                      <div className="pub-symbols-bar">
-                        {['॥', '।।', '!', '❖', '✿', '★', 'ॐ'].map((sym) => (
-                          <button
-                            key={sym}
-                            type="button"
-                            className="pub-symbol-chip"
-                            onClick={() =>
-                              updateActivePage((prev) => ({
-                                ...prev,
-                                content: `${prev.content} ${sym}`,
-                              }))
+                      <div className="pub-symbols-bar flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          {['॥', '।।', '!', '❖', '✿', '★', 'ॐ'].map((sym) => (
+                            <button
+                              key={sym}
+                              type="button"
+                              className="pub-symbol-chip"
+                              onClick={() =>
+                                updateActivePage((prev) => ({
+                                  ...prev,
+                                  content: `${prev.content} ${sym}`,
+                                }))
+                              }
+                            >
+                              {sym}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="pub-btn pub-btn-ghost text-[11px] text-amber-900 border border-amber-300 bg-amber-50 hover:bg-amber-100 py-0.5 px-2 flex items-center gap-1 font-semibold"
+                          onClick={() => {
+                            if (!activePage.continueOnNextPage) {
+                              handleContinueOnNextPageChange(true);
                             }
-                          >
-                            {sym}
-                          </button>
-                        ))}
+                            setCutModalSourcePageId(activePage.id);
+                            setIsCutModalOpen(true);
+                          }}
+                          title="Decide where this story cuts and continues on the next page"
+                        >
+                          <Scissors size={12} className="text-amber-700" />
+                          <span>✂️ Cut to Page 2</span>
+                        </button>
                       </div>
                       <RichTextEditor
                         value={activePage.content}
@@ -1837,20 +2136,117 @@ export function PublicationsPage() {
                   </div>
                 </div>
 
-                <label className="flex items-start gap-2 p-2.5 rounded border border-amber-200 bg-amber-50 text-xs font-semibold text-stone-800 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(activePage.continueOnNextPage)}
-                    onChange={(e) => handleContinueOnNextPageChange(e.target.checked)}
-                    className="mt-0.5 accent-red-700"
-                  />
-                  <span>
-                    Continue content on next page
-                    <span className="block mt-0.5 text-[11px] font-normal text-stone-500">
-                      Creates or opens the next page so this article can continue without being cut off.
-                    </span>
-                  </span>
-                </label>
+                <div className="p-3 rounded-lg border border-amber-300 bg-amber-50/70 space-y-2.5">
+                  <label className="flex items-start gap-2 text-xs font-bold text-stone-800 cursor-pointer m-0">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(activePage.continueOnNextPage)}
+                      onChange={(e) => handleContinueOnNextPageChange(e.target.checked)}
+                      className="mt-0.5 accent-red-700"
+                    />
+                    <div>
+                      <span>Continue content on next page</span>
+                      <span className="block mt-0.5 text-[11px] font-normal text-stone-500">
+                        {activePage.continueOnNextPage && targetContinuationPage
+                          ? `Story continues onto Page ${targetContinuationPage.pageNumber}`
+                          : 'Creates or opens the next page so this article can continue.'}
+                      </span>
+                    </div>
+                  </label>
+
+                  {/* Active Continuation & Cut Point Controls */}
+                  {Boolean(activePage.continueOnNextPage) && (
+                    <div className="pt-2 border-t border-amber-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                          <Scissors size={13} className="text-amber-700" />
+                          Decide Cut Point
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCutModalSourcePageId(activePage.id);
+                            setIsCutModalOpen(true);
+                          }}
+                          className="text-[11px] font-bold text-amber-900 bg-amber-200/90 hover:bg-amber-300 px-2 py-0.5 rounded transition-colors flex items-center gap-1"
+                        >
+                          <Scissors size={12} />
+                          Visual Cut Tool
+                        </button>
+                      </div>
+
+                      {/* Inline Paragraph Slider & Steppers */}
+                      <div className="bg-white p-2.5 rounded border border-amber-200/90 space-y-2 text-xs shadow-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-stone-800">
+                            Cut after Para {activeCutIndex + 1} of {sidebarBlocks.length}
+                          </span>
+                          <span className="text-[11px] text-stone-500 font-medium">
+                            P{activePage.pageNumber}: ~{sidebarP1Words}w | P{targetContinuationPage ? targetContinuationPage.pageNumber : activePage.pageNumber + 1}: ~{sidebarP2Words}w
+                          </span>
+                        </div>
+
+                        {/* Range slider */}
+                        <input
+                          type="range"
+                          min={0}
+                          max={Math.max(0, sidebarBlocks.length - 1)}
+                          value={activeCutIndex}
+                          onChange={(e) => handleApplyCut(parseInt(e.target.value, 10))}
+                          className="w-full accent-amber-700 h-1.5 cursor-pointer"
+                        />
+
+                        {/* Quick Steppers */}
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            disabled={activeCutIndex <= 0}
+                            onClick={() => handleApplyCut(Math.max(0, activeCutIndex - 1))}
+                            className="pub-btn pub-btn-secondary text-xs flex-1 py-1 disabled:opacity-40"
+                          >
+                            ◀ Less on P{activePage.pageNumber}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={activeCutIndex >= sidebarBlocks.length - 1}
+                            onClick={() => handleApplyCut(Math.min(sidebarBlocks.length - 1, activeCutIndex + 1))}
+                            className="pub-btn pub-btn-secondary text-xs flex-1 py-1 disabled:opacity-40"
+                          >
+                            More on P{activePage.pageNumber} ▶
+                          </button>
+                        </div>
+
+                        {/* Cut Snippets Preview */}
+                        <div className="pt-1.5 border-t border-stone-100 text-[11px] space-y-1">
+                          <div className="text-stone-700 truncate">
+                            <span className="font-semibold text-emerald-800">P{activePage.pageNumber} ends: </span>
+                            <span className="italic text-stone-600">"{sidebarP1Snippet}"</span>
+                          </div>
+                          <div className="text-stone-700 truncate">
+                            <span className="font-semibold text-sky-800">P{targetContinuationPage ? targetContinuationPage.pageNumber : activePage.pageNumber + 1} starts: </span>
+                            <span className="italic text-stone-600">"{sidebarP2Snippet}"</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Jump to Continuation Page */}
+                      {targetContinuationPage && (
+                        <div className="flex items-center justify-between pt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const cIdx = activePublication.pages.findIndex((p) => p.id === targetContinuationPage.id);
+                              if (cIdx >= 0) setActivePageIndex(cIdx);
+                            }}
+                            className="text-xs text-amber-900 font-semibold hover:underline flex items-center gap-1"
+                          >
+                            👉 View Page {targetContinuationPage.pageNumber} continuation
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Feature Image Section */}
                 <div className="border-t border-stone-200 pt-3 mt-1">
@@ -2335,6 +2731,157 @@ export function PublicationsPage() {
           }
         }}
       />
+
+      {/* Visual Continuation Cut Modal */}
+      {isCutModalOpen && modalSourcePage && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col border border-stone-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-stone-200 bg-amber-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-800">
+                  <Scissors size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-stone-900 m-0">
+                    Decide Where Story Cuts for Page {modalContinuationPage ? modalContinuationPage.pageNumber : modalSourcePage.pageNumber + 1}
+                  </h3>
+                  <p className="text-xs text-stone-500 m-0">
+                    Click any divider or paragraph below to decide where Page {modalSourcePage.pageNumber} ends.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCutModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-stone-200 text-stone-500 hover:text-stone-800 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Overview Stats */}
+            <div className="grid grid-cols-2 gap-2 p-3 bg-stone-100 border-b border-stone-200 text-xs">
+              <div className="bg-amber-100/70 border border-amber-300 p-2 rounded">
+                <span className="font-bold text-amber-900 block">
+                  📄 Page {modalSourcePage.pageNumber} (Main Story):
+                </span>
+                <span className="text-stone-700">
+                  {modalCutIndex + 1} paragraphs (~{modalP1Words} words)
+                </span>
+              </div>
+              <div className="bg-sky-100/70 border border-sky-300 p-2 rounded">
+                <span className="font-bold text-sky-900 block">
+                  📄 Page {modalContinuationPage ? modalContinuationPage.pageNumber : modalSourcePage.pageNumber + 1} (Continuation):
+                </span>
+                <span className="text-stone-700">
+                  {Math.max(0, modalBlocks.length - (modalCutIndex + 1))} paragraphs (~{modalP2Words} words)
+                </span>
+              </div>
+            </div>
+
+            {/* Paragraph Blocks List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-stone-50">
+              {modalBlocks.length === 0 ? (
+                <div className="text-center py-8 text-stone-500 text-xs">
+                  No text content to split. Write some article content on Page {modalSourcePage.pageNumber} first.
+                </div>
+              ) : (
+                modalBlocks.map((block, idx) => {
+                  const isPage1 = idx <= modalCutIndex;
+                  const isCutPoint = idx === modalCutIndex;
+                  return (
+                    <React.Fragment key={block.id}>
+                      <div
+                        onClick={() => handleApplyCut(idx, modalSourcePage.id)}
+                        className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                          isPage1
+                            ? 'bg-amber-50/80 border-amber-300 hover:border-amber-500 shadow-xs'
+                            : 'bg-sky-50/80 border-sky-200 hover:border-sky-400'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5 text-[11px] font-bold">
+                          <span
+                            className={`px-2 py-0.5 rounded ${
+                              isPage1 ? 'bg-amber-200 text-amber-900' : 'bg-sky-200 text-sky-900'
+                            }`}
+                          >
+                            {isPage1
+                              ? `Page ${modalSourcePage.pageNumber}`
+                              : `Page ${modalContinuationPage ? modalContinuationPage.pageNumber : modalSourcePage.pageNumber + 1}`}{' '}
+                            • Paragraph {idx + 1}
+                          </span>
+                          <span className="text-stone-500 font-normal">
+                            {block.wordCount} words
+                          </span>
+                        </div>
+                        <div
+                          className="text-stone-800 text-xs font-serif leading-relaxed"
+                          dangerouslySetInnerHTML={{ __html: block.raw }}
+                        />
+                      </div>
+
+                      {/* Cut divider between paragraphs */}
+                      {idx < modalBlocks.length - 1 && (
+                        <div className="py-1">
+                          {isCutPoint ? (
+                            <div className="flex items-center justify-between gap-2 bg-red-600 text-white px-3 py-1.5 rounded-md text-xs font-bold shadow-sm">
+                              <span className="flex items-center gap-1.5">
+                                <Scissors size={14} />
+                                ✂️ CUT POINT: Page {modalSourcePage.pageNumber} ends here ⮑ Page {modalContinuationPage ? modalContinuationPage.pageNumber : modalSourcePage.pageNumber + 1} begins below
+                              </span>
+                              <span className="text-[10px] bg-red-700 px-1.5 py-0.5 rounded">Active</span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleApplyCut(idx, modalSourcePage.id)}
+                              className="w-full group flex items-center justify-center gap-1.5 py-1.5 border border-dashed border-stone-300 hover:border-red-500 hover:bg-red-50 text-stone-400 hover:text-red-700 rounded transition-all text-xs font-semibold"
+                            >
+                              <Scissors size={12} className="opacity-60 group-hover:opacity-100" />
+                              <span>Click to Cut after Paragraph {idx + 1}</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 border-t border-stone-200 bg-stone-100 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={modalCutIndex <= 0}
+                  onClick={() => handleApplyCut(Math.max(0, modalCutIndex - 1), modalSourcePage.id)}
+                  className="pub-btn pub-btn-secondary text-xs py-1.5 px-3 disabled:opacity-40"
+                >
+                  ◀ Less on Page {modalSourcePage.pageNumber}
+                </button>
+                <button
+                  type="button"
+                  disabled={modalCutIndex >= modalBlocks.length - 1}
+                  onClick={() => handleApplyCut(Math.min(modalBlocks.length - 1, modalCutIndex + 1), modalSourcePage.id)}
+                  className="pub-btn pub-btn-secondary text-xs py-1.5 px-3 disabled:opacity-40"
+                >
+                  More on Page {modalSourcePage.pageNumber} ▶
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsCutModalOpen(false)}
+                className="pub-btn pub-btn-primary text-xs py-1.5 px-4 font-bold"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Staging Render Target for PDF & PNG Generation (Hidden behind modal backdrop during export) */}
       <div

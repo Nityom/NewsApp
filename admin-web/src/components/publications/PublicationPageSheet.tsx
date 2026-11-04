@@ -230,6 +230,18 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
     );
   };
 
+  const renderContinuationFooter = (notice?: string) => (
+    <div className="pub-continuation-byline select-none mt-1.5 text-right font-serif text-[11px] font-bold text-red-700 italic tracking-wide">
+      {notice || '— (उर्वरित पुढील पानावर)'}
+    </div>
+  );
+
+  const renderContinuationHeader = () => (
+    <div className="pub-continuation-header select-none mb-1.5 text-left font-serif text-[11px] font-medium text-stone-500 italic tracking-wide">
+      — (मागील पानावरून पुढे चालू...)
+    </div>
+  );
+
   return (
     <div
       id={id}
@@ -299,6 +311,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                               .join(''),
                       }}
                     />
+                    {page.continueOnNextPage && renderContinuationFooter(page.continuationNotice)}
                     {page.reporterMode === 'bottom' && renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                   </div>
                 )}
@@ -355,7 +368,9 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                               }}
                             />
                           )}
+                          {page.continuationFromPageId && renderContinuationHeader()}
                           {renderContentBody(page.content)}
+                          {page.continueOnNextPage && renderContinuationFooter(page.continuationNotice)}
                         </div>
                         {page.reporterMode === 'bottom' && renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                       </div>
@@ -443,7 +458,9 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                               }}
                             />
                           )}
+                          {page.continuationFromPageId && renderContinuationHeader()}
                           {renderContentBody(page.content)}
+                          {page.continueOnNextPage && renderContinuationFooter(page.continuationNotice)}
                         </div>
                         {page.reporterMode === 'bottom' && renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                       </div>
@@ -555,7 +572,9 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                           />
                         )}
 
+                        {page.continuationFromPageId && renderContinuationHeader()}
                         {renderContentBody(page.content)}
+                        {page.continueOnNextPage && renderContinuationFooter(page.continuationNotice)}
                       </div>
                       {page.reporterMode === 'bottom' && renderReporterByline(page.reporterName, page.reporterNameSize, page.reporterNameColor, page.reporterNameAlign)}
                     </div>

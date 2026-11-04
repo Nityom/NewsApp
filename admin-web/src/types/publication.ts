@@ -46,6 +46,9 @@ export interface PublicationPage {
   continueOnNextPage?: boolean;
   continuationPageId?: string;
   continuationSourceContent?: string;
+  continuationCutIndex?: number;
+  continuationFromPageId?: string;
+  continuationNotice?: string;
 
   // Two-section / split page support (divide page into 2 stories with 2 headings and 2 contents)
   isSplitPage?: boolean;

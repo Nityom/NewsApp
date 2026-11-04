@@ -1,5 +1,3 @@
-import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import {
   AlignCenter,
   AlignLeft,
@@ -24,7 +22,13 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import type { PageType, Publication, PublicationPage } from '../types/publication';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { CalendarStudio } from '../components/calendar/CalendarStudio';
+import { AdPresetModal } from '../components/publications/AdPresetModal';
+import { PublicationPageSheet } from '../components/publications/PublicationPageSheet';
+import { RichTextEditor } from '../components/RichTextEditor';
+import { exportBookletPDF, exportPageAsImage, type ExportProgress } from '../lib/publicationExport';
 import {
   deletePublication,
   duplicatePublication,
@@ -32,11 +36,7 @@ import {
   getPublication,
   savePublication,
 } from '../lib/publicationsStorage';
-import { exportBookletPDF, exportPageAsImage, type ExportProgress } from '../lib/publicationExport';
-import { PublicationPageSheet } from '../components/publications/PublicationPageSheet';
-import { RichTextEditor } from '../components/RichTextEditor';
-import { AdPresetModal } from '../components/publications/AdPresetModal';
-import { CalendarStudio } from '../components/calendar/CalendarStudio';
+import type { PageType, Publication, PublicationPage } from '../types/publication';
 
 const stripHtml = (html?: string) => {
   if (!html) return '';
@@ -525,11 +525,10 @@ export function PublicationsPage() {
           <button
             type="button"
             onClick={() => setSearchParams({})}
-            className={`flex items-center gap-2 pb-3 px-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
-              currentSection === 'publications'
+            className={`flex items-center gap-2 pb-3 px-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${currentSection === 'publications'
                 ? 'border-red-600 text-red-600'
                 : 'border-transparent text-stone-500 hover:text-stone-800'
-            }`}
+              }`}
           >
             <Newspaper size={17} />
             <span>Booklets & Special Editions</span>
@@ -537,11 +536,10 @@ export function PublicationsPage() {
           <button
             type="button"
             onClick={() => setSearchParams({ tab: 'calendar' })}
-            className={`flex items-center gap-2 pb-3 px-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
-              currentSection === 'calendar'
+            className={`flex items-center gap-2 pb-3 px-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${currentSection === 'calendar'
                 ? 'border-red-600 text-red-600'
                 : 'border-transparent text-stone-500 hover:text-stone-800'
-            }`}
+              }`}
           >
             <CalendarDays size={17} />
             <span>Calendar Studio</span>
@@ -667,7 +665,7 @@ export function PublicationsPage() {
               <AdPresetModal
                 isOpen={isAdModalOpen}
                 onClose={() => setIsAdModalOpen(false)}
-                onSelectAd={() => {}}
+                onSelectAd={() => { }}
               />
             </div>
           </div>
@@ -707,7 +705,7 @@ export function PublicationsPage() {
             }
           />
 
-        
+
 
           {saveStatus && (
             <span className="text-xs text-emerald-600 font-semibold">
@@ -950,8 +948,8 @@ export function PublicationsPage() {
               {activePage?.type === 'cover'
                 ? 'Front Cover'
                 : activePage?.type === 'back'
-                ? 'Back Cover'
-                : 'Inner Page'}
+                  ? 'Back Cover'
+                  : 'Inner Page'}
             </span>
           </div>
 
@@ -1133,22 +1131,20 @@ export function PublicationsPage() {
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            className={`pub-btn flex-1 text-xs py-1.5 px-2 ${
-                              (activePage.splitDirection === 'horizontal' || !activePage.splitDirection)
+                            className={`pub-btn flex-1 text-xs py-1.5 px-2 ${(activePage.splitDirection === 'horizontal' || !activePage.splitDirection)
                                 ? 'pub-btn-primary'
                                 : 'pub-btn-secondary'
-                            }`}
+                              }`}
                             onClick={() => updateActivePage((prev) => ({ ...prev, splitDirection: 'horizontal' }))}
                           >
                             ◫ Horizontal (Side-by-Side)
                           </button>
                           <button
                             type="button"
-                            className={`pub-btn flex-1 text-xs py-1.5 px-2 ${
-                              activePage.splitDirection === 'vertical'
+                            className={`pub-btn flex-1 text-xs py-1.5 px-2 ${activePage.splitDirection === 'vertical'
                                 ? 'pub-btn-primary'
                                 : 'pub-btn-secondary'
-                            }`}
+                              }`}
                             onClick={() => updateActivePage((prev) => ({ ...prev, splitDirection: 'vertical' }))}
                           >
                             ⬓ Vertical (Top & Bottom)
@@ -1194,11 +1190,10 @@ export function PublicationsPage() {
                               <button
                                 key={align}
                                 type="button"
-                                className={`p-1 rounded transition-all ${
-                                  (activePage.subtitleAlign || 'center') === align
+                                className={`p-1 rounded transition-all ${(activePage.subtitleAlign || 'center') === align
                                     ? 'bg-white shadow text-amber-900 font-bold'
                                     : 'text-stone-400 hover:text-stone-700'
-                                }`}
+                                  }`}
                                 onClick={() => updateActivePage((prev) => ({ ...prev, subtitleAlign: align }))}
                                 title={`Align ${align}`}
                               >
@@ -1250,11 +1245,10 @@ export function PublicationsPage() {
 
                       {/* Story 1 Reporter Name */}
                       <div
-                        className={`p-3 rounded-lg space-y-2.5 transition-all ${
-                          selectedElementId === 'reporter_name'
+                        className={`p-3 rounded-lg space-y-2.5 transition-all ${selectedElementId === 'reporter_name'
                             ? 'bg-blue-50/70 border-2 border-blue-400 ring-2 ring-blue-100 shadow-sm'
                             : 'bg-white/80 border border-red-200'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <label className="text-[11px] font-bold text-red-900 uppercase tracking-wider flex items-center gap-1.5 m-0">
@@ -1281,11 +1275,10 @@ export function PublicationsPage() {
                           <div className="flex gap-1.5">
                             <button
                               type="button"
-                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
-                                (activePage.reporterMode || 'free') === 'free'
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${(activePage.reporterMode || 'free') === 'free'
                                   ? 'pub-btn-primary'
                                   : 'pub-btn-secondary'
-                              }`}
+                                }`}
                               onClick={() => {
                                 setSelectedElementId('reporter_name');
                                 updateActivePage((prev) => ({
@@ -1300,11 +1293,10 @@ export function PublicationsPage() {
                             </button>
                             <button
                               type="button"
-                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
-                                activePage.reporterMode === 'bottom'
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${activePage.reporterMode === 'bottom'
                                   ? 'pub-btn-primary'
                                   : 'pub-btn-secondary'
-                              }`}
+                                }`}
                               onClick={() => {
                                 updateActivePage((prev) => ({ ...prev, reporterMode: 'bottom' }));
                                 if (selectedElementId === 'reporter_name') setSelectedElementId(null);
@@ -1316,7 +1308,7 @@ export function PublicationsPage() {
 
                           {(activePage.reporterMode || 'free') === 'free' && (
                             <div className="flex items-center justify-between bg-sky-50 border border-sky-200 text-sky-800 text-[11px] px-2 py-1 rounded mt-1.5">
-                              <span>💡 Freely move & resize anywhere on sheet</span>
+
                               <button
                                 type="button"
                                 className="text-[10px] font-bold text-sky-900 bg-sky-200/90 hover:bg-sky-300 px-1.5 py-0.5 rounded transition-colors"
@@ -1347,11 +1339,10 @@ export function PublicationsPage() {
                               <button
                                 key={align}
                                 type="button"
-                                className={`p-1 rounded text-xs transition-all ${
-                                  (activePage.reporterNameAlign || 'right') === align
+                                className={`p-1 rounded text-xs transition-all ${(activePage.reporterNameAlign || 'right') === align
                                     ? 'bg-white text-red-900 font-bold shadow-sm'
                                     : 'text-stone-400 hover:text-stone-700'
-                                }`}
+                                  }`}
                                 onClick={() => updateActivePage((prev) => ({ ...prev, reporterNameAlign: align }))}
                                 title={`Align ${align}`}
                               >
@@ -1405,11 +1396,10 @@ export function PublicationsPage() {
                               <button
                                 key={align}
                                 type="button"
-                                className={`p-1 rounded transition-all ${
-                                  (activePage.section2SubtitleAlign || 'center') === align
+                                className={`p-1 rounded transition-all ${(activePage.section2SubtitleAlign || 'center') === align
                                     ? 'bg-white shadow text-amber-900 font-bold'
                                     : 'text-stone-400 hover:text-stone-700'
-                                }`}
+                                  }`}
                                 onClick={() => updateActivePage((prev) => ({ ...prev, section2SubtitleAlign: align }))}
                                 title={`Align ${align}`}
                               >
@@ -1461,11 +1451,10 @@ export function PublicationsPage() {
 
                       {/* Story 2 Reporter Name */}
                       <div
-                        className={`p-3 rounded-lg space-y-2.5 transition-all ${
-                          selectedElementId === 'section2_reporter_name'
+                        className={`p-3 rounded-lg space-y-2.5 transition-all ${selectedElementId === 'section2_reporter_name'
                             ? 'bg-blue-50/70 border-2 border-blue-400 ring-2 ring-blue-100 shadow-sm'
                             : 'bg-white/80 border border-amber-200'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <label className="text-[11px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5 m-0">
@@ -1492,11 +1481,10 @@ export function PublicationsPage() {
                           <div className="flex gap-1.5">
                             <button
                               type="button"
-                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
-                                (activePage.section2ReporterMode || 'free') === 'free'
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${(activePage.section2ReporterMode || 'free') === 'free'
                                   ? 'pub-btn-primary'
                                   : 'pub-btn-secondary'
-                              }`}
+                                }`}
                               onClick={() => {
                                 setSelectedElementId('section2_reporter_name');
                                 updateActivePage((prev) => ({
@@ -1511,11 +1499,10 @@ export function PublicationsPage() {
                             </button>
                             <button
                               type="button"
-                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
-                                activePage.section2ReporterMode === 'bottom'
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${activePage.section2ReporterMode === 'bottom'
                                   ? 'pub-btn-primary'
                                   : 'pub-btn-secondary'
-                              }`}
+                                }`}
                               onClick={() => {
                                 updateActivePage((prev) => ({ ...prev, section2ReporterMode: 'bottom' }));
                                 if (selectedElementId === 'section2_reporter_name') setSelectedElementId(null);
@@ -1527,7 +1514,7 @@ export function PublicationsPage() {
 
                           {(activePage.section2ReporterMode || 'free') === 'free' && (
                             <div className="flex items-center justify-between bg-sky-50 border border-sky-200 text-sky-800 text-[11px] px-2 py-1 rounded mt-1.5">
-                              <span>💡 Freely move & resize anywhere on sheet</span>
+
                               <button
                                 type="button"
                                 className="text-[10px] font-bold text-sky-900 bg-sky-200/90 hover:bg-sky-300 px-1.5 py-0.5 rounded transition-colors"
@@ -1558,11 +1545,10 @@ export function PublicationsPage() {
                               <button
                                 key={align}
                                 type="button"
-                                className={`p-1 rounded text-xs transition-all ${
-                                  (activePage.section2ReporterNameAlign || 'right') === align
+                                className={`p-1 rounded text-xs transition-all ${(activePage.section2ReporterNameAlign || 'right') === align
                                     ? 'bg-white text-amber-900 font-bold shadow-sm'
                                     : 'text-stone-400 hover:text-stone-700'
-                                }`}
+                                  }`}
                                 onClick={() => updateActivePage((prev) => ({ ...prev, section2ReporterNameAlign: align }))}
                                 title={`Align ${align}`}
                               >
@@ -1607,11 +1593,10 @@ export function PublicationsPage() {
                             <button
                               key={align}
                               type="button"
-                              className={`p-1 rounded transition-all ${
-                                (activePage.subtitleAlign || 'center') === align
+                              className={`p-1 rounded transition-all ${(activePage.subtitleAlign || 'center') === align
                                   ? 'bg-white shadow text-amber-900 font-bold'
                                   : 'text-stone-400 hover:text-stone-700'
-                              }`}
+                                }`}
                               onClick={() => updateActivePage((prev) => ({ ...prev, subtitleAlign: align }))}
                               title={`Align ${align}`}
                             >
@@ -1685,11 +1670,10 @@ export function PublicationsPage() {
 
                     {/* Single Story Reporter Name */}
                     <div
-                      className={`p-3 rounded-lg space-y-2.5 transition-all ${
-                        selectedElementId === 'reporter_name'
+                      className={`p-3 rounded-lg space-y-2.5 transition-all ${selectedElementId === 'reporter_name'
                           ? 'bg-blue-50/70 border-2 border-blue-400 ring-2 ring-blue-100 shadow-sm'
                           : 'bg-stone-50 border border-stone-200'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5 m-0">
@@ -1716,11 +1700,10 @@ export function PublicationsPage() {
                         <div className="flex gap-1.5">
                           <button
                             type="button"
-                            className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
-                              (activePage.reporterMode || 'free') === 'free'
+                            className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${(activePage.reporterMode || 'free') === 'free'
                                 ? 'pub-btn-primary'
                                 : 'pub-btn-ghost border border-stone-200'
-                            }`}
+                              }`}
                             onClick={() => {
                               updateActivePage((prev) => ({ ...prev, reporterMode: 'free' }));
                               setSelectedElementId('reporter_name');
@@ -1730,11 +1713,10 @@ export function PublicationsPage() {
                           </button>
                           <button
                             type="button"
-                            className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
-                              activePage.reporterMode === 'bottom'
+                            className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${activePage.reporterMode === 'bottom'
                                 ? 'pub-btn-primary'
                                 : 'pub-btn-ghost border border-stone-200'
-                            }`}
+                              }`}
                             onClick={() => updateActivePage((prev) => ({ ...prev, reporterMode: 'bottom' }))}
                           >
                             ⬇ Fixed Bottom
@@ -1743,7 +1725,7 @@ export function PublicationsPage() {
 
                         {(activePage.reporterMode || 'free') === 'free' && (
                           <div className="flex items-center justify-between bg-sky-50 border border-sky-200 text-sky-800 text-[11px] px-2 py-1 rounded mt-1.5">
-                            <span>💡 Freely move & resize anywhere on sheet</span>
+
                             <button
                               type="button"
                               className="text-[10px] font-bold text-sky-900 bg-sky-200/90 hover:bg-sky-300 px-1.5 py-0.5 rounded transition-colors"
@@ -1774,11 +1756,10 @@ export function PublicationsPage() {
                             <button
                               key={align}
                               type="button"
-                              className={`p-1 rounded text-xs transition-all ${
-                                (activePage.reporterNameAlign || 'right') === align
+                              className={`p-1 rounded text-xs transition-all ${(activePage.reporterNameAlign || 'right') === align
                                   ? 'bg-amber-100 text-amber-900 font-bold'
                                   : 'text-stone-400 hover:text-stone-700'
-                              }`}
+                                }`}
                               onClick={() => updateActivePage((prev) => ({ ...prev, reporterNameAlign: align }))}
                               title={`Align ${align}`}
                             >
@@ -1932,11 +1913,10 @@ export function PublicationsPage() {
                           <button
                             key={pos}
                             type="button"
-                            className={`pub-btn flex-1 ${
-                              (activePage.featureImagePosition === pos || (pos === 'free' && activePage.featureImageX !== undefined))
+                            className={`pub-btn flex-1 ${(activePage.featureImagePosition === pos || (pos === 'free' && activePage.featureImageX !== undefined))
                                 ? 'pub-btn-primary'
                                 : 'pub-btn-secondary'
-                            }`}
+                              }`}
                             onClick={() => {
                               if (pos === 'free') {
                                 setSelectedElementId('feature_image');

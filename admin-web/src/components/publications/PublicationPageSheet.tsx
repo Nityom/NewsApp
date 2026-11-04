@@ -49,8 +49,8 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
 
   // Reporter Name Coordinates (defaults if not yet set)
   const isSplitCol1 = page.isSplitPage && (page.splitDirection === 'horizontal' || !page.splitDirection);
-  const repW = page.reporterWidth ?? (isSplitCol1 ? 180 : 190);
-  const repH = page.reporterHeight ?? 28;
+  const repW = page.reporterWidth ?? (isSplitCol1 ? 220 : 220);
+  const repH = page.reporterHeight ?? 34;
   const repX = page.reporterX ?? (isSplitCol1 ? 75 : 365);
   const repY = page.reporterY ?? (
     page.isSplitPage && page.splitDirection === 'vertical'
@@ -59,8 +59,8 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
   );
 
   // Story 2 Reporter Name Coordinates (defaults if not yet set)
-  const sec2RepW = page.section2ReporterWidth ?? (isSplitCol1 ? 180 : 190);
-  const sec2RepH = page.section2ReporterHeight ?? 28;
+  const sec2RepW = page.section2ReporterWidth ?? (isSplitCol1 ? 220 : 220);
+  const sec2RepH = page.section2ReporterHeight ?? 34;
   const sec2RepX = page.section2ReporterX ?? 365;
   const sec2RepY = page.section2ReporterY ?? (
     !isCover && hasAd && !isAdFree ? Math.max(350, 814 - (page.adHeight || 175) - 34) : 765
@@ -217,12 +217,14 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
     if (!name || !name.trim()) return null;
     return (
       <div
-        className="pub-reporter-byline select-none mt-1.5 shrink-0"
+        className="pub-reporter-byline select-none mt-1.5 shrink-0 overflow-visible"
         style={{
-          fontSize: `${fontSize || 11.5}px`,
+          fontSize: `${fontSize || 12}px`,
           color: color || '#57534e',
           textAlign: align || 'right',
-          lineHeight: 1.25,
+          lineHeight: 1.5,
+          paddingTop: '2px',
+          paddingBottom: '2px',
         }}
       >
         — {name.trim()}
@@ -687,11 +689,12 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
               onChange={(coords) => onUpdateElement?.('reporter_name', coords)}
               onDelete={() => onDeleteElement?.('reporter_name')}
               minWidth={60}
-              minHeight={20}
+              minHeight={24}
               zIndex={26}
+              overflowVisible={true}
             >
               <div
-                className="w-full h-full flex items-center px-1 overflow-hidden"
+                className="w-full h-full flex items-center px-1 overflow-visible"
                 style={{
                   justifyContent:
                     page.reporterNameAlign === 'center'
@@ -702,12 +705,15 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                 }}
               >
                 <span
-                  className="pub-reporter-byline font-serif italic select-none block truncate"
+                  className="pub-reporter-byline select-none block overflow-visible"
                   style={{
                     fontSize: `${page.reporterNameSize || 12}px`,
                     color: page.reporterNameColor || '#57534e',
                     textAlign: page.reporterNameAlign || 'right',
-                    lineHeight: 1.25,
+                    lineHeight: 1.5,
+                    paddingTop: '2px',
+                    paddingBottom: '2px',
+                    whiteSpace: 'nowrap',
                   }}
                   title={page.reporterName}
                 >
@@ -735,11 +741,12 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
               onChange={(coords) => onUpdateElement?.('section2_reporter_name', coords)}
               onDelete={() => onDeleteElement?.('section2_reporter_name')}
               minWidth={60}
-              minHeight={20}
+              minHeight={24}
               zIndex={26}
+              overflowVisible={true}
             >
               <div
-                className="w-full h-full flex items-center px-1 overflow-hidden"
+                className="w-full h-full flex items-center px-1 overflow-visible"
                 style={{
                   justifyContent:
                     page.section2ReporterNameAlign === 'center'
@@ -750,12 +757,15 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                 }}
               >
                 <span
-                  className="pub-reporter-byline font-serif italic select-none block truncate"
+                  className="pub-reporter-byline select-none block overflow-visible"
                   style={{
                     fontSize: `${page.section2ReporterNameSize || 12}px`,
                     color: page.section2ReporterNameColor || '#57534e',
                     textAlign: page.section2ReporterNameAlign || 'right',
-                    lineHeight: 1.25,
+                    lineHeight: 1.5,
+                    paddingTop: '2px',
+                    paddingBottom: '2px',
+                    whiteSpace: 'nowrap',
                   }}
                   title={page.section2ReporterName}
                 >

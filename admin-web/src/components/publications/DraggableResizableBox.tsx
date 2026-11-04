@@ -19,6 +19,7 @@ interface DraggableResizableBoxProps {
   zIndex?: number;
   minWidth?: number;
   minHeight?: number;
+  overflowVisible?: boolean;
 }
 
 export const DraggableResizableBox: React.FC<DraggableResizableBoxProps> = ({
@@ -37,6 +38,7 @@ export const DraggableResizableBox: React.FC<DraggableResizableBoxProps> = ({
   zIndex = 10,
   minWidth = 40,
   minHeight = 30,
+  overflowVisible = false,
 }) => {
   if (!interactive) {
     // Non-interactive (clean print / export mode)
@@ -51,7 +53,7 @@ export const DraggableResizableBox: React.FC<DraggableResizableBoxProps> = ({
           zIndex,
         }}
       >
-        <div className="w-full h-full relative overflow-hidden flex items-center justify-center pointer-events-none">
+        <div className={`w-full h-full relative ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'} flex items-center justify-center pointer-events-none`}>
           {children}
         </div>
       </div>
@@ -190,8 +192,8 @@ export const DraggableResizableBox: React.FC<DraggableResizableBoxProps> = ({
         </div>
       )}
 
-      {/* Actual Content (Image or Ad) */}
-      <div className="w-full h-full relative overflow-hidden flex items-center justify-center pointer-events-none">
+      {/* Actual Content (Image, Ad, or Reporter Byline) */}
+      <div className={`w-full h-full relative ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'} flex items-center justify-center pointer-events-none`}>
         {children}
       </div>
     </Rnd>

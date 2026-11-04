@@ -214,28 +214,24 @@ export function RichTextEditor({
         {onCutToNextPage && (
           <button
             type="button"
-            className="rich-text-scissor-cut"
+            className="rich-text-tool-btn"
             onMouseDown={(event) => event.preventDefault()}
             onClick={handleScissorCut}
             aria-label="Cut at cursor & bring to next page"
-            title="✂️ Cut at cursor & bring remaining text to next page"
+            title="✂️ Cut at cursor & bring to next page"
             style={{
-              color: '#b91c1c',
-              backgroundColor: '#fef2f2',
+              width: '31px',
+              height: '31px',
+              color: '#dc2626',
+              backgroundColor: '#fee2e2',
+              borderRadius: '2px',
               border: '1px solid #fca5a5',
-              padding: '2px 8px',
-              borderRadius: '5px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontWeight: 700,
-              fontSize: '11px',
-              marginLeft: 'auto',
               cursor: 'pointer',
+              display: 'grid',
+              placeItems: 'center',
             }}
           >
-            <Scissors size={14} />
-            <span>✂️ Cut to Next Page</span>
+            <Scissors size={16} />
           </button>
         )}
       </div>}
@@ -269,28 +265,24 @@ export function RichTextEditor({
         {onCutToNextPage && (
           <button
             type="button"
-            className="rich-text-scissor-cut"
+            className="rich-text-tool-btn"
             onMouseDown={(event) => event.preventDefault()}
             onClick={handleScissorCut}
             aria-label="Cut at cursor & bring to next page"
-            title="✂️ Cut at cursor & bring remaining text to next page"
+            title="✂️ Cut at cursor & bring to next page"
             style={{
-              color: '#b91c1c',
-              backgroundColor: '#fef2f2',
+              width: '31px',
+              height: '31px',
+              color: '#dc2626',
+              backgroundColor: '#fee2e2',
+              borderRadius: '2px',
               border: '1px solid #fca5a5',
-              padding: '2px 8px',
-              borderRadius: '5px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              fontWeight: 700,
-              fontSize: '11px',
-              marginLeft: 'auto',
               cursor: 'pointer',
+              display: 'grid',
+              placeItems: 'center',
             }}
           >
-            <Scissors size={14} />
-            <span>✂️ Cut to Next Page</span>
+            <Scissors size={16} />
           </button>
         )}
       </div>}

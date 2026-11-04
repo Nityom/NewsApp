@@ -3,6 +3,7 @@ import Link from '@tiptap/extension-link';
 import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Underline from '@tiptap/extension-underline';
+import { DOMSerializer } from '@tiptap/pm/model';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import {
@@ -20,6 +21,7 @@ import {
     Quote,
     Redo2,
     RemoveFormatting,
+    Scissors,
     Strikethrough,
     Underline as UnderlineIcon,
     Undo2,
@@ -34,6 +36,7 @@ interface RichTextEditorProps {
   variant?: 'body' | 'title' | 'subtitle';
   maxWords?: number;
   toolbarPosition?: 'top' | 'bottom';
+  onCutToNextPage?: (firstPart: string, nextPart: string) => void;
 }
 
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu;
@@ -46,6 +49,7 @@ export function RichTextEditor({
   variant = 'body',
   maxWords,
   toolbarPosition = 'top',
+  onCutToNextPage,
 }: RichTextEditorProps) {
   const lastAcceptedHtml = useRef(value);
   const maxWordsRef = useRef(maxWords);
@@ -150,6 +154,35 @@ export function RichTextEditor({
     { label: 'Redo', icon: Redo2, active: false, disabled: !editor.can().redo(), action: () => editor.chain().focus().redo().run() },
   ];
 
+  function handleScissorCut() {
+    if (!editor || !onCutToNextPage) return;
+    const { from } = editor.state.selection;
+    const docSize = editor.state.doc.content.size;
+
+    let cutPos = from;
+    if (cutPos <= 1 || cutPos >= docSize - 1) {
+      cutPos = Math.max(1, Math.floor(docSize / 2));
+    }
+
+    try {
+      const serializer = DOMSerializer.fromSchema(editor.schema);
+
+      const slice1 = editor.state.doc.slice(0, cutPos);
+      const div1 = document.createElement('div');
+      div1.appendChild(serializer.serializeFragment(slice1.content));
+      const firstHtml = div1.innerHTML;
+
+      const slice2 = editor.state.doc.slice(cutPos, docSize);
+      const div2 = document.createElement('div');
+      div2.appendChild(serializer.serializeFragment(slice2.content));
+      const nextHtml = div2.innerHTML;
+
+      onCutToNextPage(firstHtml, nextHtml);
+    } catch (err) {
+      console.error('Failed to cut at cursor:', err);
+    }
+  }
+
   return (
     <div className={`rich-text-editor ${toolbarPosition === 'bottom' ? 'toolbar-bottom' : ''}`}>
       {toolbarPosition === 'top' && <div className="rich-text-toolbar" role="toolbar" aria-label="Text formatting">
@@ -178,6 +211,33 @@ export function RichTextEditor({
             onInput={(event) => editor.chain().focus().setColor(event.currentTarget.value).run()}
           />
         </label>
+        {onCutToNextPage && (
+          <button
+            type="button"
+            className="rich-text-scissor-cut"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={handleScissorCut}
+            aria-label="Cut at cursor & bring to next page"
+            title="✂️ Cut at cursor & bring remaining text to next page"
+            style={{
+              color: '#b91c1c',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fca5a5',
+              padding: '2px 8px',
+              borderRadius: '5px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontWeight: 700,
+              fontSize: '11px',
+              marginLeft: 'auto',
+              cursor: 'pointer',
+            }}
+          >
+            <Scissors size={14} />
+            <span>✂️ Cut to Next Page</span>
+          </button>
+        )}
       </div>}
       <EditorContent editor={editor} />
       {toolbarPosition === 'bottom' && <div className="rich-text-toolbar" role="toolbar" aria-label="Text formatting">
@@ -206,6 +266,33 @@ export function RichTextEditor({
             onInput={(event) => editor.chain().focus().setColor(event.currentTarget.value).run()}
           />
         </label>
+        {onCutToNextPage && (
+          <button
+            type="button"
+            className="rich-text-scissor-cut"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={handleScissorCut}
+            aria-label="Cut at cursor & bring to next page"
+            title="✂️ Cut at cursor & bring remaining text to next page"
+            style={{
+              color: '#b91c1c',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fca5a5',
+              padding: '2px 8px',
+              borderRadius: '5px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontWeight: 700,
+              fontSize: '11px',
+              marginLeft: 'auto',
+              cursor: 'pointer',
+            }}
+          >
+            <Scissors size={14} />
+            <span>✂️ Cut to Next Page</span>
+          </button>
+        )}
       </div>}
     </div>
   );

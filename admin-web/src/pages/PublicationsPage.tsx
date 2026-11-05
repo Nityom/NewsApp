@@ -7,6 +7,8 @@ import {
   ArrowUp,
   CalendarDays,
   Check,
+  ChevronDown,
+  ChevronUp,
   Copy,
   Download,
   FileImage,
@@ -130,6 +132,12 @@ export function PublicationsPage() {
       ) {
         e.preventDefault();
         handleRedo();
+      } else if (e.key === 'PageUp' || (e.altKey && e.key === 'ArrowUp')) {
+        e.preventDefault();
+        setActivePageIndex((prev) => Math.max(0, prev - 1));
+      } else if (e.key === 'PageDown' || (e.altKey && e.key === 'ArrowDown')) {
+        e.preventDefault();
+        setActivePageIndex((prev) => Math.min(activePublication.pages.length - 1, prev + 1));
       }
     };
 
@@ -1138,11 +1146,31 @@ export function PublicationsPage() {
         {/* ================= CENTER SHEET VIEWPORT ================= */}
         <main className="pub-canvas-viewport">
           <div className="pub-canvas-controls">
-            <span>
+            <button
+              type="button"
+              className="p-1 -ml-1 rounded-full text-stone-500 hover:text-stone-900 hover:bg-stone-100 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+              onClick={() => setActivePageIndex((prev) => Math.max(0, prev - 1))}
+              disabled={activePageIndex === 0}
+              title={`Previous Page (Page ${activePageIndex})`}
+              aria-label="Previous Page"
+            >
+              <ChevronUp size={15} />
+            </button>
+            <span className="font-bold text-stone-800">
               Page {activePageIndex + 1} of {activePublication.pages.length}
             </span>
-            <span>•</span>
-            <span>
+            <button
+              type="button"
+              className="p-1 rounded-full text-stone-500 hover:text-stone-900 hover:bg-stone-100 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+              onClick={() => setActivePageIndex((prev) => Math.min(activePublication.pages.length - 1, prev + 1))}
+              disabled={activePageIndex === activePublication.pages.length - 1}
+              title={`Next Page (Page ${activePageIndex + 2})`}
+              aria-label="Next Page"
+            >
+              <ChevronDown size={15} />
+            </button>
+            <span className="text-stone-300">•</span>
+            <span className="text-stone-600">
               {activePage?.type === 'cover'
                 ? 'Front Cover'
                 : activePage?.type === 'back'

@@ -17,14 +17,16 @@ import {
   Newspaper,
   Palette,
   Plus,
+  Redo2,
   Scissors,
   Trash2,
+  Undo2,
   Upload,
   User,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarStudio } from '../components/calendar/CalendarStudio';
 import { AdPresetModal } from '../components/publications/AdPresetModal';
@@ -58,6 +60,82 @@ export function PublicationsPage() {
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>('');
+
+  // Undo / Redo History Stack
+  const [historyPast, setHistoryPast] = useState<{ pub: Publication; pageIndex: number }[]>([]);
+  const [historyFuture, setHistoryFuture] = useState<{ pub: Publication; pageIndex: number }[]>([]);
+  const lastHistorySnapshotTime = useRef<number>(0);
+
+  const pushHistory = (currentPub?: Publication, currentIdx?: number, force = false) => {
+    const pubToSave = currentPub || activePublication;
+    if (!pubToSave) return;
+    const now = Date.now();
+    if (force || now - lastHistorySnapshotTime.current > 800) {
+      setHistoryPast((prev) => [
+        ...prev.slice(-30),
+        { pub: JSON.parse(JSON.stringify(pubToSave)), pageIndex: currentIdx ?? activePageIndex },
+      ]);
+      setHistoryFuture([]);
+      lastHistorySnapshotTime.current = now;
+    }
+  };
+
+  const handleUndo = () => {
+    if (historyPast.length === 0 || !activePublication) return;
+    const previous = historyPast[historyPast.length - 1];
+    const newPast = historyPast.slice(0, -1);
+    setHistoryFuture((prev) => [
+      ...prev,
+      { pub: JSON.parse(JSON.stringify(activePublication)), pageIndex: activePageIndex },
+    ]);
+    setHistoryPast(newPast);
+    setActivePublication(previous.pub);
+    if (typeof previous.pageIndex === 'number' && previous.pageIndex < previous.pub.pages.length) {
+      setActivePageIndex(previous.pageIndex);
+    }
+    setSaveStatus('Undo successful');
+    setTimeout(() => setSaveStatus(''), 2000);
+  };
+
+  const handleRedo = () => {
+    if (historyFuture.length === 0 || !activePublication) return;
+    const next = historyFuture[historyFuture.length - 1];
+    const newFuture = historyFuture.slice(0, -1);
+    setHistoryPast((prev) => [
+      ...prev,
+      { pub: JSON.parse(JSON.stringify(activePublication)), pageIndex: activePageIndex },
+    ]);
+    setHistoryFuture(newFuture);
+    setActivePublication(next.pub);
+    if (typeof next.pageIndex === 'number' && next.pageIndex < next.pub.pages.length) {
+      setActivePageIndex(next.pageIndex);
+    }
+    setSaveStatus('Redo successful');
+    setTimeout(() => setSaveStatus(''), 2000);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!activePublication) return;
+      const target = e.target as HTMLElement | null;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
+      if (isInput) return;
+
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+      } else if (
+        ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'z') ||
+        ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y')
+      ) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activePublication, historyPast, historyFuture, activePageIndex]);
 
   // Hidden print render container for PDF compilation
   const [printRenderIndex, setPrintRenderIndex] = useState<number | null>(null);
@@ -193,6 +271,7 @@ export function PublicationsPage() {
 
   const updateActivePage = (updater: (prev: PublicationPage) => PublicationPage) => {
     if (!activePublication || !activePage) return;
+    pushHistory();
     const updatedPages = [...activePublication.pages];
     updatedPages[activePageIndex] = updater(activePage);
 
@@ -224,15 +303,54 @@ export function PublicationsPage() {
   const handleScissorCut = (firstPart: string, nextPart: string) => {
     if (!activePublication || !activePage) return;
 
-    const nextPageNumber = activePage.pageNumber + 1;
-    const existingContinuation = activePage.continuationPageId
-      ? activePublication.pages.find((page) => page.id === activePage.continuationPageId)
-      : undefined;
+    const plainNext = nextPart.replace(/<[^>]*>/g, '').trim();
+    if (!plainNext) {
+      setSaveStatus('⚠️ Place cursor or select text to cut to the next page.');
+      setTimeout(() => setSaveStatus(''), 3000);
+      return;
+    }
 
-    const continuationPage: PublicationPage = {
-      ...(existingContinuation ?? {
-        id: `p_page_${Date.now()}_${nextPageNumber}`,
-        pageNumber: nextPageNumber,
+    // Force snapshot to history so user can Undo instantly!
+    pushHistory(activePublication, activePageIndex, true);
+
+    const currentPageIndex = activePageIndex;
+    const currentPages = [...activePublication.pages];
+    let targetIndex = -1;
+
+    // 1. If activePage already has a linked continuation page, use that
+    if (activePage.continuationPageId) {
+      const idx = currentPages.findIndex((p) => p.id === activePage.continuationPageId);
+      if (idx >= 0) {
+        targetIndex = idx;
+      }
+    }
+
+    // 2. If not yet linked, check if an existing inner page immediately follows
+    if (targetIndex === -1 && currentPageIndex + 1 < currentPages.length) {
+      const nextPage = currentPages[currentPageIndex + 1];
+      if (nextPage.type !== 'cover') {
+        targetIndex = currentPageIndex + 1;
+      }
+    }
+
+    let targetPageId = '';
+
+    if (targetIndex >= 0) {
+      // Update existing page
+      const existingPage = currentPages[targetIndex];
+      targetPageId = existingPage.id;
+      currentPages[targetIndex] = {
+        ...existingPage,
+        content: nextPart,
+        continuationFromPageId: activePage.id,
+      };
+    } else {
+      // Create a new inner page immediately after current page
+      targetIndex = currentPageIndex + 1;
+      targetPageId = `p_page_${Date.now()}_${targetIndex + 1}`;
+      const newContinuationPage: PublicationPage = {
+        id: targetPageId,
+        pageNumber: targetIndex + 1,
         type: 'inner',
         title: activePage.title,
         titleColor: activePage.titleColor,
@@ -247,45 +365,48 @@ export function PublicationsPage() {
         reporterY: activePage.reporterY,
         reporterWidth: activePage.reporterWidth,
         reporterHeight: activePage.reporterHeight,
-        content: '',
+        content: nextPart,
         fontSize: activePage.fontSize,
         lineHeight: activePage.lineHeight,
         textAlign: activePage.textAlign,
         featureImagePosition: 'right',
         decorativeBorder: true,
         ad: { type: 'none' },
-      }),
-      content: nextPart,
-      continuationFromPageId: activePage.id,
+        continuationFromPageId: activePage.id,
+      };
+      currentPages.splice(targetIndex, 0, newContinuationPage);
+    }
+
+    // Update source page with firstPart and continuation link
+    currentPages[currentPageIndex] = {
+      ...currentPages[currentPageIndex],
+      content: firstPart,
+      continueOnNextPage: true,
+      continuationPageId: targetPageId,
     };
 
-    setActivePublication((prev) => {
-      if (!prev) return prev;
-      const continuationIndex = prev.pages.findIndex((page) => page.id === continuationPage.id);
-      const pages = [...prev.pages];
-      if (continuationIndex >= 0) {
-        pages[continuationIndex] = continuationPage;
-      } else {
-        pages.splice(activePageIndex + 1, 0, continuationPage);
-      }
-      pages[activePageIndex] = {
-        ...pages[activePageIndex],
-        content: firstPart,
-        continueOnNextPage: true,
-        continuationPageId: continuationPage.id,
-      };
-      pages.forEach((page, index) => {
-        page.pageNumber = index + 1;
-      });
-      return { ...prev, pages };
+    // Re-number all pages sequentially
+    currentPages.forEach((p, idx) => {
+      p.pageNumber = idx + 1;
     });
 
-    setSaveStatus(`✂️ Text cut at cursor! Remaining brought to Page ${nextPageNumber}.`);
-    setTimeout(() => setSaveStatus(''), 4000);
+    setActivePublication({
+      ...activePublication,
+      pages: currentPages,
+      updatedAt: Date.now(),
+    });
+
+    // CRUCIAL: Immediately switch the user to the continuation page so it never disappears!
+    setActivePageIndex(targetIndex);
+
+    setSaveStatus(`✂️ Story cut! Remaining text placed on Page ${targetIndex + 1}.`);
+    setTimeout(() => setSaveStatus(''), 4500);
   };
 
   const handleMergeBack = (sourcePage: PublicationPage) => {
     if (!activePublication) return;
+    pushHistory(activePublication, activePageIndex, true);
+
     const continuationId = sourcePage.continuationPageId;
     const continuation = continuationId
       ? activePublication.pages.find((page) => page.id === continuationId)
@@ -296,29 +417,39 @@ export function PublicationsPage() {
         ? `${sourcePage.content}\n${continuation.content}`.trim()
         : sourcePage.content;
 
-    setActivePublication((prev) => {
-      if (!prev) return prev;
-      const pages = continuationId
-        ? prev.pages.filter((page) => page.id !== continuationId)
-        : prev.pages;
-      const updated = pages.map((page) =>
-        page.id === sourcePage.id
-          ? {
-              ...page,
-              content: restoredContent,
-              continueOnNextPage: false,
-              continuationPageId: undefined,
-              continuationSourceContent: undefined,
-            }
-          : page
-      );
-      updated.forEach((page, index) => {
-        page.pageNumber = index + 1;
-      });
-      return { ...prev, pages };
+    // Only delete the page if booklet has > 4 pages AND it was an auto-created continuation page
+    const shouldDeletePage =
+      continuationId &&
+      activePublication.pages.length > 4 &&
+      continuation?.id.startsWith('p_page_');
+
+    const pages = shouldDeletePage
+      ? activePublication.pages.filter((page) => page.id !== continuationId)
+      : activePublication.pages.map((page) =>
+          page.id === continuationId
+            ? { ...page, content: '', continuationFromPageId: undefined }
+            : page
+        );
+
+    const updated = pages.map((page) =>
+      page.id === sourcePage.id
+        ? {
+            ...page,
+            content: restoredContent,
+            continueOnNextPage: false,
+            continuationPageId: undefined,
+            continuationSourceContent: undefined,
+          }
+        : page
+    );
+
+    updated.forEach((page, index) => {
+      page.pageNumber = index + 1;
     });
 
-    const sourceIdx = activePublication.pages.findIndex((page) => page.id === sourcePage.id);
+    setActivePublication({ ...activePublication, pages: updated });
+
+    const sourceIdx = updated.findIndex((page) => page.id === sourcePage.id);
     if (sourceIdx >= 0) {
       setActivePageIndex(sourceIdx);
     }
@@ -339,6 +470,7 @@ export function PublicationsPage() {
 
   const handleAddPage = () => {
     if (!activePublication) return;
+    pushHistory(activePublication, activePageIndex, true);
     const newPageNum = activePublication.pages.length + 1;
     const newPage: PublicationPage = {
       id: `p_page_${Date.now()}_${newPageNum}`,
@@ -374,6 +506,7 @@ export function PublicationsPage() {
       return;
     }
     if (confirm(`Delete page ${index + 1}?`)) {
+      pushHistory(activePublication, activePageIndex, true);
       const updated = activePublication.pages.filter((_, i) => i !== index);
       updated.forEach((p, idx) => {
         p.pageNumber = idx + 1;
@@ -391,6 +524,7 @@ export function PublicationsPage() {
     const targetIdx = direction === 'up' ? index - 1 : index + 1;
     if (targetIdx < 0 || targetIdx >= activePublication.pages.length) return;
 
+    pushHistory(activePublication, activePageIndex, true);
     const pages = [...activePublication.pages];
     const temp = pages[index];
     pages[index] = pages[targetIdx];
@@ -407,6 +541,7 @@ export function PublicationsPage() {
   const handleDuplicatePage = (index: number, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!activePublication) return;
+    pushHistory(activePublication, activePageIndex, true);
     const source = activePublication.pages[index];
     const cloned: PublicationPage = {
       ...source,
@@ -756,6 +891,28 @@ export function PublicationsPage() {
         </div>
 
         <div className="pub-studio-actions">
+          {/* Undo / Redo Studio Buttons */}
+          <div className="flex items-center gap-1 bg-stone-100 p-0.5 rounded-md border border-stone-200">
+            <button
+              type="button"
+              className="pub-btn pub-btn-ghost px-2.5 py-1 text-xs flex items-center gap-1 disabled:opacity-35 disabled:cursor-not-allowed text-stone-700 hover:text-stone-900 font-medium"
+              onClick={handleUndo}
+              disabled={historyPast.length === 0}
+              title="Undo (Ctrl+Z / Cmd+Z)"
+            >
+              <Undo2 size={14} /> Undo
+            </button>
+            <button
+              type="button"
+              className="pub-btn pub-btn-ghost px-2.5 py-1 text-xs flex items-center gap-1 disabled:opacity-35 disabled:cursor-not-allowed text-stone-700 hover:text-stone-900 font-medium"
+              onClick={handleRedo}
+              disabled={historyFuture.length === 0}
+              title="Redo (Ctrl+Y / Cmd+Shift+Z)"
+            >
+              <Redo2 size={14} /> Redo
+            </button>
+          </div>
+
           <button
             type="button"
             className="pub-btn pub-btn-outline"
@@ -1309,6 +1466,10 @@ export function PublicationsPage() {
                           minHeight={150}
                           toolbarPosition="bottom"
                           onCutToNextPage={handleScissorCut}
+                          onUndo={handleUndo}
+                          onRedo={handleRedo}
+                          canUndo={historyPast.length > 0}
+                          canRedo={historyFuture.length > 0}
                         />
                       </div>
 
@@ -1515,6 +1676,10 @@ export function PublicationsPage() {
                           placeholder="Type story 2 content here..."
                           minHeight={150}
                           toolbarPosition="bottom"
+                          onUndo={handleUndo}
+                          onRedo={handleRedo}
+                          canUndo={historyPast.length > 0}
+                          canRedo={historyFuture.length > 0}
                         />
                       </div>
 
@@ -1735,6 +1900,10 @@ export function PublicationsPage() {
                         minHeight={220}
                         toolbarPosition="bottom"
                         onCutToNextPage={handleScissorCut}
+                        onUndo={handleUndo}
+                        onRedo={handleRedo}
+                        canUndo={historyPast.length > 0}
+                        canRedo={historyFuture.length > 0}
                       />
                     </div>
 

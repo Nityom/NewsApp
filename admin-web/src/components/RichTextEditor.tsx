@@ -37,6 +37,10 @@ interface RichTextEditorProps {
   maxWords?: number;
   toolbarPosition?: 'top' | 'bottom';
   onCutToNextPage?: (firstPart: string, nextPart: string) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 const WORD_PATTERN = /[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu;
@@ -50,6 +54,10 @@ export function RichTextEditor({
   maxWords,
   toolbarPosition = 'top',
   onCutToNextPage,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }: RichTextEditorProps) {
   const lastAcceptedHtml = useRef(value);
   const maxWordsRef = useRef(maxWords);
@@ -150,32 +158,105 @@ export function RichTextEditor({
   ];
   const historyTools = [
     { label: 'Clear formatting', icon: RemoveFormatting, active: false, action: () => editor.chain().focus().unsetColor().unsetAllMarks().clearNodes().run() },
-    { label: 'Undo', icon: Undo2, active: false, disabled: !editor.can().undo(), action: () => editor.chain().focus().undo().run() },
-    { label: 'Redo', icon: Redo2, active: false, disabled: !editor.can().redo(), action: () => editor.chain().focus().redo().run() },
+    {
+      label: 'Undo',
+      icon: Undo2,
+      active: false,
+      disabled: !editor.can().undo() && !canUndo,
+      action: () => {
+        if (editor.can().undo()) {
+          editor.chain().focus().undo().run();
+        } else if (onUndo) {
+          onUndo();
+        }
+      },
+    },
+    {
+      label: 'Redo',
+      icon: Redo2,
+      active: false,
+      disabled: !editor.can().redo() && !canRedo,
+      action: () => {
+        if (editor.can().redo()) {
+          editor.chain().focus().redo().run();
+        } else if (onRedo) {
+          onRedo();
+        }
+      },
+    },
   ];
 
   function handleScissorCut() {
     if (!editor || !onCutToNextPage) return;
-    const { from } = editor.state.selection;
+    const { from, to, empty } = editor.state.selection;
     const docSize = editor.state.doc.content.size;
-
-    let cutPos = from;
-    if (cutPos <= 1 || cutPos >= docSize - 1) {
-      cutPos = Math.max(1, Math.floor(docSize / 2));
-    }
 
     try {
       const serializer = DOMSerializer.fromSchema(editor.schema);
+      let firstHtml = '';
+      let nextHtml = '';
 
-      const slice1 = editor.state.doc.slice(0, cutPos);
-      const div1 = document.createElement('div');
-      div1.appendChild(serializer.serializeFragment(slice1.content));
-      const firstHtml = div1.innerHTML;
+      if (!empty && from < to) {
+        // User highlighted a specific portion of text to cut to the next page
+        const selectedSlice = editor.state.doc.slice(from, to);
+        const divNext = document.createElement('div');
+        divNext.appendChild(serializer.serializeFragment(selectedSlice.content));
+        nextHtml = divNext.innerHTML.trim();
 
-      const slice2 = editor.state.doc.slice(cutPos, docSize);
-      const div2 = document.createElement('div');
-      div2.appendChild(serializer.serializeFragment(slice2.content));
-      const nextHtml = div2.innerHTML;
+        const sliceBefore = editor.state.doc.slice(0, from);
+        const sliceAfter = editor.state.doc.slice(to, docSize);
+        const divFirst = document.createElement('div');
+        divFirst.appendChild(serializer.serializeFragment(sliceBefore.content));
+        divFirst.appendChild(serializer.serializeFragment(sliceAfter.content));
+        firstHtml = divFirst.innerHTML.trim();
+      } else {
+        // Cursor placed at a point
+        let cutPos = from;
+
+        // If cursor is at very start or very end of document, split cleanly at middle paragraph
+        if (cutPos <= 2 || cutPos >= docSize - 2) {
+          const totalChildren = editor.state.doc.childCount;
+          if (totalChildren > 1) {
+            let currentPos = 0;
+            const halfIndex = Math.ceil(totalChildren / 2);
+            for (let i = 0; i < halfIndex; i++) {
+              currentPos += editor.state.doc.child(i).nodeSize;
+            }
+            cutPos = currentPos;
+          } else {
+            cutPos = Math.max(1, Math.floor(docSize / 2));
+          }
+        }
+
+        const slice1 = editor.state.doc.slice(0, cutPos);
+        const div1 = document.createElement('div');
+        div1.appendChild(serializer.serializeFragment(slice1.content));
+        firstHtml = div1.innerHTML.trim();
+
+        const slice2 = editor.state.doc.slice(cutPos, docSize);
+        const div2 = document.createElement('div');
+        div2.appendChild(serializer.serializeFragment(slice2.content));
+        nextHtml = div2.innerHTML.trim();
+      }
+
+      // Ensure proper paragraph structure
+      const formatHtml = (html: string) => {
+        let h = html.trim();
+        if (!h) return '';
+        if (!h.startsWith('<')) {
+          h = `<p>${h}</p>`;
+        }
+        return h;
+      };
+
+      firstHtml = formatHtml(firstHtml);
+      nextHtml = formatHtml(nextHtml);
+
+      // Verify that nextHtml actually contains text
+      const plainNext = nextHtml.replace(/<[^>]*>/g, '').trim();
+      if (!plainNext) {
+        return;
+      }
 
       onCutToNextPage(firstHtml, nextHtml);
     } catch (err) {

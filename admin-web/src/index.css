@@ -42,7 +42,16 @@ textarea { resize: vertical; }
 .success-message { color: #176038; font-size: 13px; font-weight: 700; }
 
 .app-shell { min-height: 100vh; }
-.sidebar { position: fixed; inset: 0 auto 0 0; width: 248px; background: #191918; color: white; display: flex; flex-direction: column; z-index: 30; }
+.sidebar { position: fixed; inset: 0 auto 0 0; width: 248px; background: #191918; color: white; display: flex; flex-direction: column; z-index: 30; transition: width .2s ease, transform .2s ease; }
+.sidebar.sidebar-collapsed { width: 70px; }
+.sidebar.sidebar-collapsed .brand-block { padding: 18px 14px; justify-content: center; }
+.sidebar.sidebar-collapsed .brand-block img { width: 40px; height: 40px; }
+.sidebar.sidebar-collapsed nav { padding: 18px 8px; }
+.sidebar.sidebar-collapsed nav a { grid-template-columns: 1fr; justify-items: center; padding: 0; min-height: 44px; }
+.sidebar.sidebar-collapsed nav a span,
+.sidebar.sidebar-collapsed nav a .nav-arrow { display: none; }
+.sidebar.sidebar-collapsed .sidebar-account { grid-template-columns: 1fr; justify-items: center; padding: 12px 6px; }
+.sidebar.sidebar-collapsed .sidebar-account > div:nth-child(2) { display: none; }
 .brand-block { height: 86px; display: flex; align-items: center; padding: 18px 22px; border-bottom: 1px solid #343431; }
 .brand-block img { width: 54px; height: 54px; object-fit: contain; }
 .sidebar nav { padding: 18px 12px; display: grid; gap: 3px; }
@@ -58,7 +67,8 @@ textarea { resize: vertical; }
 .sidebar-account span { color: #999790; font-size: 10px; overflow: hidden; text-overflow: ellipsis; }
 .icon-button { width: 34px; height: 34px; border: 0; background: transparent; color: inherit; display: grid; place-items: center; border-radius: 3px; }
 .icon-button:hover { background: rgba(128,128,128,.14); }
-.workspace { margin-left: 248px; min-height: 100vh; }
+.workspace { margin-left: 248px; min-height: 100vh; transition: margin-left .2s ease; }
+.workspace.workspace-expanded { margin-left: 70px; }
 .topbar { height: 62px; border-bottom: 1px solid var(--line); background: rgba(255,254,250,.92); backdrop-filter: blur(12px); display: flex; align-items: center; padding: 0 26px; position: sticky; top: 0; z-index: 20; }
 .topbar > div { display: flex; align-items: baseline; gap: 9px; }
 .topbar span { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }

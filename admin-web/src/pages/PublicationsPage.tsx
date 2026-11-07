@@ -1308,6 +1308,29 @@ export function PublicationsPage() {
 
           <button
             type="button"
+            className={`pub-btn flex items-center gap-1.5 text-xs font-semibold ${
+              isInspectorMinimized
+                ? 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
+                : 'pub-btn-outline'
+            }`}
+            onClick={() => setIsInspectorMinimized(!isInspectorMinimized)}
+            title={isInspectorMinimized ? "Expand Inspector Sidebar (साइडबार दाखवा)" : "Minimize Inspector Sidebar (साइडबार लहान करा)"}
+          >
+            {isInspectorMinimized ? (
+              <>
+                <PanelRightOpen size={14} className="text-amber-700" />
+                <span>Show Sidebar</span>
+              </>
+            ) : (
+              <>
+                <PanelRightClose size={14} />
+                <span>Minimize Sidebar</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
             className="pub-btn pub-btn-secondary"
             onClick={handleExportPNG}
             title="Export Current Page as Image for WhatsApp"
@@ -2028,6 +2051,22 @@ export function PublicationsPage() {
           </aside>
         ) : (
           <aside className="pub-inspector-panel">
+            {/* Inspector Top Bar with Minimize Button */}
+            <div className="flex items-center justify-between px-3 py-1.5 bg-stone-100 border-b border-stone-200">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-stone-600">
+                Inspector Panel
+              </span>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-stone-700 hover:text-stone-900 bg-white hover:bg-stone-50 border border-stone-300 rounded shadow-2xs transition-colors cursor-pointer"
+                onClick={() => setIsInspectorMinimized(true)}
+                title="Minimize Sidebar (साइडबार लहान करा)"
+              >
+                <PanelRightClose size={13} className="text-amber-700" />
+                <span>Minimize Sidebar</span>
+              </button>
+            </div>
+
             <div className="pub-inspector-tabs">
               <button
                 type="button"
@@ -2049,14 +2088,6 @@ export function PublicationsPage() {
                 onClick={() => setActiveTab('header')}
               >
                 <Palette size={14} /> Header & Theme
-              </button>
-              <button
-                type="button"
-                className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 rounded-md transition-colors ml-auto my-auto"
-                onClick={() => setIsInspectorMinimized(true)}
-                title="Minimize Sidebar"
-              >
-                <PanelRightClose size={15} />
               </button>
             </div>
 

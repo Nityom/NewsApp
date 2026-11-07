@@ -24,6 +24,7 @@ export function publicationHasLocalImages(pub: Publication): boolean {
 /**
  * Recursively scans and uploads all local/base64 images in a publication to Cloudinary,
  * returning a clean copy with permanent HTTPS URLs.
+ * Individual failures are caught and logged so one bad image never aborts the sync.
  */
 export async function uploadPublicationImages(
   pub: Publication,
@@ -34,21 +35,35 @@ export async function uploadPublicationImages(
 
   // 1. Master Header images
   if (isLocalOrBase64Image(clone.masterHeader.centerLogoUrl)) {
-    onProgress?.(`Uploading emblem/logo for "${clone.title}"...`);
-    clone.masterHeader.centerLogoUrl = await uploadImage(
-      clone.masterHeader.centerLogoUrl!,
-      'education-news/publications/logos'
-    );
-    uploadedCount++;
+    try {
+      onProgress?.(`Uploading emblem/logo for "${clone.title}"...`);
+      const url = await uploadImage(
+        clone.masterHeader.centerLogoUrl!,
+        'education-news/publications/logos'
+      );
+      if (url && url !== clone.masterHeader.centerLogoUrl) {
+        clone.masterHeader.centerLogoUrl = url;
+        uploadedCount++;
+      }
+    } catch (err) {
+      console.warn('Failed to upload logo to Cloudinary:', err);
+    }
   }
 
   if (isLocalOrBase64Image(clone.masterHeader.headerImageUrl)) {
-    onProgress?.(`Uploading header banner for "${clone.title}"...`);
-    clone.masterHeader.headerImageUrl = await uploadImage(
-      clone.masterHeader.headerImageUrl!,
-      'education-news/publications/headers'
-    );
-    uploadedCount++;
+    try {
+      onProgress?.(`Uploading header banner for "${clone.title}"...`);
+      const url = await uploadImage(
+        clone.masterHeader.headerImageUrl!,
+        'education-news/publications/headers'
+      );
+      if (url && url !== clone.masterHeader.headerImageUrl) {
+        clone.masterHeader.headerImageUrl = url;
+        uploadedCount++;
+      }
+    } catch (err) {
+      console.warn('Failed to upload header banner to Cloudinary:', err);
+    }
   }
 
   // 2. Each Page images
@@ -57,22 +72,36 @@ export async function uploadPublicationImages(
 
     // Feature image
     if (isLocalOrBase64Image(page.featureImageUrl)) {
-      onProgress?.(`Uploading Page ${pageIdx + 1} photo for "${clone.title}"...`);
-      page.featureImageUrl = await uploadImage(
-        page.featureImageUrl!,
-        'education-news/publications/features'
-      );
-      uploadedCount++;
+      try {
+        onProgress?.(`Uploading Page ${pageIdx + 1} photo for "${clone.title}"...`);
+        const url = await uploadImage(
+          page.featureImageUrl!,
+          'education-news/publications/features'
+        );
+        if (url && url !== page.featureImageUrl) {
+          page.featureImageUrl = url;
+          uploadedCount++;
+        }
+      } catch (err) {
+        console.warn(`Failed to upload Page ${pageIdx + 1} feature image to Cloudinary:`, err);
+      }
     }
 
     // Ad banner image
     if (isLocalOrBase64Image(page.ad?.imageUrl)) {
-      onProgress?.(`Uploading Page ${pageIdx + 1} ad banner for "${clone.title}"...`);
-      page.ad.imageUrl = await uploadImage(
-        page.ad.imageUrl!,
-        'education-news/publications/ads'
-      );
-      uploadedCount++;
+      try {
+        onProgress?.(`Uploading Page ${pageIdx + 1} ad banner for "${clone.title}"...`);
+        const url = await uploadImage(
+          page.ad.imageUrl!,
+          'education-news/publications/ads'
+        );
+        if (url && url !== page.ad.imageUrl) {
+          page.ad.imageUrl = url;
+          uploadedCount++;
+        }
+      } catch (err) {
+        console.warn(`Failed to upload Page ${pageIdx + 1} ad banner to Cloudinary:`, err);
+      }
     }
 
     // Canvas freeform ad/element images
@@ -80,18 +109,52 @@ export async function uploadPublicationImages(
       for (let elemIdx = 0; elemIdx < page.canvasElements.length; elemIdx++) {
         const elem = page.canvasElements[elemIdx];
         if (isLocalOrBase64Image(elem.imageUrl)) {
-          onProgress?.(`Uploading Page ${pageIdx + 1} canvas element for "${clone.title}"...`);
-          elem.imageUrl = await uploadImage(
-            elem.imageUrl!,
-            'education-news/publications/canvas'
-          );
-          uploadedCount++;
+          try {
+            onProgress?.(`Uploading Page ${pageIdx + 1} canvas element for "${clone.title}"...`);
+            const url = await uploadImage(
+              elem.imageUrl!,
+              'education-news/publications/canvas'
+            );
+            if (url && url !== elem.imageUrl) {
+              elem.imageUrl = url;
+              uploadedCount++;
+            }
+          } catch (err) {
+            console.warn(`Failed to upload Page ${pageIdx + 1} canvas element to Cloudinary:`, err);
+          }
         }
       }
     }
   }
 
   return { publication: clone, uploadedCount };
+}
+
+/**
+ * Sanitizes a publication before sending to Convex to ensure the payload stays under Convex's 1MB limit.
+ */
+function sanitizeForConvex(pub: Publication): Publication {
+  const jsonStr = JSON.stringify(pub);
+  if (jsonStr.length < 800000) {
+    return pub;
+  }
+  const clone: Publication = JSON.parse(jsonStr);
+  for (const page of clone.pages) {
+    if (page.featureImageUrl?.startsWith('data:image/') && page.featureImageUrl.length > 150000) {
+      page.featureImageUrl = '';
+    }
+    if (page.ad?.imageUrl?.startsWith('data:image/') && page.ad.imageUrl.length > 150000) {
+      page.ad.imageUrl = '';
+    }
+    if (page.canvasElements) {
+      for (const elem of page.canvasElements) {
+        if (elem.imageUrl?.startsWith('data:image/') && elem.imageUrl.length > 150000) {
+          elem.imageUrl = '';
+        }
+      }
+    }
+  }
+  return clone;
 }
 
 /**
@@ -116,7 +179,8 @@ export async function syncPublicationToCloud(
   // 4. Upsert to Convex cloud database
   try {
     onProgress?.(`Syncing "${resolvedPub.title}" to Convex cloud...`);
-    await convex.mutation(api.publications.upsert, { publication: resolvedPub });
+    const convexPayload = sanitizeForConvex(resolvedPub);
+    await convex.mutation(api.publications.upsert, { publication: convexPayload });
   } catch (err) {
     console.warn('Convex publication upsert offline or failed, local copy preserved:', err);
   }
@@ -169,7 +233,8 @@ export async function syncAllPublications(
         }
 
         onProgress?.(`Saving "${cleanPub.title}" to Convex...`);
-        await convex.mutation(api.publications.upsert, { publication: cleanPub });
+        const convexPayload = sanitizeForConvex(cleanPub);
+        await convex.mutation(api.publications.upsert, { publication: convexPayload });
         syncedCount++;
       } catch (err: any) {
         console.error(`Failed to sync publication ${localPub.id}:`, err);

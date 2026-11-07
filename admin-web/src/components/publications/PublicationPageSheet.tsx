@@ -6,6 +6,7 @@ import { DraggableResizableBox } from './DraggableResizableBox';
 interface PublicationPageSheetProps {
   page: PublicationPage;
   masterHeader: PublicationMasterHeader;
+  totalPages?: number;
   scale?: number;
   interactive?: boolean;
   selectedElementId?: string | null;
@@ -22,6 +23,7 @@ interface PublicationPageSheetProps {
 export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
   page,
   masterHeader,
+  totalPages,
   scale = 1,
   interactive = false,
   selectedElementId,
@@ -31,6 +33,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
   id,
 }) => {
   const isCover = page.type === 'cover';
+  const isFrontPage = page.pageNumber === 1 || isCover;
   const hasAd = page.ad && page.ad.type !== 'none';
 
   // Feature Image Coordinates (defaults if not yet set)
@@ -68,9 +71,11 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
   );
 
   // Header banner is 86px tall + 4px margin = 90px
-  // .pub-matter-section has py-1 (4px padding top)
-  // Title is ~28px if present, subtitle is ~18px if present
-  const headerHeight = 90;
+  // Yellow strip (frontpage) is ~26px; inner page subheader is ~22px
+  const stripHeight = isFrontPage
+    ? (masterHeader.showYellowStrip !== false ? 26 : 0)
+    : (masterHeader.showPageNumbers !== false ? 22 : 0);
+  const headerHeight = 90 + stripHeight;
   const titleHeight = page.title ? 28 : 0;
   const subtitleHeight = page.subtitle ? 18 : 0;
   const textTop = isCover ? 0 : (headerHeight + 4 + titleHeight + subtitleHeight);
@@ -261,6 +266,41 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
             className="w-full h-[86px] object-fill bg-yellow-300 rounded mb-1 shrink-0"
             crossOrigin="anonymous"
           />
+
+          {/* Yellow Masthead Registration Strip - Frontpage Only */}
+          {isFrontPage && masterHeader.showYellowStrip !== false && (
+            <div
+              className="pub-meta-strip w-full bg-[#ffe600] border-y border-black py-1 px-3 mb-1 text-center font-bold text-black tracking-wide shrink-0 select-none overflow-hidden"
+              style={{ minHeight: '23px', boxSizing: 'border-box' }}
+            >
+              {masterHeader.customStripText?.trim() ? (
+                <span className="text-[11.5px] font-bold block">{masterHeader.customStripText.trim()}</span>
+              ) : (
+                <span className="text-[11.5px] font-bold whitespace-nowrap block">
+                  वर्ष : {masterHeader.year || '3'} &nbsp;|&nbsp; अंक : {masterHeader.issueNumber || '38'} &nbsp;|&nbsp; पृष्ठ : {page.pageLabel || page.pageNumber || 1} &nbsp;|&nbsp; दिनांक {masterHeader.volumeDate || masterHeader.issueDate || '7/11/2026'} &nbsp;|&nbsp; मूल्य : {masterHeader.price || 'निःशुल्क'}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Running Sub-Header Strip with Page Number - Inner & Back Pages */}
+          {!isFrontPage && masterHeader.showPageNumbers !== false && (
+            <div
+              className="pub-inner-meta-strip w-full border-b border-stone-300 py-0.5 px-3 mb-1 flex items-center justify-between text-[11px] font-semibold text-stone-700 shrink-0 select-none"
+              style={{ minHeight: '20px', boxSizing: 'border-box' }}
+            >
+              <span className="font-bold text-stone-800">
+                {masterHeader.publicationName || 'एज्युकेशन न्युज'}
+              </span>
+              <span className="text-stone-500 font-medium">
+                {masterHeader.volumeDate || masterHeader.issueDate || ''}
+              </span>
+              <span className="font-bold text-red-700 bg-red-50/90 px-2 py-0.5 rounded border border-red-200">
+                {page.pageLabel || `पृष्ठ : ${page.pageNumber}`}
+              </span>
+            </div>
+          )}
+
           {/* ================= COVER PAGE ================= */}
           {isCover ? (
             <div className="pub-cover-layout flex flex-col h-full bg-gradient-to-b from-yellow-200 via-amber-50 to-white box-border">
@@ -574,6 +614,13 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                   style={{ height: `${page.adHeight || 175}px` }}
                 >
                   <AdSlotRenderer ad={page.ad} interactive={interactive} />
+                </div>
+              )}
+
+              {/* Bottom Page Numbering for Inner Pages (when no bottom ad or freeform ad) */}
+              {(!hasAd || isAdFree) && masterHeader.showPageNumbers !== false && (
+                <div className="pub-page-bottom-number mt-auto pt-1 pb-0.5 text-center text-[10.5px] font-bold text-stone-600 select-none shrink-0 border-t border-stone-200/60">
+                  — {page.pageLabel || `पृष्ठ : ${page.pageNumber}`} {totalPages ? ` / ${totalPages}` : ''} —
                 </div>
               )}
             </div>

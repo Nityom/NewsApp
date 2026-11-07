@@ -19,6 +19,12 @@ export const defaultPublications: Publication[] = [
       themeColor: 'festive-red',
       primaryColor: '#bd3029',
       secondaryColor: '#f0d928',
+      year: '3',
+      issueNumber: '38',
+      volumeDate: '7/11/2026',
+      price: 'निःशुल्क',
+      showYellowStrip: true,
+      showPageNumbers: true,
     },
     pages: [
       {

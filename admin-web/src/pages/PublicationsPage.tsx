@@ -1352,6 +1352,7 @@ export function PublicationsPage() {
               id="pub-live-sheet"
               page={activePage}
               masterHeader={activePublication.masterHeader}
+              totalPages={activePublication.pages.length}
               scale={canvasZoom}
               interactive={true}
               selectedElementId={selectedElementId}
@@ -1512,6 +1513,123 @@ export function PublicationsPage() {
                     <option value="cover">Front Cover Page</option>
                     <option value="back">Back Cover Page</option>
                   </select>
+                </div>
+
+                {/* Frontpage Yellow Strip Quick Customizer */}
+                {(activePage.type === 'cover' || activePageIndex === 0) && (
+                  <div className="rounded-lg border border-yellow-400 bg-yellow-50/80 p-3 shadow-xs mb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-bold text-xs text-yellow-950 flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-600 inline-block" />
+                        Frontpage Yellow Strip (नोंदणी पट्टी)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('header')}
+                        className="text-[11px] text-yellow-800 hover:text-yellow-950 font-semibold underline"
+                      >
+                        All Settings ➔
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                      <div>
+                        <label className="text-[11px] font-semibold text-stone-700 block mb-0.5">वर्ष (Year)</label>
+                        <input
+                          type="text"
+                          className="pub-input text-xs"
+                          placeholder="3"
+                          value={activePublication.masterHeader.year ?? '3'}
+                          onChange={(e) =>
+                            setActivePublication({
+                              ...activePublication,
+                              masterHeader: {
+                                ...activePublication.masterHeader,
+                                year: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-stone-700 block mb-0.5">अंक (Issue)</label>
+                        <input
+                          type="text"
+                          className="pub-input text-xs"
+                          placeholder="38"
+                          value={activePublication.masterHeader.issueNumber ?? '38'}
+                          onChange={(e) =>
+                            setActivePublication({
+                              ...activePublication,
+                              masterHeader: {
+                                ...activePublication.masterHeader,
+                                issueNumber: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-stone-700 block mb-0.5">दिनांक (Date)</label>
+                        <input
+                          type="text"
+                          className="pub-input text-xs"
+                          placeholder="7/11/2026"
+                          value={activePublication.masterHeader.volumeDate ?? activePublication.masterHeader.issueDate ?? '7/11/2026'}
+                          onChange={(e) =>
+                            setActivePublication({
+                              ...activePublication,
+                              masterHeader: {
+                                ...activePublication.masterHeader,
+                                volumeDate: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-semibold text-stone-700 block mb-0.5">मूल्य (Price)</label>
+                        <input
+                          type="text"
+                          className="pub-input text-xs"
+                          placeholder="निःशुल्क"
+                          value={activePublication.masterHeader.price ?? 'निःशुल्क'}
+                          onChange={(e) =>
+                            setActivePublication({
+                              ...activePublication,
+                              masterHeader: {
+                                ...activePublication.masterHeader,
+                                price: e.target.value,
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-1.5 bg-[#ffe600] border-y border-black text-center text-[10.5px] font-bold text-black select-none truncate">
+                      {activePublication.masterHeader.customStripText?.trim() ||
+                        `वर्ष : ${activePublication.masterHeader.year || '3'} | अंक : ${activePublication.masterHeader.issueNumber || '38'} | पृष्ठ : ${activePage.pageLabel || activePage.pageNumber || 1} | दिनांक ${activePublication.masterHeader.volumeDate || activePublication.masterHeader.issueDate || '7/11/2026'} | मूल्य : ${activePublication.masterHeader.price || 'निःशुल्क'}`}
+                    </div>
+                  </div>
+                )}
+
+                {/* Page Number / Custom Label for this page */}
+                <div className="pub-control-group mb-3">
+                  <label className="flex items-center justify-between">
+                    <span>Page Number / Label (पृष्ठ क्रमांक)</span>
+                    <span className="text-[10px] text-stone-400">Page {activePageIndex + 1} of {activePublication.pages.length}</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="pub-input text-xs"
+                    placeholder={`पृष्ठ : ${activePageIndex + 1}`}
+                    value={activePage.pageLabel ?? ''}
+                    onChange={(e) => updateActivePage((prev) => ({ ...prev, pageLabel: e.target.value }))}
+                  />
+                  <span className="text-[10px] text-stone-500 mt-0.5">
+                    Custom label for this page (e.g. "पृष्ठ : {activePageIndex + 1}"). Leave empty for default.
+                  </span>
                 </div>
 
                 {/* Split Page Checkbox Card (for Inner & Back Pages) */}
@@ -2714,6 +2832,164 @@ export function PublicationsPage() {
                   </div>
                 </div>
 
+                {/* Yellow Masthead Strip Configuration */}
+                <div className="pub-control-card border border-yellow-300 bg-yellow-50/70 rounded-lg p-3 my-2">
+                  <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-yellow-200">
+                    <span className="font-bold text-xs text-yellow-950 flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-600 inline-block" />
+                      Frontpage Yellow Strip (नोंदणी पट्टी)
+                    </span>
+                    <label className="flex items-center gap-1.5 text-xs text-stone-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={activePublication.masterHeader.showYellowStrip !== false}
+                        onChange={(e) =>
+                          setActivePublication({
+                            ...activePublication,
+                            masterHeader: {
+                              ...activePublication.masterHeader,
+                              showYellowStrip: e.target.checked,
+                            },
+                          })
+                        }
+                      />
+                      <span>Show on Frontpage</span>
+                    </label>
+                  </div>
+
+                  <p className="text-[11px] text-stone-600 mb-2">
+                    Appears directly beneath the header masthead on the front page only.
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="pub-control-group">
+                      <label>वर्ष (Year / Volume)</label>
+                      <input
+                        type="text"
+                        className="pub-input text-xs"
+                        placeholder="3"
+                        value={activePublication.masterHeader.year ?? '3'}
+                        onChange={(e) =>
+                          setActivePublication({
+                            ...activePublication,
+                            masterHeader: {
+                              ...activePublication.masterHeader,
+                              year: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="pub-control-group">
+                      <label>अंक (Issue Number)</label>
+                      <input
+                        type="text"
+                        className="pub-input text-xs"
+                        placeholder="38"
+                        value={activePublication.masterHeader.issueNumber ?? '38'}
+                        onChange={(e) =>
+                          setActivePublication({
+                            ...activePublication,
+                            masterHeader: {
+                              ...activePublication.masterHeader,
+                              issueNumber: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="pub-control-group">
+                      <label>दिनांक (Date)</label>
+                      <input
+                        type="text"
+                        className="pub-input text-xs"
+                        placeholder="7/11/2026"
+                        value={activePublication.masterHeader.volumeDate ?? activePublication.masterHeader.issueDate ?? '7/11/2026'}
+                        onChange={(e) =>
+                          setActivePublication({
+                            ...activePublication,
+                            masterHeader: {
+                              ...activePublication.masterHeader,
+                              volumeDate: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+
+                    <div className="pub-control-group">
+                      <label>मूल्य (Price)</label>
+                      <input
+                        type="text"
+                        className="pub-input text-xs"
+                        placeholder="निःशुल्क"
+                        value={activePublication.masterHeader.price ?? 'निःशुल्क'}
+                        onChange={(e) =>
+                          setActivePublication({
+                            ...activePublication,
+                            masterHeader: {
+                              ...activePublication.masterHeader,
+                              price: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pub-control-group mt-2">
+                    <label className="text-[11px] text-stone-600">Custom Strip Text Override (Optional)</label>
+                    <input
+                      type="text"
+                      className="pub-input text-xs"
+                      placeholder="Leave blank to use formatted values above"
+                      value={activePublication.masterHeader.customStripText ?? ''}
+                      onChange={(e) =>
+                        setActivePublication({
+                          ...activePublication,
+                          masterHeader: {
+                            ...activePublication.masterHeader,
+                            customStripText: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="mt-2 p-1.5 bg-[#ffe600] border-y border-black text-center text-[10.5px] font-bold text-black select-none truncate">
+                    {activePublication.masterHeader.customStripText?.trim() ||
+                      `वर्ष : ${activePublication.masterHeader.year || '3'} | अंक : ${activePublication.masterHeader.issueNumber || '38'} | पृष्ठ : 1 | दिनांक ${activePublication.masterHeader.volumeDate || activePublication.masterHeader.issueDate || '7/11/2026'} | मूल्य : ${activePublication.masterHeader.price || 'निःशुल्क'}`}
+                  </div>
+                </div>
+
+                {/* Page Numbering Controls */}
+                <div className="pub-control-card border border-stone-200 bg-stone-50/70 rounded-lg p-3 my-2">
+                  <div className="flex items-center justify-between mb-1.5 pb-1 border-b border-stone-200">
+                    <span className="font-bold text-xs text-stone-900">Page Numbering (पृष्ठ क्रमांक)</span>
+                    <label className="flex items-center gap-1.5 text-xs text-stone-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={activePublication.masterHeader.showPageNumbers !== false}
+                        onChange={(e) =>
+                          setActivePublication({
+                            ...activePublication,
+                            masterHeader: {
+                              ...activePublication.masterHeader,
+                              showPageNumbers: e.target.checked,
+                            },
+                          })
+                        }
+                      />
+                      <span>Show on all pages</span>
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-stone-500">
+                    Displays पृष्ठ : 1 on frontpage yellow strip, and running page numbers on all inner & back pages (in running sub-header and footer).
+                  </p>
+                </div>
+
                 <div className="pub-control-group">
                   <label>Header Emblem / Logo</label>
                   {activePublication.masterHeader.centerLogoUrl ? (
@@ -2814,6 +3090,7 @@ export function PublicationsPage() {
             id="pub-export-offscreen-sheet"
             page={printRenderPage}
             masterHeader={activePublication.masterHeader}
+            totalPages={activePublication.pages.length}
             scale={1}
             interactive={false}
           />

@@ -100,6 +100,7 @@ export interface PublicationPage {
   // Aesthetics
   decorativeBorder?: boolean;
   paperTint?: string;
+  pageLabel?: string; // Custom page label or numbering (e.g. "पृष्ठ : 2" or "Page 2 of 6")
 }
 
 export interface PublicationMasterHeader {
@@ -114,6 +115,16 @@ export interface PublicationMasterHeader {
   primaryColor?: string;
   secondaryColor?: string;
   fontFamily?: string;
+
+  // Frontpage Yellow Registration Strip & Page Numbering
+  showYellowStrip?: boolean;
+  year?: string; // e.g. "3" or "३"
+  issueNumber?: string; // e.g. "38" or "३८"
+  volumeDate?: string; // e.g. "7/11/2026"
+  price?: string; // e.g. "निःशुल्क"
+  pageLabel?: string; // Cover page label (default "1")
+  customStripText?: string; // Full override for the strip text
+  showPageNumbers?: boolean; // Show page numbers across pages
 }
 
 export interface Publication {

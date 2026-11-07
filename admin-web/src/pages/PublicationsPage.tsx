@@ -224,7 +224,19 @@ export function PublicationsPage() {
     if (showLoading) setLoading(true);
     try {
       const list = await getAllPublications();
-      setPublications(list);
+      const upgradedList = list.map((p) => {
+        if (!p.masterHeader?.publicationName || p.masterHeader.publicationName.trim() === 'Education News') {
+          return {
+            ...p,
+            masterHeader: {
+              ...p.masterHeader,
+              publicationName: 'एज्युकेशन न्युज',
+            },
+          };
+        }
+        return p;
+      });
+      setPublications(upgradedList);
     } catch (err) {
       console.error('Failed to load publications:', err);
     } finally {
@@ -254,6 +266,12 @@ export function PublicationsPage() {
   const handleOpenEditor = async (pubId: string) => {
     const pub = await getPublication(pubId);
     if (pub) {
+      if (!pub.masterHeader?.publicationName || pub.masterHeader.publicationName.trim() === 'Education News') {
+        pub.masterHeader = {
+          ...pub.masterHeader,
+          publicationName: 'एज्युकेशन न्युज',
+        };
+      }
       setActivePublication({
         ...pub,
         pages: pub.pages.map((page) => {
@@ -278,12 +296,12 @@ export function PublicationsPage() {
       pageOrientation: 'portrait',
       pageSize: 'A4',
       masterHeader: {
-        publicationName: 'Education News',
-        tagline: 'Family Companion',
-        editionTitle: 'Special Edition',
+        publicationName: 'एज्युकेशन न्युज',
+        tagline: '॥ कुटुंबाचा सोबती ॥',
+        editionTitle: 'विशेष पुरवणी',
         headerImageUrl: '/logoBanner.jpeg',
-        cityLocation: 'Wardha',
-        issueDate: 'October 2026',
+        cityLocation: 'वर्धा',
+        issueDate: 'ऑक्टोबर २०२६',
         themeColor: 'festive-red',
         primaryColor: '#bd3029',
         secondaryColor: '#f0d928',
@@ -2812,10 +2830,28 @@ export function PublicationsPage() {
             {activeTab === 'header' && (
               <>
                 <div className="pub-control-group">
-                  <label>Publication Name (Masthead)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="m-0">Publication Name (वृत्तपत्र नाव)</label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setActivePublication({
+                          ...activePublication,
+                          masterHeader: {
+                            ...activePublication.masterHeader,
+                            publicationName: 'एज्युकेशन न्युज',
+                          },
+                        })
+                      }
+                      className="text-[10.5px] text-amber-900 bg-yellow-100 hover:bg-yellow-200 border border-yellow-400 px-2 py-0.5 rounded font-bold cursor-pointer"
+                    >
+                      Use "एज्युकेशन न्युज"
+                    </button>
+                  </div>
                   <input
                     type="text"
                     className="pub-input"
+                    placeholder="एज्युकेशन न्युज"
                     value={activePublication.masterHeader.publicationName}
                     onChange={(e) =>
                       setActivePublication({

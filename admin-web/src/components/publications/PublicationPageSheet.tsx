@@ -26,6 +26,43 @@ interface PublicationPageSheetProps {
   id?: string;
 }
 
+const formatMarathiDate = (dateStr?: string): string => {
+  if (!dateStr) return '';
+  const monthMap: Record<string, string> = {
+    January: 'जानेवारी',
+    February: 'फेब्रुवारी',
+    March: 'मार्च',
+    April: 'एप्रिल',
+    May: 'मे',
+    June: 'जून',
+    July: 'जुलै',
+    August: 'ऑगस्ट',
+    September: 'सप्टेंबर',
+    October: 'ऑक्टोबर',
+    November: 'नोव्हेंबर',
+    December: 'डिसेंबर',
+    Jan: 'जानेवारी',
+    Feb: 'फेब्रुवारी',
+    Mar: 'मार्च',
+    Apr: 'एप्रिल',
+    Jun: 'जून',
+    Jul: 'जुलै',
+    Aug: 'ऑगस्ट',
+    Sep: 'सप्टेंबर',
+    Sept: 'सप्टेंबर',
+    Oct: 'ऑक्टोबर',
+    Nov: 'नोव्हेंबर',
+    Dec: 'डिसेंबर',
+  };
+
+  let result = dateStr;
+  for (const [en, mr] of Object.entries(monthMap)) {
+    const regex = new RegExp(`\\b${en}\\b`, 'gi');
+    result = result.replace(regex, mr);
+  }
+  return result;
+};
+
 export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
   page,
   masterHeader,
@@ -48,7 +85,15 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
   const effIssue = masterHeader.issueNumber || settings?.issueNumber || '38';
   const effPrice = masterHeader.price || settings?.price || 'निःशुल्क';
   const effPage = page.pageLabel || (page.pageNumber === 1 && settings?.pageLabel ? settings.pageLabel : page.pageNumber || 1);
-  const effDate = masterHeader.volumeDate || masterHeader.issueDate || '7/11/2026';
+  const rawDate = masterHeader.volumeDate || masterHeader.issueDate || '7/11/2026';
+  const effDate = formatMarathiDate(rawDate);
+
+  // Resolved publication name in Marathi
+  const rawPubName = masterHeader.publicationName?.trim();
+  const displayPubName =
+    !rawPubName || rawPubName.toLowerCase() === 'education news'
+      ? 'एज्युकेशन न्युज'
+      : rawPubName;
 
   // Feature Image Coordinates (defaults if not yet set)
   const featX = page.featureImageX ?? (isCover ? 60 : 380);
@@ -304,10 +349,10 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
               style={{ minHeight: '20px', boxSizing: 'border-box' }}
             >
               <span className="font-bold text-stone-800">
-                {masterHeader.publicationName || 'एज्युकेशन न्युज'}
+                {displayPubName}
               </span>
               <span className="text-stone-500 font-medium">
-                {masterHeader.volumeDate || masterHeader.issueDate || ''}
+                {effDate}
               </span>
               <span className="font-bold text-red-700 bg-red-50/90 px-2 py-0.5 rounded border border-red-200">
                 {page.pageLabel || `पृष्ठ : ${page.pageNumber}`}
@@ -634,7 +679,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
               {/* Bottom Page Numbering for Inner Pages (when no bottom ad or freeform ad) */}
               {(!hasAd || isAdFree) && masterHeader.showPageNumbers !== false && (
                 <div className="pub-page-bottom-number mt-auto pt-1 pb-0.5 text-center text-[10.5px] font-bold text-stone-600 select-none shrink-0 border-t border-stone-200/60">
-                  — {page.pageLabel || `पृष्ठ : ${page.pageNumber}`} {totalPages ? ` / ${totalPages}` : ''} —
+                  — {displayPubName} • {page.pageLabel || `पृष्ठ : ${page.pageNumber}`} {totalPages ? ` / ${totalPages}` : ''} —
                 </div>
               )}
             </div>

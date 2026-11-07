@@ -10,7 +10,7 @@ export const defaultPublications: Publication[] = [
     pageOrientation: 'portrait',
     pageSize: 'A4',
     masterHeader: {
-      publicationName: 'Education News',
+      publicationName: 'एज्युकेशन न्युज',
       tagline: '॥ कुटुंबाचा सोबती ॥',
       editionTitle: 'आरती संग्रह',
       headerImageUrl: '/logoBanner.jpeg',

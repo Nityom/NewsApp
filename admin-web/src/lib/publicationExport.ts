@@ -8,6 +8,12 @@ export interface ExportProgress {
   status: string;
 }
 
+// Exact ISO standard A4 dimensions & print resolution
+export const A4_WIDTH_MM = 210;
+export const A4_HEIGHT_MM = 297;
+export const A4_WIDTH_PX = 595;
+export const A4_HEIGHT_PX = 842;
+
 /**
  * Ensures all images inside an element are fully loaded before capturing
  */
@@ -63,19 +69,19 @@ export async function exportPageAsImage(
   await waitForImagesToLoad(element);
 
   const canvas = await html2canvas(element, {
-    scale: 2, // High resolution (300 DPI equivalent)
+    scale: 2.5, // 300 DPI print quality
     useCORS: true,
     allowTaint: false, // Must be false so toDataURL never throws SecurityError
     backgroundColor: '#fffdf5',
     logging: false,
-    width: 595,
-    height: 842,
+    width: A4_WIDTH_PX,
+    height: A4_HEIGHT_PX,
     scrollX: 0,
     scrollY: 0,
     x: 0,
     y: 0,
-    windowWidth: 595,
-    windowHeight: 842,
+    windowWidth: A4_WIDTH_PX,
+    windowHeight: A4_HEIGHT_PX,
   });
 
   const dataUrl = canvas.toDataURL('image/png');
@@ -110,8 +116,19 @@ export async function exportBookletPDF(
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
-    format: 'a4',
+    format: [A4_WIDTH_MM, A4_HEIGHT_MM],
     compress: true,
+    putOnlyUsedFonts: true,
+    floatPrecision: 16,
+  });
+
+  // Set explicit ISO print metadata
+  pdf.setDocumentProperties({
+    title: publication.title || 'Publication Booklet',
+    subject: publication.masterHeader?.editionTitle || 'Special Edition',
+    author: publication.masterHeader?.publicationName || 'Education News',
+    keywords: 'A4, 300 DPI, ISO 216, Print Ready',
+    creator: 'Education News Studio (ISO A4 300 DPI)',
   });
 
   for (let i = 0; i < total; i++) {
@@ -132,29 +149,29 @@ export async function exportBookletPDF(
     await waitForImagesToLoad(element);
 
     const canvas = await html2canvas(element, {
-      scale: 2,
+      scale: 2.5, // 300 DPI high resolution
       useCORS: true,
       allowTaint: false,
       backgroundColor: '#fffdf5',
       logging: false,
-      width: 595,
-      height: 842,
+      width: A4_WIDTH_PX,
+      height: A4_HEIGHT_PX,
       scrollX: 0,
       scrollY: 0,
       x: 0,
       y: 0,
-      windowWidth: 595,
-      windowHeight: 842,
+      windowWidth: A4_WIDTH_PX,
+      windowHeight: A4_HEIGHT_PX,
     });
 
     const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
     if (i > 0) {
-      pdf.addPage('a4', 'portrait');
+      pdf.addPage([A4_WIDTH_MM, A4_HEIGHT_MM], 'portrait');
     }
 
     // A4 dimensions are 210mm x 297mm
-    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+    pdf.addImage(imgData, 'JPEG', 0, 0, A4_WIDTH_MM, A4_HEIGHT_MM, undefined, 'FAST');
   }
 
   onProgress?.({

@@ -64,19 +64,23 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <aside className={`sidebar ${open ? 'sidebar-open' : ''} ${isCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <div className="brand-block flex items-center justify-between">
-          <img src="/app-logo.png" alt="Education News" />
-          {!isCollapsed && (
-            <button
-              type="button"
-              className="icon-button text-stone-400 hover:text-white cursor-pointer ml-auto hidden md:grid"
-              onClick={toggleCollapse}
-              title="Minimize Navigation Sidebar"
-              aria-label="Minimize sidebar"
-            >
-              <PanelLeftClose size={18} />
-            </button>
-          )}
+        <div className={`brand-block flex ${isCollapsed ? 'flex-col gap-2 items-center justify-center' : 'items-center justify-between'}`}>
+          <img
+            src="/app-logo.png"
+            alt="Education News"
+            className={isCollapsed ? 'cursor-pointer hover:opacity-85' : ''}
+            onClick={isCollapsed ? toggleCollapse : undefined}
+            title={isCollapsed ? 'Expand Sidebar' : undefined}
+          />
+          <button
+            type="button"
+            className={`icon-button text-stone-400 hover:text-white cursor-pointer hidden md:grid ${isCollapsed ? 'mt-1' : 'ml-auto'}`}
+            onClick={toggleCollapse}
+            title={isCollapsed ? 'Expand Navigation Sidebar' : 'Minimize Navigation Sidebar'}
+            aria-label={isCollapsed ? 'Expand sidebar' : 'Minimize sidebar'}
+          >
+            {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
         </div>
         <nav>
           {links.map(({ to, label, icon: Icon }) => (
@@ -110,17 +114,6 @@ export function AppShell() {
             aria-label="Open menu"
           >
             <Menu />
-          </button>
-
-          {/* Desktop minimize/expand sidebar button */}
-          <button
-            type="button"
-            className="icon-button mr-2.5 text-stone-600 hover:text-stone-900 hidden md:grid cursor-pointer"
-            onClick={toggleCollapse}
-            title={isCollapsed ? "Expand Navigation Sidebar (साइडबार मोठा करा)" : "Minimize Navigation Sidebar (साइडबार लहान करा)"}
-            aria-label="Toggle navigation sidebar"
-          >
-            {isCollapsed ? <PanelLeftOpen size={19} /> : <PanelLeftClose size={19} />}
           </button>
 
           <div><span>Admin Console</span><strong>{active?.label ?? 'Management'}</strong></div>

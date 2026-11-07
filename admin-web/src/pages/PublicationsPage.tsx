@@ -11,10 +11,12 @@ import {
   ChevronUp,
   Copy,
   Download,
+  Eye,
   FileImage,
   FileText,
   HardDrive,
   Image as ImageIcon,
+  LayoutGrid,
   Link2,
   Newspaper,
   Palette,
@@ -31,6 +33,7 @@ import {
   Undo2,
   Upload,
   User,
+  X,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
@@ -62,6 +65,7 @@ const stripHtml = (html?: string) => {
 export function PublicationsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentSection = searchParams.get('tab') === 'calendar' ? 'calendar' : 'publications';
+  const pubIdParam = searchParams.get('pubId');
   const [publications, setPublications] = useState<Publication[]>([]);
   const [loading, setLoading] = useState(true);
   const [activePublication, setActivePublication] = useState<Publication | null>(null);
@@ -76,6 +80,10 @@ export function PublicationsPage() {
   const [syncStatus, setSyncStatus] = useState<string>('');
   const [isInspectorMinimized, setIsInspectorMinimized] = useState<boolean>(false);
   const [isPagesStripMinimized, setIsPagesStripMinimized] = useState<boolean>(false);
+
+  // Multi-Page Booklet Print Preview State
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
+  const [previewGridCols, setPreviewGridCols] = useState<number>(3); // 2, 3, or 4 cols
 
   // Global Publication Info Settings from Convex
   const publicationSettings = useQuery(api.settings.getPublicationInfo, {});
@@ -180,6 +188,11 @@ export function PublicationsPage() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isPreviewModalOpen) {
+        e.preventDefault();
+        setIsPreviewModalOpen(false);
+        return;
+      }
       if (!activePublication) return;
       const target = e.target as HTMLElement | null;
       const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
@@ -205,7 +218,7 @@ export function PublicationsPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activePublication, historyPast, historyFuture, activePageIndex]);
+  }, [activePublication, historyPast, historyFuture, activePageIndex, isPreviewModalOpen]);
 
   // Hidden print render container for PDF compilation
   const [printRenderIndex, setPrintRenderIndex] = useState<number | null>(null);
@@ -269,27 +282,68 @@ export function PublicationsPage() {
     }
   };
 
-  const handleOpenEditor = async (pubId: string) => {
-    const pub = await getPublication(pubId);
-    if (pub) {
-      if (!pub.masterHeader?.publicationName || pub.masterHeader.publicationName.trim() === 'Education News') {
-        pub.masterHeader = {
-          ...pub.masterHeader,
-          publicationName: 'एज्युकेशन न्युज',
-        };
-      }
-      setActivePublication({
-        ...pub,
-        pages: pub.pages.map((page) => {
-          const cleanTitle = page.title.replace(/\s*\(Continued\)\s*$/g, '').trim();
-          return cleanTitle === page.title
-            ? page
-            : { ...page, title: cleanTitle, subtitle: undefined };
-        }),
+  // URL-driven synchronization of active publication
+  useEffect(() => {
+    if (pubIdParam) {
+      if (activePublication?.id === pubIdParam) return;
+      getPublication(pubIdParam).then((pub) => {
+        if (pub) {
+          if (!pub.masterHeader?.publicationName || pub.masterHeader.publicationName.trim() === 'Education News') {
+            pub.masterHeader = {
+              ...pub.masterHeader,
+              publicationName: 'एज्युकेशन न्युज',
+            };
+          }
+          setActivePublication({
+            ...pub,
+            pages: pub.pages.map((page) => {
+              const cleanTitle = page.title.replace(/\s*\(Continued\)\s*$/g, '').trim();
+              return cleanTitle === page.title
+                ? page
+                : { ...page, title: cleanTitle, subtitle: undefined };
+            }),
+          });
+          setActivePageIndex(0);
+          setSelectedElementId(null);
+        } else {
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('pubId');
+            return next;
+          });
+        }
       });
-      setActivePageIndex(0);
-      setSelectedElementId(null);
+    } else {
+      if (activePublication) {
+        setActivePublication(null);
+      }
     }
+  }, [pubIdParam]);
+
+  const handleOpenEditor = (pubId: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('pubId', pubId);
+      return next;
+    });
+  };
+
+  const handleBackToDashboard = async () => {
+    if (activePublication) {
+      await handleSaveActivePub();
+    }
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('pubId');
+      return next;
+    });
+  };
+
+  const handleSwitchToCalendar = async () => {
+    if (activePublication) {
+      await handleSaveActivePub();
+    }
+    setSearchParams({ tab: 'calendar' });
   };
 
   const handleCreateNew = async () => {
@@ -352,8 +406,11 @@ export function PublicationsPage() {
 
     await savePublication(newPub);
     await loadPublications();
-    setActivePublication(newPub);
-    setActivePageIndex(0);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('pubId', newPub.id);
+      return next;
+    });
   };
 
   const handleDuplicate = async (id: string, e?: React.MouseEvent) => {
@@ -369,9 +426,42 @@ export function PublicationsPage() {
     if (confirm('Delete this publication booklet?')) {
       await deletePublication(id);
       await loadPublications();
-      if (activePublication?.id === id) {
-        setActivePublication(null);
+      if (activePublication?.id === id || pubIdParam === id) {
+        setSearchParams((prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('pubId');
+          return next;
+        });
       }
+    }
+  };
+
+  // Export single page as PNG (for WhatsApp / Web sharing)
+  const handleExportSinglePagePNG = async (pageIdx: number) => {
+    if (!activePublication) return;
+    const targetPage = activePublication.pages[pageIdx];
+    if (!targetPage) return;
+    setPrintRenderIndex(pageIdx);
+    setExportProgress({ current: 1, total: 1, status: 'Generating PNG image...' });
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      if (document.fonts) {
+        try {
+          await Promise.race([
+            document.fonts.ready,
+            new Promise((r) => setTimeout(r, 1200)),
+          ]);
+        } catch {
+          // ignore font delay
+        }
+      }
+      const filename = `${activePublication.title || 'Publication'}-Page-${targetPage.pageNumber}.png`;
+      await exportPageAsImage('pub-export-offscreen-sheet', filename);
+    } catch (err) {
+      alert(`Failed to export page image: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setPrintRenderIndex(null);
+      setExportProgress(null);
     }
   };
 
@@ -1133,27 +1223,36 @@ export function PublicationsPage() {
           <button
             type="button"
             className="pub-btn pub-btn-secondary"
-            onClick={() => {
-              handleSaveActivePub();
-              setActivePublication(null);
-            }}
+            onClick={handleBackToDashboard}
+            title="Save & return to All Publications"
           >
             <ArrowLeft size={16} /> All Publications
           </button>
 
+          <button
+            type="button"
+            className="pub-btn pub-btn-ghost text-xs text-stone-700 hover:text-stone-900 border border-stone-200 flex items-center gap-1.5"
+            onClick={handleSwitchToCalendar}
+            title="Save & switch to Calendar Studio"
+          >
+            <CalendarDays size={14} className="text-amber-700" />
+            <span className="hidden sm:inline">Calendar Studio</span>
+          </button>
+
+          <div className="h-5 w-px bg-stone-300 mx-1 hidden md:block" />
+
           <input
             type="text"
-            className="pub-input font-bold text-sm w-[280px]"
+            className="pub-input font-bold text-sm w-[240px] sm:w-[280px]"
             value={activePublication.title}
             onChange={(e) =>
               setActivePublication({ ...activePublication, title: e.target.value })
             }
+            title="Publication Booklet Title"
           />
 
-
-
           {saveStatus && (
-            <span className="text-xs text-emerald-600 font-semibold">
+            <span className="text-xs text-emerald-600 font-semibold truncate max-w-[200px]">
               ✔ {saveStatus}
             </span>
           )}
@@ -1218,11 +1317,11 @@ export function PublicationsPage() {
 
           <button
             type="button"
-            className="pub-btn pub-btn-primary"
-            onClick={handleExportFullPDF}
-            title="Download Complete Booklet as Multi-Page PDF"
+            className="pub-btn pub-btn-primary flex items-center gap-1.5"
+            onClick={() => setIsPreviewModalOpen(true)}
+            title="Preview all pages before downloading complete booklet PDF"
           >
-            <Download size={16} /> Download PDF ({activePublication.pages.length} Pages)
+            <Eye size={16} /> Preview & Download PDF ({activePublication.pages.length} Pages)
           </button>
 
           <button
@@ -1234,6 +1333,224 @@ export function PublicationsPage() {
           </button>
         </div>
       </header>
+
+      {/* ======================================================== */}
+      {/* MULTI-PAGE BOOKLET PRINT PREVIEW & DOWNLOAD MODAL */}
+      {/* ======================================================== */}
+      {isPreviewModalOpen && activePublication && (
+        <div
+          className="fixed inset-0 z-[50000] bg-stone-950/92 backdrop-blur-md flex flex-col text-stone-100 select-none animate-fadeIn"
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* Top Preview Toolbar */}
+          <header className="px-6 py-3.5 bg-stone-900/95 border-b border-stone-800 flex items-center justify-between gap-4 shrink-0 shadow-lg">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+                <Eye size={20} className="text-amber-400" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-white truncate m-0">
+                    {activePublication.title || 'Publication Preview'}
+                  </h3>
+                  <span className="bg-amber-500/20 text-amber-300 text-[11px] font-bold px-2 py-0.5 rounded-full border border-amber-500/30 shrink-0">
+                    {activePublication.pages.length} Pages
+                  </span>
+                  <span className="bg-stone-800 text-stone-300 text-[11px] font-medium px-2 py-0.5 rounded-full border border-stone-700 hidden sm:inline-block">
+                    A4 (210×297 mm)
+                  </span>
+                </div>
+                <p className="text-xs text-stone-400 m-0 truncate">
+                  Inspect all pages together before downloading. Click any page to jump straight to editing it.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+              {/* Grid Column density selector */}
+              <div className="hidden md:flex items-center bg-stone-800/80 p-0.5 rounded-lg border border-stone-700 text-xs">
+                <span className="text-stone-400 text-[11px] px-2 font-medium flex items-center gap-1">
+                  <LayoutGrid size={13} /> View:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewGridCols(2)}
+                  className={`px-2 py-1 rounded-md transition-colors ${
+                    previewGridCols === 2
+                      ? 'bg-amber-600 text-white font-bold shadow-xs'
+                      : 'text-stone-300 hover:text-white'
+                  }`}
+                  title="2 Pages per row (Large)"
+                >
+                  2 Cols
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewGridCols(3)}
+                  className={`px-2 py-1 rounded-md transition-colors ${
+                    previewGridCols === 3
+                      ? 'bg-amber-600 text-white font-bold shadow-xs'
+                      : 'text-stone-300 hover:text-white'
+                  }`}
+                  title="3 Pages per row (Standard)"
+                >
+                  3 Cols
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewGridCols(4)}
+                  className={`px-2 py-1 rounded-md transition-colors ${
+                    previewGridCols === 4
+                      ? 'bg-amber-600 text-white font-bold shadow-xs'
+                      : 'text-stone-300 hover:text-white'
+                  }`}
+                  title="4 Pages per row (Compact)"
+                >
+                  4 Cols
+                </button>
+              </div>
+
+              {/* Confirm & Download Button */}
+              <button
+                type="button"
+                className="pub-btn pub-btn-primary flex items-center gap-2 px-4 py-2 text-xs font-bold shadow-md hover:shadow-lg transition-all"
+                onClick={handleExportFullPDF}
+                title="Download entire booklet as high-resolution print PDF"
+              >
+                <Download size={15} />
+                <span>Download PDF ({activePublication.pages.length} Pages)</span>
+              </button>
+
+              {/* Close / Back to Editor */}
+              <button
+                type="button"
+                onClick={() => setIsPreviewModalOpen(false)}
+                className="p-2 text-stone-400 hover:text-white hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
+                title="Close Preview & Back to Editor"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </header>
+
+          {/* Grid Viewport */}
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-stone-900/60 flex flex-col items-center">
+            <div
+              className="w-full max-w-7xl mx-auto grid gap-8 justify-center"
+              style={{
+                gridTemplateColumns: `repeat(${previewGridCols}, minmax(0, max-content))`,
+              }}
+            >
+              {activePublication.pages.map((page, idx) => {
+                const previewScale = previewGridCols === 2 ? 0.54 : previewGridCols === 3 ? 0.42 : 0.32;
+                return (
+                  <div
+                    key={page.id}
+                    className="flex flex-col items-center group"
+                  >
+                    {/* Header info badge */}
+                    <div className="flex items-center justify-between w-full mb-2 px-1 text-xs">
+                      <span className="font-bold text-amber-300 flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-amber-500/20 border border-amber-500/40 text-[11px] flex items-center justify-center font-bold">
+                          {page.pageNumber}
+                        </span>
+                        <span>Page {page.pageNumber}</span>
+                      </span>
+                      <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-stone-800 text-stone-300 border border-stone-700">
+                        {page.type === 'cover' ? 'Front Cover' : page.type === 'back' ? 'Back Cover' : 'Inner Page'}
+                      </span>
+                    </div>
+
+                    {/* Sheet Frame */}
+                    <div
+                      className="relative bg-[#fffef0] shadow-2xl rounded-sm overflow-hidden border border-stone-300 transition-all duration-200 group-hover:border-amber-500 group-hover:ring-4 group-hover:ring-amber-500/20 cursor-pointer"
+                      style={{
+                        width: 595 * previewScale,
+                        height: 842 * previewScale,
+                      }}
+                      onClick={() => {
+                        setActivePageIndex(idx);
+                        setIsPreviewModalOpen(false);
+                      }}
+                      title={`Click to edit Page ${page.pageNumber}`}
+                    >
+                      <div
+                        style={{
+                          width: 595,
+                          height: 842,
+                          transform: `scale(${previewScale})`,
+                          transformOrigin: 'top left',
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        <PublicationPageSheet
+                          page={page}
+                          masterHeader={activePublication.masterHeader}
+                          totalPages={activePublication.pages.length}
+                          settings={publicationSettings}
+                          scale={1}
+                          interactive={false}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Card Actions below */}
+                    <div className="flex items-center justify-between w-full mt-2.5 px-1 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActivePageIndex(idx);
+                          setIsPreviewModalOpen(false);
+                        }}
+                        className="text-xs text-stone-300 hover:text-white hover:underline flex items-center gap-1 py-1 px-2 rounded hover:bg-stone-800/80 transition-colors cursor-pointer"
+                        title={`Edit Page ${page.pageNumber} in studio`}
+                      >
+                        <span>✏️ Edit Page {page.pageNumber}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleExportSinglePagePNG(idx)}
+                        className="text-xs text-amber-300 hover:text-amber-200 flex items-center gap-1 py-1 px-2 rounded bg-stone-800/80 hover:bg-stone-700/80 border border-stone-700 transition-colors cursor-pointer"
+                        title={`Export only Page ${page.pageNumber} as PNG`}
+                      >
+                        <FileImage size={12} />
+                        <span>PNG</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Bottom Sticky Action Bar */}
+          <footer className="px-6 py-3 bg-stone-900 border-t border-stone-800 flex items-center justify-between gap-4 shrink-0 shadow-2xl text-xs">
+            <span className="text-stone-400 hidden sm:inline-block">
+              ✨ Print standard: ISO 210×297 mm, 300 DPI layout. All fonts and graphics are pixel-perfect.
+            </span>
+            <div className="flex items-center gap-3 ml-auto">
+              <button
+                type="button"
+                onClick={() => setIsPreviewModalOpen(false)}
+                className="pub-btn pub-btn-secondary text-xs px-3.5 py-1.5"
+              >
+                Back to Editing
+              </button>
+              <button
+                type="button"
+                onClick={handleExportFullPDF}
+                className="pub-btn pub-btn-primary text-xs px-4 py-1.5 font-bold flex items-center gap-2 shadow-md"
+              >
+                <Download size={14} />
+                <span>Confirm & Download PDF ({activePublication.pages.length} Pages)</span>
+              </button>
+            </div>
+          </footer>
+        </div>
+      )}
 
       {/* Sleek Compact Centered Export Progress Modal */}
       {exportProgress && (

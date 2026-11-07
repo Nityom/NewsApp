@@ -221,7 +221,9 @@ textarea { resize: vertical; }
 .rich-subtitle-surface p { margin-bottom: 0; }
 .pub-rich-title p, .pub-rich-subtitle p { margin: 0; display: block; }
 .pub-reporter-byline { font-family: 'Martel', 'Newsreader', serif; font-style: normal; font-weight: 700; letter-spacing: 0.01em; line-height: 1.5; }
-.rich-text-surface p { margin: 0 0 10px; }
+.rich-text-surface p { margin: 0 0 3px; min-height: 1.25em; }
+.rich-text-surface p:empty,
+.rich-text-surface p:has(> br:only-child) { min-height: 14px; margin: 6px 0; }
 .rich-text-surface h2, .rich-text-surface h3 { margin: 18px 0 8px; font-family: 'Newsreader', serif; }
 .rich-text-surface ul, .rich-text-surface ol { padding-left: 24px; }
 .rich-text-surface blockquote { margin: 14px 0; padding: 4px 14px; border-left: 3px solid var(--red); color: #55524c; }
@@ -985,8 +987,25 @@ textarea { resize: vertical; }
 }
 
 /* Publication Page Sheet Rich Content Typography */
+.pub-rich-page-content {
+  width: 100%;
+}
 .pub-rich-page-content p {
+  margin: 0;
+  padding: 1.5px 0;
+  line-height: inherit;
+}
+/* For prose news stories with justified or left alignment */
+.pub-matter-text[style*="text-align: justify"] .pub-rich-page-content p,
+.pub-matter-text[style*="text-align: left"] .pub-rich-page-content p {
   margin: 0 0 6px;
+  padding: 0;
+}
+.pub-rich-page-content p:empty,
+.pub-rich-page-content p:has(> br:only-child) {
+  min-height: 10px;
+  height: 10px;
+  margin: 2px 0;
 }
 .pub-rich-page-content h2,
 .pub-rich-page-content h3 {

@@ -1,3 +1,4 @@
+import { cleanSplitHtml, toEditorHtml } from '../lib/richTextFormat';
 import Color from '@tiptap/extension-color';
 import Link from '@tiptap/extension-link';
 import TextAlign from '@tiptap/extension-text-align';
@@ -70,7 +71,7 @@ export function RichTextEditor({
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Link.configure({ openOnClick: false, autolink: true, defaultProtocol: 'https' }),
     ],
-    content: value,
+    content: toEditorHtml(value),
     editorProps: {
       attributes: {
         class: `rich-text-surface ${
@@ -97,9 +98,11 @@ export function RichTextEditor({
   }, [maxWords]);
 
   useEffect(() => {
-    if (!editor || editor.getHTML() === value) return;
-    editor.commands.setContent(value, { emitUpdate: false });
-    lastAcceptedHtml.current = value;
+    if (!editor) return;
+    const formatted = toEditorHtml(value);
+    if (editor.getHTML() === formatted || editor.getHTML() === value) return;
+    editor.commands.setContent(formatted, { emitUpdate: false });
+    lastAcceptedHtml.current = formatted;
   }, [editor, value]);
 
   if (!editor) return null;
@@ -198,17 +201,19 @@ export function RichTextEditor({
 
       if (!empty && from < to) {
         // User highlighted a specific portion of text to cut to the next page
+        const $pos = editor.state.doc.resolve(from);
+        const parentAttrs = $pos.parent?.attrs;
         const selectedSlice = editor.state.doc.slice(from, to);
         const divNext = document.createElement('div');
         divNext.appendChild(serializer.serializeFragment(selectedSlice.content));
-        nextHtml = divNext.innerHTML.trim();
+        nextHtml = cleanSplitHtml(divNext.innerHTML.trim(), parentAttrs);
 
         const sliceBefore = editor.state.doc.slice(0, from);
         const sliceAfter = editor.state.doc.slice(to, docSize);
         const divFirst = document.createElement('div');
         divFirst.appendChild(serializer.serializeFragment(sliceBefore.content));
         divFirst.appendChild(serializer.serializeFragment(sliceAfter.content));
-        firstHtml = divFirst.innerHTML.trim();
+        firstHtml = cleanSplitHtml(divFirst.innerHTML.trim(), parentAttrs);
       } else {
         // Cursor placed at a point
         let cutPos = from;
@@ -234,29 +239,12 @@ export function RichTextEditor({
         const slice1 = editor.state.doc.slice(0, cutPos);
         const div1 = document.createElement('div');
         div1.appendChild(serializer.serializeFragment(slice1.content));
-        firstHtml = div1.innerHTML.trim();
+        firstHtml = cleanSplitHtml(div1.innerHTML.trim(), parentAttrs);
 
         const slice2 = editor.state.doc.slice(cutPos, docSize);
         const div2 = document.createElement('div');
         div2.appendChild(serializer.serializeFragment(slice2.content));
-        nextHtml = div2.innerHTML.trim();
-
-        // Ensure proper paragraph structure preserving paragraph attributes (e.g. text alignment)
-        const formatHtml = (html: string, attrs?: Record<string, any>) => {
-          let h = html.trim();
-          if (!h) return '';
-          if (!h.startsWith('<')) {
-            let styleAttr = '';
-            if (attrs?.textAlign) {
-              styleAttr = ` style="text-align: ${attrs.textAlign}"`;
-            }
-            h = `<p${styleAttr}>${h}</p>`;
-          }
-          return h;
-        };
-
-        firstHtml = formatHtml(firstHtml, parentAttrs);
-        nextHtml = formatHtml(nextHtml, parentAttrs);
+        nextHtml = cleanSplitHtml(div2.innerHTML.trim(), parentAttrs);
       }
 
       // Verify that nextHtml actually contains text

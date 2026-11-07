@@ -1,5 +1,6 @@
 import React from 'react';
 import type { PageAd, PublicationMasterHeader, PublicationPage } from '../../types/publication';
+import { toEditorHtml } from '../../lib/richTextFormat';
 import { DraggableResizableBox } from './DraggableResizableBox';
 
 interface PublicationPageSheetProps {
@@ -115,11 +116,12 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
 
   const renderContentBody = (contentStr?: string) => {
     if (!contentStr || !contentStr.trim()) return null;
-    if (contentStr.includes('<')) {
+    const normalized = toEditorHtml(contentStr);
+    if (normalized.includes('<')) {
       return (
         <div
           className="pub-rich-page-content"
-          dangerouslySetInnerHTML={{ __html: contentStr }}
+          dangerouslySetInnerHTML={{ __html: normalized }}
         />
       );
     }

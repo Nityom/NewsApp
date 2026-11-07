@@ -5,6 +5,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  BookOpen,
   CalendarDays,
   Check,
   ChevronDown,
@@ -14,6 +15,9 @@ import {
   Eye,
   FileImage,
   FileText,
+  Folder,
+  FolderOpen,
+  FolderPlus,
   HardDrive,
   Image as ImageIcon,
   LayoutGrid,
@@ -38,7 +42,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { useMutation, useQuery } from 'convex/react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarStudio } from '../components/calendar/CalendarStudio';
 import { AdPresetModal } from '../components/publications/AdPresetModal';
@@ -62,7 +66,8 @@ const stripHtml = (html?: string) => {
   return html.replace(/<[^>]+>/g, '').trim();
 };
 
-export function PublicationsPage() {
+export function PublicationsPage({ mode = 'special' }: { mode?: 'special' | 'monthly' }) {
+  const isMonthly = mode === 'monthly';
   const [searchParams, setSearchParams] = useSearchParams();
   const currentSection = searchParams.get('tab') === 'calendar' ? 'calendar' : 'publications';
   const pubIdParam = searchParams.get('pubId');
@@ -80,6 +85,99 @@ export function PublicationsPage() {
   const [syncStatus, setSyncStatus] = useState<string>('');
   const [isInspectorMinimized, setIsInspectorMinimized] = useState<boolean>(false);
   const [isPagesStripMinimized, setIsPagesStripMinimized] = useState<boolean>(false);
+
+  // Monthly Folders State (for mode === 'monthly')
+  const DEFAULT_MONTHLY_FOLDERS = [
+    'नोव्हेंबर २०२६',
+    'ऑक्टोबर २०२६',
+    'सप्टेंबर २०२६',
+    'ऑगस्ट २०२६',
+  ];
+
+  const [customMonthFolders, setCustomMonthFolders] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('newsapp_monthly_folders');
+      return saved ? JSON.parse(saved) : DEFAULT_MONTHLY_FOLDERS;
+    } catch {
+      return DEFAULT_MONTHLY_FOLDERS;
+    }
+  });
+
+  const [selectedMonthFolder, setSelectedMonthFolder] = useState<string>('all');
+  const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+
+  // Collect all month folders (custom list + any folder found on monthly publications)
+  const allMonthFolders = useMemo(() => {
+    const set = new Set<string>([...customMonthFolders]);
+    publications.forEach((p) => {
+      if (p.publicationType === 'monthly' && p.monthFolder?.trim()) {
+        set.add(p.monthFolder.trim());
+      }
+    });
+    return Array.from(set);
+  }, [customMonthFolders, publications]);
+
+  // Separate publications by mode:
+  const currentPubs = useMemo(() => {
+    return publications.filter((p) =>
+      isMonthly ? p.publicationType === 'monthly' : p.publicationType !== 'monthly'
+    );
+  }, [publications, isMonthly]);
+
+  // Displayed publications filtered by active month folder
+  const displayedPubs = useMemo(() => {
+    if (!isMonthly || selectedMonthFolder === 'all') return currentPubs;
+    return currentPubs.filter(
+      (p) => (p.monthFolder || allMonthFolders[0]) === selectedMonthFolder
+    );
+  }, [isMonthly, currentPubs, selectedMonthFolder, allMonthFolders]);
+
+  const handleCreateFolder = () => {
+    const trimmed = newFolderName.trim();
+    if (!trimmed) return;
+    if (!customMonthFolders.includes(trimmed)) {
+      const next = [trimmed, ...customMonthFolders];
+      setCustomMonthFolders(next);
+      try {
+        localStorage.setItem('newsapp_monthly_folders', JSON.stringify(next));
+      } catch {}
+    }
+    setSelectedMonthFolder(trimmed);
+    setNewFolderName('');
+    setIsNewFolderModalOpen(false);
+  };
+
+  const handleDeleteFolder = (folderName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (
+      confirm(
+        `Delete month folder "${folderName}"? (Booklets in this folder will remain and can be moved to another folder)`
+      )
+    ) {
+      const next = customMonthFolders.filter((f) => f !== folderName);
+      setCustomMonthFolders(next);
+      try {
+        localStorage.setItem('newsapp_monthly_folders', JSON.stringify(next));
+      } catch {}
+      if (selectedMonthFolder === folderName) {
+        setSelectedMonthFolder('all');
+      }
+    }
+  };
+
+  const handleMoveBookletToFolder = async (pubId: string, targetFolder: string) => {
+    const pub = publications.find((p) => p.id === pubId);
+    if (!pub) return;
+    const updated: Publication = { ...pub, monthFolder: targetFolder, updatedAt: Date.now() };
+    await savePublication(updated);
+    await loadPublications();
+    if (activePublication?.id === pubId) {
+      setActivePublication(updated);
+    }
+    setSaveStatus(`Moved to ${targetFolder}`);
+    setTimeout(() => setSaveStatus(''), 2000);
+  };
 
   // Multi-Page Booklet Print Preview State
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
@@ -347,21 +445,24 @@ export function PublicationsPage() {
   };
 
   const handleCreateNew = async () => {
+    const activeFolder = selectedMonthFolder !== 'all' ? selectedMonthFolder : (allMonthFolders[0] || 'नोव्हेंबर २०२६');
     const newPub: Publication = {
       id: `pub_${Date.now()}`,
-      title: 'New Publication Booklet',
-      category: 'Special Edition',
+      title: isMonthly ? `मासिक पुरवणी - ${activeFolder}` : 'New Publication Booklet',
+      category: isMonthly ? 'Monthly Edition' : 'Special Edition',
+      publicationType: isMonthly ? 'monthly' : 'special',
+      monthFolder: isMonthly ? activeFolder : undefined,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       pageOrientation: 'portrait',
       pageSize: 'A4',
       masterHeader: {
         publicationName: 'एज्युकेशन न्युज',
-        tagline: '॥ कुटुंबाचा सोबती ॥',
-        editionTitle: 'विशेष पुरवणी',
+        tagline: isMonthly ? '॥ मासिक पुरवणी ॥' : '॥ कुटुंबाचा सोबती ॥',
+        editionTitle: isMonthly ? activeFolder : 'विशेष पुरवणी',
         headerImageUrl: '/logoBanner.jpeg',
         cityLocation: 'वर्धा',
-        issueDate: 'ऑक्टोबर २०२६',
+        issueDate: isMonthly ? activeFolder : 'ऑक्टोबर २०२६',
         themeColor: 'festive-red',
         primaryColor: '#bd3029',
         secondaryColor: '#f0d928',
@@ -377,8 +478,8 @@ export function PublicationsPage() {
           id: `p_cover_${Date.now()}`,
           pageNumber: 1,
           type: 'cover',
-          title: 'Special Edition',
-          subtitle: 'Cover Page',
+          title: isMonthly ? 'मासिक पुरवणी' : 'Special Edition',
+          subtitle: isMonthly ? activeFolder : 'Cover Page',
           greetingText: '',
           content: '',
           fontSize: 16,
@@ -1040,37 +1141,41 @@ export function PublicationsPage() {
   if (!activePublication) {
     return (
       <div className="flex flex-col h-[calc(100vh-64px)] overflow-hidden">
-        {/* Top-Level Section Tabs: Booklets vs Calendar Studio */}
-        <div className="flex items-center gap-2 border-b border-stone-200 bg-white px-6 pt-2 pb-0 shrink-0 shadow-xs z-10">
-          <button
-            type="button"
-            onClick={() => setSearchParams({})}
-            className={`flex items-center gap-2 pb-3 px-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${currentSection === 'publications'
-                ? 'border-red-600 text-red-600'
-                : 'border-transparent text-stone-500 hover:text-stone-800'
+        {/* Top-Level Section Tabs: Booklets vs Calendar Studio (only in special publications mode) */}
+        {!isMonthly && (
+          <div className="flex items-center gap-2 border-b border-stone-200 bg-white px-6 pt-2 pb-0 shrink-0 shadow-xs z-10">
+            <button
+              type="button"
+              onClick={() => setSearchParams({})}
+              className={`flex items-center gap-2 pb-3 px-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+                currentSection === 'publications'
+                  ? 'border-red-600 text-red-600'
+                  : 'border-transparent text-stone-500 hover:text-stone-800'
               }`}
-          >
-            <Newspaper size={17} />
-            <span>Booklets & Special Editions</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setSearchParams({ tab: 'calendar' })}
-            className={`flex items-center gap-2 pb-3 px-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${currentSection === 'calendar'
-                ? 'border-red-600 text-red-600'
-                : 'border-transparent text-stone-500 hover:text-stone-800'
+            >
+              <Newspaper size={17} />
+              <span>Booklets & Special Editions</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchParams({ tab: 'calendar' })}
+              className={`flex items-center gap-2 pb-3 px-3 text-sm font-bold border-b-2 transition-colors cursor-pointer ${
+                currentSection === 'calendar'
+                  ? 'border-red-600 text-red-600'
+                  : 'border-transparent text-stone-500 hover:text-stone-800'
               }`}
-          >
-            <CalendarDays size={17} />
-            <span>Calendar Studio</span>
-            <span className="bg-red-100 text-red-700 text-[10px] font-black px-1.5 py-0.5 rounded-full border border-red-200">
-              New
-            </span>
-          </button>
-        </div>
+            >
+              <CalendarDays size={17} />
+              <span>Calendar Studio</span>
+              <span className="bg-red-100 text-red-700 text-[10px] font-black px-1.5 py-0.5 rounded-full border border-red-200">
+                New
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* Active Section Content */}
-        {currentSection === 'calendar' ? (
+        {!isMonthly && currentSection === 'calendar' ? (
           <div className="flex-1 overflow-hidden">
             <CalendarStudio />
           </div>
@@ -1079,9 +1184,13 @@ export function PublicationsPage() {
             <div className="pub-dashboard-container">
               <div className="pub-dash-header">
                 <div>
-                  <h1 className="text-xl font-bold text-stone-900 m-0">Publications & Special Booklets</h1>
+                  <h1 className="text-xl font-bold text-stone-900 m-0">
+                    {isMonthly ? 'Monthly Booklets & Editions' : 'Publications & Special Booklets'}
+                  </h1>
                   <p className="text-sm text-stone-600 m-0 mt-1">
-                    Create daily booklets, magazines, and special print editions. Manage pages, advertisements, and content locally.
+                    {isMonthly
+                      ? 'Create, edit, and organize all your monthly newspaper booklets arranged in monthly folders.'
+                      : 'Create daily booklets, magazines, and special print editions. Manage pages, advertisements, and content locally.'}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1110,34 +1219,161 @@ export function PublicationsPage() {
                   >
                     <Palette size={15} /> Ad Library
                   </button>
+                  {isMonthly && (
+                    <button
+                      type="button"
+                      className="pub-btn pub-btn-secondary flex items-center gap-1.5 text-xs bg-white border border-stone-300 font-bold"
+                      onClick={() => setIsNewFolderModalOpen(true)}
+                    >
+                      <FolderPlus size={15} className="text-amber-700" />
+                      <span>+ New Month Folder</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="pub-btn pub-btn-primary"
                     onClick={handleCreateNew}
                   >
-                    <Plus size={16} /> Create Publication
+                    <Plus size={16} /> {isMonthly ? 'Create Monthly Booklet' : 'Create Publication'}
                   </button>
                 </div>
               </div>
 
+              {/* Monthly Folders Bar (Only in monthly mode) */}
+              {isMonthly && (
+                <div className="bg-white border border-stone-200 rounded-xl p-4 mb-6 shadow-xs">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
+                        <Folder size={15} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-stone-800 m-0">
+                          Monthly Folders (महिना फोल्डर्स)
+                        </h4>
+                        <span className="text-[11px] text-stone-500">
+                          Select a folder to view booklets or click New Folder to add a month
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsNewFolderModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <FolderPlus size={14} />
+                      <span>+ New Month Folder</span>
+                    </button>
+                  </div>
+
+                  {/* Folder Pills / Buttons */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMonthFolder('all')}
+                      className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                        selectedMonthFolder === 'all'
+                          ? 'bg-red-700 text-white shadow-sm ring-2 ring-red-700/20'
+                          : 'bg-stone-50 border border-stone-200 text-stone-700 hover:bg-stone-100'
+                      }`}
+                    >
+                      <BookOpen size={14} />
+                      <span>All Monthly Booklets</span>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                          selectedMonthFolder === 'all' ? 'bg-red-900/50 text-white' : 'bg-stone-200 text-stone-700'
+                        }`}
+                      >
+                        {currentPubs.length}
+                      </span>
+                    </button>
+
+                    {allMonthFolders.map((folder) => {
+                      const count = currentPubs.filter(
+                        (p) => (p.monthFolder || allMonthFolders[0]) === folder
+                      ).length;
+                      const isSelected = selectedMonthFolder === folder;
+                      return (
+                        <div
+                          key={folder}
+                          onClick={() => setSelectedMonthFolder(folder)}
+                          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-600/20'
+                              : 'bg-stone-50 border border-stone-200 text-stone-700 hover:bg-stone-100'
+                          }`}
+                        >
+                          {isSelected ? <FolderOpen size={15} /> : <Folder size={15} className="text-amber-700" />}
+                          <span>{folder}</span>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                              isSelected ? 'bg-amber-800/60 text-white' : 'bg-stone-200 text-stone-700'
+                            }`}
+                          >
+                            {count}
+                          </span>
+                          {customMonthFolders.includes(folder) && (
+                            <button
+                              type="button"
+                              className={`ml-0.5 p-1 rounded hover:bg-black/10 transition-colors ${
+                                isSelected ? 'text-white/80 hover:text-white' : 'text-stone-400 hover:text-red-700'
+                              }`}
+                              onClick={(e) => handleDeleteFolder(folder, e)}
+                              title={`Delete folder "${folder}"`}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {loading ? (
                 <div className="app-loading">Loading publications...</div>
+              ) : displayedPubs.length === 0 ? (
+                <div className="text-center py-12 px-4 bg-white rounded-xl border border-stone-200 shadow-2xs">
+                  <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center mx-auto mb-3">
+                    <FolderOpen size={24} />
+                  </div>
+                  <h3 className="text-base font-bold text-stone-800 m-0 mb-1">
+                    {isMonthly
+                      ? selectedMonthFolder !== 'all'
+                        ? `No booklets in folder "${selectedMonthFolder}" yet`
+                        : 'No monthly booklets created yet'
+                      : 'No publications found'}
+                  </h3>
+                  <p className="text-xs text-stone-500 m-0 mb-4 max-w-sm mx-auto">
+                    {isMonthly
+                      ? `Create your first monthly booklet for ${selectedMonthFolder !== 'all' ? selectedMonthFolder : 'this month'}.`
+                      : 'Click below to create a new publication booklet.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="pub-btn pub-btn-primary mx-auto"
+                    onClick={handleCreateNew}
+                  >
+                    <Plus size={16} /> {isMonthly ? `Create Booklet in ${selectedMonthFolder !== 'all' ? selectedMonthFolder : 'Folder'}` : 'Create Publication'}
+                  </button>
+                </div>
               ) : (
                 <div className="pub-dash-grid">
-                  {publications.map((pub) => {
+                  {displayedPubs.map((pub) => {
                     const coverPage = pub.pages[0];
                     return (
                       <div key={pub.id} className="pub-dash-card" onClick={() => handleOpenEditor(pub.id)}>
                         <div className="pub-dash-card-preview">
                           <div className="text-center w-[90%]">
                             <span className="text-[11px] text-red-900 font-extrabold block">
-                              {pub.masterHeader.tagline || 'Family Companion'}
+                              {pub.masterHeader.tagline || (isMonthly ? '॥ मासिक पुरवणी ॥' : 'Family Companion')}
                             </span>
                             <h2 className="font-serif text-[22px] text-red-700 font-bold my-1 truncate">
                               {pub.masterHeader.publicationName || 'Education News'}
                             </h2>
                             <div className="inline-block bg-yellow-400 text-red-950 px-3 py-0.5 rounded-full text-xs font-extrabold shadow-sm">
-                              {pub.masterHeader.editionTitle || 'Special Edition'}
+                              {pub.masterHeader.editionTitle || (isMonthly ? (pub.monthFolder || 'मासिक पुरवणी') : 'Special Edition')}
                             </div>
                           </div>
                           {coverPage?.featureImageUrl && (
@@ -1150,6 +1386,29 @@ export function PublicationsPage() {
                         </div>
 
                         <div className="pub-dash-card-body">
+                          {/* Monthly Folder Tag & Mover */}
+                          {isMonthly && (
+                            <div className="flex items-center justify-between text-xs mb-1.5 pb-1 border-b border-stone-100">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-950 border border-amber-200">
+                                <Folder size={11} className="text-amber-700" />
+                                <span>{pub.monthFolder || allMonthFolders[0]}</span>
+                              </span>
+                              <select
+                                value={pub.monthFolder || allMonthFolders[0]}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => handleMoveBookletToFolder(pub.id, e.target.value)}
+                                className="bg-stone-50 border border-stone-200 hover:border-amber-400 rounded px-1.5 py-0.5 text-[10px] font-bold text-stone-600 hover:text-amber-900 cursor-pointer"
+                                title="Move booklet to another month folder"
+                              >
+                                {allMonthFolders.map((f) => (
+                                  <option key={f} value={f}>
+                                    📁 {f}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
                           <h3 className="pub-dash-card-title">{pub.title}</h3>
                           <div className="pub-dash-card-meta">
                             <span>📄 {pub.pages.length} Pages</span>
@@ -1202,6 +1461,87 @@ export function PublicationsPage() {
                 onClose={() => setIsAdModalOpen(false)}
                 onSelectAd={() => { }}
               />
+
+              {/* Modal for Creating New Month Folder */}
+              {isNewFolderModalOpen && (
+                <div className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                  <div className="bg-white rounded-2xl shadow-2xl border border-stone-200 w-full max-w-md p-6 animate-scaleIn">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
+                          <FolderPlus size={18} />
+                        </div>
+                        <h3 className="text-base font-bold text-stone-900 m-0">Create New Month Folder</h3>
+                      </div>
+                      <button
+                        type="button"
+                        className="p-1.5 text-stone-400 hover:text-stone-700 rounded-lg hover:bg-stone-100"
+                        onClick={() => setIsNewFolderModalOpen(false)}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-stone-600 mb-4">
+                      Enter the month and year name to organize your booklets (e.g. "नोव्हेंबर २०२६", "दिवाळी विशेषांक", "November 2026").
+                    </p>
+
+                    <label className="text-xs font-bold text-stone-700 block mb-1">
+                      Folder Name (महिना फोल्डर नाव)
+                    </label>
+                    <input
+                      type="text"
+                      autoFocus
+                      className="pub-input text-sm w-full mb-3"
+                      placeholder="e.g. नोव्हेंबर २०२६"
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCreateFolder();
+                        }
+                      }}
+                    />
+
+                    {/* Quick Suggestions */}
+                    <div className="mb-4">
+                      <span className="text-[11px] font-semibold text-stone-500 block mb-1.5">Quick Suggestions:</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['डिसेंबर २०२६', 'जानेवारी २०२७', 'फेब्रुवारी २०२७', 'दिवाळी अंक २०२६', 'विशेष पुरवणी'].map((sug) => (
+                          <button
+                            key={sug}
+                            type="button"
+                            className="text-[11px] px-2 py-0.5 rounded bg-stone-100 hover:bg-amber-100 hover:text-amber-900 border border-stone-200 transition-colors cursor-pointer"
+                            onClick={() => setNewFolderName(sug)}
+                          >
+                            + {sug}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
+                      <button
+                        type="button"
+                        className="pub-btn pub-btn-secondary text-xs"
+                        onClick={() => setIsNewFolderModalOpen(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="pub-btn pub-btn-primary text-xs flex items-center gap-1.5"
+                        onClick={handleCreateFolder}
+                        disabled={!newFolderName.trim()}
+                      >
+                        <FolderPlus size={14} />
+                        <span>Create Folder</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1224,20 +1564,47 @@ export function PublicationsPage() {
             type="button"
             className="pub-btn pub-btn-secondary"
             onClick={handleBackToDashboard}
-            title="Save & return to All Publications"
+            title={isMonthly ? "Save & return to Monthly Booklets" : "Save & return to All Publications"}
           >
-            <ArrowLeft size={16} /> All Publications
+            <ArrowLeft size={16} /> {isMonthly ? 'All Monthly Booklets' : 'All Publications'}
           </button>
 
-          <button
-            type="button"
-            className="pub-btn pub-btn-ghost text-xs text-stone-700 hover:text-stone-900 border border-stone-200 flex items-center gap-1.5"
-            onClick={handleSwitchToCalendar}
-            title="Save & switch to Calendar Studio"
-          >
-            <CalendarDays size={14} className="text-amber-700" />
-            <span className="hidden sm:inline">Calendar Studio</span>
-          </button>
+          {!isMonthly && (
+            <button
+              type="button"
+              className="pub-btn pub-btn-ghost text-xs text-stone-700 hover:text-stone-900 border border-stone-200 flex items-center gap-1.5"
+              onClick={handleSwitchToCalendar}
+              title="Save & switch to Calendar Studio"
+            >
+              <CalendarDays size={14} className="text-amber-700" />
+              <span className="hidden sm:inline">Calendar Studio</span>
+            </button>
+          )}
+
+          {isMonthly && (
+            <div className="flex items-center gap-1.5 bg-stone-100 px-2 py-1 rounded-md border border-stone-200 text-xs font-semibold text-stone-700">
+              <Folder size={14} className="text-amber-700" />
+              <span className="hidden sm:inline">Folder:</span>
+              <select
+                value={activePublication.monthFolder || allMonthFolders[0]}
+                onChange={(e) => {
+                  const newFolder = e.target.value;
+                  setActivePublication({
+                    ...activePublication,
+                    monthFolder: newFolder,
+                  });
+                }}
+                className="bg-white border border-stone-300 rounded px-1.5 py-0.5 text-xs font-bold text-amber-950 cursor-pointer"
+                title="Change month folder for this booklet"
+              >
+                {allMonthFolders.map((f) => (
+                  <option key={f} value={f}>
+                    📁 {f}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="h-5 w-px bg-stone-300 mx-1 hidden md:block" />
 

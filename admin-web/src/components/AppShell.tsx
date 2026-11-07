@@ -2,6 +2,7 @@ import { signOut } from 'firebase/auth';
 import {
   BarChart3,
   Bell,
+  BookOpen,
   BookOpenText,
   ChevronRight,
   CreditCard,
@@ -26,6 +27,7 @@ const links = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/articles', label: 'Articles', icon: BookOpenText },
   { to: '/publications', label: 'Other Publications', icon: Newspaper },
+  { to: '/monthly-booklets', label: 'Monthly Booklets', icon: BookOpen },
   { to: '/video-studio', label: 'Video Studio', icon: Video },
   { to: '/reporters', label: 'Reporters', icon: Users },
   { to: '/payments', label: 'Payments', icon: CreditCard },

@@ -149,6 +149,8 @@ export interface Publication {
   pages: PublicationPage[];
   pageOrientation: 'portrait' | 'landscape';
   pageSize: 'A4' | 'Tabloid';
+  publicationType?: 'special' | 'monthly';
+  monthFolder?: string;
 }
 
 export interface AdPreset {

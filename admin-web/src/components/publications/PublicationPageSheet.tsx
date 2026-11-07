@@ -18,7 +18,7 @@ interface PublicationPageSheetProps {
   selectedElementId?: string | null;
   onSelectElementId?: (id: string | null) => void;
   onUpdateElement?: (
-    type: 'feature_image' | 'main_ad' | 'canvas_element' | 'reporter_name' | 'section2_reporter_name',
+    type: 'feature_image' | 'main_ad' | 'canvas_element' | 'reporter_name' | 'section2_reporter_name' | 'subtitle' | 'section2_subtitle',
     coords: { x: number; y: number; width: number; height: number },
     elementId?: string
   ) => void;
@@ -129,6 +129,20 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
     !isCover && hasAd && !isAdFree ? Math.max(350, 814 - (page.adHeight || 175) - 34) : 765
   );
 
+  // Subtitle Coordinates (defaults if not yet set)
+  const isSubtitleFree = page.subtitleMode === 'free';
+  const subW = page.subtitleWidth ?? (isSplitCol1 ? 230 : 340);
+  const subH = page.subtitleHeight ?? 32;
+  const subX = page.subtitleX ?? (isSplitCol1 ? 75 : 127);
+  const subY = page.subtitleY ?? (104 + (page.title ? 28 : 0));
+
+  // Story 2 Subtitle Coordinates (defaults if not yet set)
+  const isSec2SubtitleFree = page.section2SubtitleMode === 'free';
+  const sec2SubW = page.section2SubtitleWidth ?? (isSplitCol1 ? 230 : 340);
+  const sec2SubH = page.section2SubtitleHeight ?? 32;
+  const sec2SubX = page.section2SubtitleX ?? (isSplitCol1 ? 330 : 127);
+  const sec2SubY = page.section2SubtitleY ?? 400;
+
   // Header banner is 86px tall + 4px margin = 90px
   // Yellow strip (frontpage) is ~26px; inner page subheader is ~22px
   const stripHeight = isFrontPage
@@ -136,7 +150,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
     : (masterHeader.showPageNumbers !== false ? 22 : 0);
   const headerHeight = 90 + stripHeight;
   const titleHeight = page.title ? 28 : 0;
-  const subtitleHeight = page.subtitle ? 18 : 0;
+  const subtitleHeight = (page.subtitle && !isSubtitleFree) ? 18 : 0;
   const textTop = isCover ? 0 : (headerHeight + 4 + titleHeight + subtitleHeight);
   const adSlotHeight = (!isCover && hasAd && !isAdFree) ? (page.adHeight || 175) : 0;
   const textBottom = isCover ? 0 : (842 - 16 - adSlotHeight);
@@ -249,8 +263,10 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
     subtitleStr?: string,
     color?: string,
     align?: 'left' | 'center' | 'right',
-    size: 'lg' | 'md' | 'sm' = 'lg'
+    size: 'lg' | 'md' | 'sm' = 'lg',
+    isFree = false
   ) => {
+    if (isFree) return null;
     if (!subtitleStr || !subtitleStr.trim()) return null;
     const isHtml = subtitleStr.includes('<');
     const sizeClass = size === 'lg' ? 'text-[13px]' : 'text-[12px]';
@@ -428,7 +444,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                     {/* Story 1 (Left Column) */}
                     <div className="pub-split-col flex-1 min-w-0 flex flex-col overflow-hidden">
                       {renderTitle(page.title, page.titleColor, page.titleAlign, 'sm')}
-                      {renderSubtitle(page.subtitle, page.subtitleColor, page.subtitleAlign, 'sm')}
+                      {renderSubtitle(page.subtitle, page.subtitleColor, page.subtitleAlign, 'sm', isSubtitleFree)}
                       <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
                         <div
                           className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
@@ -474,7 +490,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                     {/* Story 2 (Right Column) */}
                     <div className="pub-split-col flex-1 min-w-0 flex flex-col overflow-hidden">
                       {renderTitle(page.section2Title, page.section2TitleColor, page.section2TitleAlign, 'sm')}
-                      {renderSubtitle(page.section2Subtitle, page.section2SubtitleColor, page.section2SubtitleAlign, 'sm')}
+                      {renderSubtitle(page.section2Subtitle, page.section2SubtitleColor, page.section2SubtitleAlign, 'sm', isSec2SubtitleFree)}
                       <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
                         <div
                           className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
@@ -516,7 +532,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                     {/* Story 1 (Top Section) */}
                     <div className="pub-split-section flex-1 min-h-0 flex flex-col overflow-hidden pb-1">
                       {renderTitle(page.title, page.titleColor, page.titleAlign, 'md')}
-                      {renderSubtitle(page.subtitle, page.subtitleColor, page.subtitleAlign, 'md')}
+                      {renderSubtitle(page.subtitle, page.subtitleColor, page.subtitleAlign, 'md', isSubtitleFree)}
                       <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
                         <div
                           className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
@@ -562,7 +578,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                     {/* Story 2 (Bottom Section) */}
                     <div className="pub-split-section flex-1 min-h-0 flex flex-col overflow-hidden pt-0.5">
                       {renderTitle(page.section2Title, page.section2TitleColor, page.section2TitleAlign, 'md')}
-                      {renderSubtitle(page.section2Subtitle, page.section2SubtitleColor, page.section2SubtitleAlign, 'md')}
+                      {renderSubtitle(page.section2Subtitle, page.section2SubtitleColor, page.section2SubtitleAlign, 'md', isSec2SubtitleFree)}
                       <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
                         <div
                           className="pub-matter-text font-serif text-stone-900 overflow-hidden flex-1"
@@ -605,7 +621,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                     {renderTitle(page.title, page.titleColor, page.titleAlign, 'lg')}
 
                     {/* Subtitle */}
-                    {renderSubtitle(page.subtitle, page.subtitleColor, page.subtitleAlign, 'lg')}
+                    {renderSubtitle(page.subtitle, page.subtitleColor, page.subtitleAlign, 'lg', isSubtitleFree)}
 
                     {/* Text Body */}
                     <div className="pub-matter-body-wrap flex-1 min-h-0 relative flex flex-col overflow-hidden">
@@ -881,6 +897,104 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                     ? page.section2ReporterName.trim()
                     : `— ${page.section2ReporterName.trim()}`}
                 </span>
+              </div>
+            </DraggableResizableBox>
+          )}
+
+          {/* 6. Subtitle (Canva Free Draggable & Resizable) */}
+          {page.subtitleMode === 'free' && page.subtitle?.trim() && (
+            <DraggableResizableBox
+              id="subtitle_box"
+              x={subX}
+              y={subY}
+              width={subW}
+              height={subH}
+              scale={scale}
+              interactive={interactive}
+              isSelected={selectedElementId === 'subtitle'}
+              label="Subtitle (उपशीर्षक)"
+              onSelect={() => onSelectElementId?.('subtitle')}
+              onChange={(coords) => onUpdateElement?.('subtitle', coords)}
+              onDelete={() => onDeleteElement?.('subtitle')}
+              minWidth={60}
+              minHeight={20}
+              zIndex={28}
+              overflowVisible={true}
+            >
+              <div
+                className="w-full h-full flex items-center px-1 overflow-visible"
+                style={{
+                  justifyContent:
+                    page.subtitleAlign === 'center'
+                      ? 'center'
+                      : page.subtitleAlign === 'right'
+                      ? 'flex-end'
+                      : 'flex-start',
+                }}
+              >
+                <div
+                  className="pub-matter-subtitle font-serif font-bold block select-none overflow-visible w-full"
+                  style={{
+                    fontSize: `${page.subtitleSize || 13}px`,
+                    color: page.subtitleColor || '#92400e',
+                    textAlign: page.subtitleAlign || 'center',
+                    lineHeight: 1.3,
+                  }}
+                  dangerouslySetInnerHTML={
+                    page.subtitle.includes('<') ? { __html: page.subtitle } : undefined
+                  }
+                >
+                  {!page.subtitle.includes('<') ? page.subtitle : undefined}
+                </div>
+              </div>
+            </DraggableResizableBox>
+          )}
+
+          {/* 7. Story 2 Subtitle (Canva Free Draggable & Resizable) */}
+          {page.isSplitPage && page.section2SubtitleMode === 'free' && page.section2Subtitle?.trim() && (
+            <DraggableResizableBox
+              id="section2_subtitle_box"
+              x={sec2SubX}
+              y={sec2SubY}
+              width={sec2SubW}
+              height={sec2SubH}
+              scale={scale}
+              interactive={interactive}
+              isSelected={selectedElementId === 'section2_subtitle'}
+              label="Story 2 Subtitle"
+              onSelect={() => onSelectElementId?.('section2_subtitle')}
+              onChange={(coords) => onUpdateElement?.('section2_subtitle', coords)}
+              onDelete={() => onDeleteElement?.('section2_subtitle')}
+              minWidth={60}
+              minHeight={20}
+              zIndex={28}
+              overflowVisible={true}
+            >
+              <div
+                className="w-full h-full flex items-center px-1 overflow-visible"
+                style={{
+                  justifyContent:
+                    page.section2SubtitleAlign === 'center'
+                      ? 'center'
+                      : page.section2SubtitleAlign === 'right'
+                      ? 'flex-end'
+                      : 'flex-start',
+                }}
+              >
+                <div
+                  className="pub-matter-subtitle font-serif font-bold block select-none overflow-visible w-full"
+                  style={{
+                    fontSize: `${page.section2SubtitleSize || 13}px`,
+                    color: page.section2SubtitleColor || '#92400e',
+                    textAlign: page.section2SubtitleAlign || 'center',
+                    lineHeight: 1.3,
+                  }}
+                  dangerouslySetInnerHTML={
+                    page.section2Subtitle.includes('<') ? { __html: page.section2Subtitle } : undefined
+                  }
+                >
+                  {!page.section2Subtitle.includes('<') ? page.section2Subtitle : undefined}
+                </div>
               </div>
             </DraggableResizableBox>
           )}

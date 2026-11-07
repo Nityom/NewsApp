@@ -30,6 +30,12 @@ export interface PublicationPage {
   subtitle?: string;
   subtitleColor?: string;
   subtitleAlign?: 'left' | 'center' | 'right';
+  subtitleMode?: 'inline' | 'free';
+  subtitleX?: number;
+  subtitleY?: number;
+  subtitleWidth?: number;
+  subtitleHeight?: number;
+  subtitleSize?: number;
   reporterName?: string;
   reporterMode?: 'free' | 'bottom';
   reporterNameSize?: number;
@@ -59,6 +65,12 @@ export interface PublicationPage {
   section2Subtitle?: string;
   section2SubtitleColor?: string;
   section2SubtitleAlign?: 'left' | 'center' | 'right';
+  section2SubtitleMode?: 'inline' | 'free';
+  section2SubtitleX?: number;
+  section2SubtitleY?: number;
+  section2SubtitleWidth?: number;
+  section2SubtitleHeight?: number;
+  section2SubtitleSize?: number;
   section2Content?: string;
   section2ReporterName?: string;
   section2ReporterMode?: 'free' | 'bottom';

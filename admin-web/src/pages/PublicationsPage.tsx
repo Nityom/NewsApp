@@ -18,6 +18,10 @@ import {
   Link2,
   Newspaper,
   Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   Redo2,
   RefreshCw,
@@ -70,6 +74,8 @@ export function PublicationsPage() {
   const [saveStatus, setSaveStatus] = useState<string>('');
   const [syncing, setSyncing] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<string>('');
+  const [isInspectorMinimized, setIsInspectorMinimized] = useState<boolean>(false);
+  const [isPagesStripMinimized, setIsPagesStripMinimized] = useState<boolean>(false);
 
   // Global Publication Info Settings from Convex
   const publicationSettings = useQuery(api.settings.getPublicationInfo, {});
@@ -484,6 +490,12 @@ export function PublicationsPage() {
       subtitle: activePage.subtitle,
       subtitleColor: activePage.subtitleColor,
       subtitleAlign: activePage.subtitleAlign,
+      subtitleMode: activePage.subtitleMode,
+      subtitleX: activePage.subtitleX,
+      subtitleY: activePage.subtitleY,
+      subtitleWidth: activePage.subtitleWidth,
+      subtitleHeight: activePage.subtitleHeight,
+      subtitleSize: activePage.subtitleSize,
       fontSize: activePage.fontSize || 14.5,
       lineHeight: activePage.lineHeight || 1.65,
       textAlign: activePage.textAlign || (activePage.title?.includes('आरती') ? 'center' : 'justify'),
@@ -508,6 +520,12 @@ export function PublicationsPage() {
       section2Subtitle: activePage.section2Subtitle,
       section2SubtitleColor: activePage.section2SubtitleColor,
       section2SubtitleAlign: activePage.section2SubtitleAlign,
+      section2SubtitleMode: activePage.section2SubtitleMode,
+      section2SubtitleX: activePage.section2SubtitleX,
+      section2SubtitleY: activePage.section2SubtitleY,
+      section2SubtitleWidth: activePage.section2SubtitleWidth,
+      section2SubtitleHeight: activePage.section2SubtitleHeight,
+      section2SubtitleSize: activePage.section2SubtitleSize,
       section2ReporterName: activePage.section2ReporterName,
       section2ReporterMode: activePage.section2ReporterMode,
       section2ReporterNameSize: activePage.section2ReporterNameSize,
@@ -1256,22 +1274,75 @@ export function PublicationsPage() {
       )}
 
       {/* Main Workspace (Thumbnails | Sheet Viewport | Inspector) */}
-      <div className="pub-studio-workspace">
+      <div
+        className="pub-studio-workspace"
+        style={{
+          gridTemplateColumns: `${isPagesStripMinimized ? '52px' : '240px'} 1fr ${isInspectorMinimized ? '52px' : '380px'}`,
+        }}
+      >
         {/* ================= LEFT PAGES STRIP ================= */}
-        <aside className="pub-pages-strip">
-          <div className="pub-strip-header">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 m-0">
-              Pages ({activePublication.pages.length})
-            </h3>
+        {isPagesStripMinimized ? (
+          <aside className="pub-pages-strip !p-2 items-center select-none bg-stone-50 border-r border-stone-200">
             <button
               type="button"
-              className="pub-thumb-btn"
+              className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-200/80 rounded-md transition-colors"
+              onClick={() => setIsPagesStripMinimized(false)}
+              title="Expand Pages Strip"
+            >
+              <PanelLeftOpen size={16} />
+            </button>
+            <button
+              type="button"
+              className="p-1.5 text-stone-600 hover:text-stone-900 hover:bg-stone-200/80 rounded-md transition-colors mt-2"
               onClick={handleAddPage}
               title="Add New Page"
             >
               <Plus size={16} />
             </button>
-          </div>
+            <div className="w-5 h-px bg-stone-200 my-2" />
+            <div className="flex flex-col gap-1.5 w-full items-center overflow-y-auto">
+              {activePublication.pages.map((p, idx) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setActivePageIndex(idx)}
+                  className={`w-7 h-7 rounded text-xs font-bold flex items-center justify-center transition-colors ${
+                    idx === activePageIndex
+                      ? 'bg-amber-600 text-white shadow-xs'
+                      : 'bg-white border border-stone-200 text-stone-700 hover:bg-stone-100'
+                  }`}
+                  title={`Page ${p.pageNumber}`}
+                >
+                  {p.pageNumber}
+                </button>
+              ))}
+            </div>
+          </aside>
+        ) : (
+          <aside className="pub-pages-strip">
+            <div className="pub-strip-header">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 m-0">
+                Pages ({activePublication.pages.length})
+              </h3>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  className="pub-thumb-btn"
+                  onClick={handleAddPage}
+                  title="Add New Page"
+                >
+                  <Plus size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="pub-thumb-btn"
+                  onClick={() => setIsPagesStripMinimized(true)}
+                  title="Minimize Pages Strip"
+                >
+                  <PanelLeftClose size={14} />
+                </button>
+              </div>
+            </div>
 
           {activePublication.pages.map((p, idx) => (
             <div
@@ -1385,6 +1456,7 @@ export function PublicationsPage() {
             <Plus size={16} /> Add New Page
           </button>
         </aside>
+        )}
 
         {/* ================= CENTER SHEET VIEWPORT ================= */}
         <main className="pub-canvas-viewport">
@@ -1420,6 +1492,25 @@ export function PublicationsPage() {
                   ? 'Back Cover'
                   : 'Inner Page'}
             </span>
+            <div className="h-4 w-px bg-stone-300/80 mx-1" />
+            <button
+              type="button"
+              onClick={() => setIsInspectorMinimized(!isInspectorMinimized)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer"
+              title={isInspectorMinimized ? "Expand Inspector Sidebar" : "Minimize Inspector Sidebar"}
+            >
+              {isInspectorMinimized ? (
+                <>
+                  <PanelRightOpen size={14} className="text-amber-600" />
+                  <span className="font-bold text-amber-700">Expand Sidebar</span>
+                </>
+              ) : (
+                <>
+                  <PanelRightClose size={14} />
+                  <span>Minimize Sidebar</span>
+                </>
+              )}
+            </button>
           </div>
 
           {activePage && (
@@ -1434,7 +1525,13 @@ export function PublicationsPage() {
               selectedElementId={selectedElementId}
               onSelectElementId={(id) => {
                 setSelectedElementId(id);
-                if (id === 'feature_image' || id === 'reporter_name' || id === 'section2_reporter_name') {
+                if (
+                  id === 'feature_image' ||
+                  id === 'reporter_name' ||
+                  id === 'section2_reporter_name' ||
+                  id === 'subtitle' ||
+                  id === 'section2_subtitle'
+                ) {
                   setActiveTab('matter');
                 } else if (id === 'main_ad' || id?.startsWith('elem_ad_')) {
                   setActiveTab('ad');
@@ -1475,6 +1572,24 @@ export function PublicationsPage() {
                     section2ReporterWidth: coords.width,
                     section2ReporterHeight: coords.height,
                   }));
+                } else if (type === 'subtitle') {
+                  updateActivePage((prev) => ({
+                    ...prev,
+                    subtitleMode: 'free',
+                    subtitleX: coords.x,
+                    subtitleY: coords.y,
+                    subtitleWidth: coords.width,
+                    subtitleHeight: coords.height,
+                  }));
+                } else if (type === 'section2_subtitle') {
+                  updateActivePage((prev) => ({
+                    ...prev,
+                    section2SubtitleMode: 'free',
+                    section2SubtitleX: coords.x,
+                    section2SubtitleY: coords.y,
+                    section2SubtitleWidth: coords.width,
+                    section2SubtitleHeight: coords.height,
+                  }));
                 } else if (type === 'canvas_element' && elemId) {
                   updateActivePage((prev) => ({
                     ...prev,
@@ -1503,6 +1618,24 @@ export function PublicationsPage() {
                     section2ReporterWidth: undefined,
                     section2ReporterHeight: undefined,
                   }));
+                } else if (elemId === 'subtitle') {
+                  updateActivePage((prev) => ({
+                    ...prev,
+                    subtitleMode: 'inline',
+                    subtitleX: undefined,
+                    subtitleY: undefined,
+                    subtitleWidth: undefined,
+                    subtitleHeight: undefined,
+                  }));
+                } else if (elemId === 'section2_subtitle') {
+                  updateActivePage((prev) => ({
+                    ...prev,
+                    section2SubtitleMode: 'inline',
+                    section2SubtitleX: undefined,
+                    section2SubtitleY: undefined,
+                    section2SubtitleWidth: undefined,
+                    section2SubtitleHeight: undefined,
+                  }));
                 } else {
                   updateActivePage((prev) => ({
                     ...prev,
@@ -1517,30 +1650,98 @@ export function PublicationsPage() {
         </main>
 
         {/* ================= RIGHT INSPECTOR PANEL ================= */}
-        <aside className="pub-inspector-panel">
-          <div className="pub-inspector-tabs">
+        {isInspectorMinimized ? (
+          <aside className="pub-inspector-panel !p-2 items-center select-none bg-stone-50 border-l border-stone-200">
             <button
               type="button"
-              className={`pub-inspector-tab ${activeTab === 'matter' ? 'active' : ''}`}
-              onClick={() => setActiveTab('matter')}
+              className="p-2 text-stone-600 hover:text-stone-900 hover:bg-stone-200/80 rounded-lg transition-colors mb-2"
+              onClick={() => setIsInspectorMinimized(false)}
+              title="Expand Inspector Sidebar"
             >
-              <FileText size={14} /> Content
+              <PanelRightOpen size={18} />
             </button>
-            <button
-              type="button"
-              className={`pub-inspector-tab ${activeTab === 'ad' ? 'active' : ''}`}
-              onClick={() => setActiveTab('ad')}
-            >
-              <ImageIcon size={14} /> Advertisement
-            </button>
-            <button
-              type="button"
-              className={`pub-inspector-tab ${activeTab === 'header' ? 'active' : ''}`}
-              onClick={() => setActiveTab('header')}
-            >
-              <Palette size={14} /> Header & Theme
-            </button>
-          </div>
+            <div className="w-5 h-px bg-stone-200 my-1" />
+            <div className="flex flex-col gap-2 mt-2 items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('matter');
+                  setIsInspectorMinimized(false);
+                }}
+                className={`p-2 rounded-lg transition-colors ${
+                  activeTab === 'matter'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'text-stone-500 hover:bg-stone-200/60'
+                }`}
+                title="Content (मजकूर)"
+              >
+                <FileText size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('ad');
+                  setIsInspectorMinimized(false);
+                }}
+                className={`p-2 rounded-lg transition-colors ${
+                  activeTab === 'ad'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'text-stone-500 hover:bg-stone-200/60'
+                }`}
+                title="Advertisement (जाहिरात)"
+              >
+                <ImageIcon size={18} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('header');
+                  setIsInspectorMinimized(false);
+                }}
+                className={`p-2 rounded-lg transition-colors ${
+                  activeTab === 'header'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'text-stone-500 hover:bg-stone-200/60'
+                }`}
+                title="Header & Theme"
+              >
+                <Palette size={18} />
+              </button>
+            </div>
+          </aside>
+        ) : (
+          <aside className="pub-inspector-panel">
+            <div className="pub-inspector-tabs">
+              <button
+                type="button"
+                className={`pub-inspector-tab ${activeTab === 'matter' ? 'active' : ''}`}
+                onClick={() => setActiveTab('matter')}
+              >
+                <FileText size={14} /> Content
+              </button>
+              <button
+                type="button"
+                className={`pub-inspector-tab ${activeTab === 'ad' ? 'active' : ''}`}
+                onClick={() => setActiveTab('ad')}
+              >
+                <ImageIcon size={14} /> Advertisement
+              </button>
+              <button
+                type="button"
+                className={`pub-inspector-tab ${activeTab === 'header' ? 'active' : ''}`}
+                onClick={() => setActiveTab('header')}
+              >
+                <Palette size={14} /> Header & Theme
+              </button>
+              <button
+                type="button"
+                className="p-1.5 text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 rounded-md transition-colors ml-auto my-auto"
+                onClick={() => setIsInspectorMinimized(true)}
+                title="Minimize Sidebar"
+              >
+                <PanelRightClose size={15} />
+              </button>
+            </div>
 
           <div className="pub-inspector-body">
             {/* TAB 1: CONTENT */}
@@ -1837,6 +2038,84 @@ export function PublicationsPage() {
                           toolbarPosition="top"
                           minHeight={38}
                         />
+
+                        {/* Story 1 Subtitle Drag & Layout Option */}
+                        <div className="pt-1.5 mt-1.5 border-t border-stone-200/60">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
+                              Layout & Drag Option
+                            </label>
+                            {activePage.subtitleMode === 'free' && (
+                              <div className="flex items-center gap-1.5">
+                                <label className="text-[10px] text-stone-500 font-medium">Size:</label>
+                                <input
+                                  type="number"
+                                  min="9"
+                                  max="36"
+                                  className="pub-input text-[11px] py-0.5 px-1.5 w-12 text-center"
+                                  value={activePage.subtitleSize || 13}
+                                  onChange={(e) => updateActivePage((prev) => ({ ...prev, subtitleSize: Number(e.target.value) || 13 }))}
+                                />
+                                <input
+                                  type="color"
+                                  className="w-5 h-5 rounded cursor-pointer border border-stone-300 p-0"
+                                  value={activePage.subtitleColor || '#92400e'}
+                                  onChange={(e) => updateActivePage((prev) => ({ ...prev, subtitleColor: e.target.value }))}
+                                  title="Subtitle Color"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                                activePage.subtitleMode === 'free'
+                                  ? 'pub-btn-primary'
+                                  : 'pub-btn-ghost border border-stone-200'
+                              }`}
+                              onClick={() => {
+                                updateActivePage((prev) => ({
+                                  ...prev,
+                                  subtitleMode: 'free',
+                                  subtitleX: prev.subtitleX ?? (prev.isSplitPage && prev.splitDirection === 'vertical' ? 75 : 127),
+                                  subtitleY: prev.subtitleY ?? 130,
+                                  subtitleWidth: prev.subtitleWidth ?? (prev.isSplitPage && prev.splitDirection === 'vertical' ? 230 : 340),
+                                  subtitleHeight: prev.subtitleHeight ?? 32,
+                                }));
+                                setSelectedElementId('subtitle');
+                              }}
+                            >
+                              ✋ Canva Free Drag
+                            </button>
+                            <button
+                              type="button"
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                                activePage.subtitleMode !== 'free'
+                                  ? 'pub-btn-primary'
+                                  : 'pub-btn-ghost border border-stone-200'
+                              }`}
+                              onClick={() => {
+                                updateActivePage((prev) => ({ ...prev, subtitleMode: 'inline' }));
+                                if (selectedElementId === 'subtitle') setSelectedElementId(null);
+                              }}
+                            >
+                              ⬇ Fixed Inline
+                            </button>
+                          </div>
+                          {activePage.subtitleMode === 'free' && (
+                            <div className="flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-900 text-[11px] px-2 py-1 rounded mt-1.5">
+                              <span>✋ Canvas Drag & Resize active</span>
+                              <button
+                                type="button"
+                                className="text-[10px] font-bold text-amber-950 bg-amber-200/90 hover:bg-amber-300 px-1.5 py-0.5 rounded transition-colors"
+                                onClick={() => setSelectedElementId('subtitle')}
+                              >
+                                🎯 Focus on Canvas
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Story 1 Content */}
@@ -2048,6 +2327,84 @@ export function PublicationsPage() {
                           toolbarPosition="top"
                           minHeight={38}
                         />
+
+                        {/* Story 2 Subtitle Drag & Layout Option */}
+                        <div className="pt-1.5 mt-1.5 border-t border-stone-200/60">
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
+                              Layout & Drag Option
+                            </label>
+                            {activePage.section2SubtitleMode === 'free' && (
+                              <div className="flex items-center gap-1.5">
+                                <label className="text-[10px] text-stone-500 font-medium">Size:</label>
+                                <input
+                                  type="number"
+                                  min="9"
+                                  max="36"
+                                  className="pub-input text-[11px] py-0.5 px-1.5 w-12 text-center"
+                                  value={activePage.section2SubtitleSize || 13}
+                                  onChange={(e) => updateActivePage((prev) => ({ ...prev, section2SubtitleSize: Number(e.target.value) || 13 }))}
+                                />
+                                <input
+                                  type="color"
+                                  className="w-5 h-5 rounded cursor-pointer border border-stone-300 p-0"
+                                  value={activePage.section2SubtitleColor || '#92400e'}
+                                  onChange={(e) => updateActivePage((prev) => ({ ...prev, section2SubtitleColor: e.target.value }))}
+                                  title="Subtitle 2 Color"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                                activePage.section2SubtitleMode === 'free'
+                                  ? 'pub-btn-primary'
+                                  : 'pub-btn-ghost border border-stone-200'
+                              }`}
+                              onClick={() => {
+                                updateActivePage((prev) => ({
+                                  ...prev,
+                                  section2SubtitleMode: 'free',
+                                  section2SubtitleX: prev.section2SubtitleX ?? (prev.splitDirection === 'vertical' ? 330 : 127),
+                                  section2SubtitleY: prev.section2SubtitleY ?? 400,
+                                  section2SubtitleWidth: prev.section2SubtitleWidth ?? (prev.splitDirection === 'vertical' ? 230 : 340),
+                                  section2SubtitleHeight: prev.section2SubtitleHeight ?? 32,
+                                }));
+                                setSelectedElementId('section2_subtitle');
+                              }}
+                            >
+                              ✋ Canva Free Drag
+                            </button>
+                            <button
+                              type="button"
+                              className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                                activePage.section2SubtitleMode !== 'free'
+                                  ? 'pub-btn-primary'
+                                  : 'pub-btn-ghost border border-stone-200'
+                              }`}
+                              onClick={() => {
+                                updateActivePage((prev) => ({ ...prev, section2SubtitleMode: 'inline' }));
+                                if (selectedElementId === 'section2_subtitle') setSelectedElementId(null);
+                              }}
+                            >
+                              ⬇ Fixed Inline
+                            </button>
+                          </div>
+                          {activePage.section2SubtitleMode === 'free' && (
+                            <div className="flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-900 text-[11px] px-2 py-1 rounded mt-1.5">
+                              <span>✋ Canvas Drag & Resize active</span>
+                              <button
+                                type="button"
+                                className="text-[10px] font-bold text-amber-950 bg-amber-200/90 hover:bg-amber-300 px-1.5 py-0.5 rounded transition-colors"
+                                onClick={() => setSelectedElementId('section2_subtitle')}
+                              >
+                                🎯 Focus on Canvas
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       {/* Story 2 Content */}
@@ -2249,6 +2606,84 @@ export function PublicationsPage() {
                         toolbarPosition="top"
                         minHeight={38}
                       />
+
+                      {/* Single Page Subtitle Drag & Layout Option */}
+                      <div className="pt-1.5 mt-1.5 border-t border-stone-200/60">
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">
+                            Layout & Drag Option
+                          </label>
+                          {activePage.subtitleMode === 'free' && (
+                            <div className="flex items-center gap-1.5">
+                              <label className="text-[10px] text-stone-500 font-medium">Size:</label>
+                              <input
+                                type="number"
+                                min="9"
+                                max="36"
+                                className="pub-input text-[11px] py-0.5 px-1.5 w-12 text-center"
+                                value={activePage.subtitleSize || 13}
+                                onChange={(e) => updateActivePage((prev) => ({ ...prev, subtitleSize: Number(e.target.value) || 13 }))}
+                              />
+                              <input
+                                type="color"
+                                className="w-5 h-5 rounded cursor-pointer border border-stone-300 p-0"
+                                value={activePage.subtitleColor || '#92400e'}
+                                onChange={(e) => updateActivePage((prev) => ({ ...prev, subtitleColor: e.target.value }))}
+                                title="Subtitle Color"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                              activePage.subtitleMode === 'free'
+                                ? 'pub-btn-primary'
+                                : 'pub-btn-ghost border border-stone-200'
+                            }`}
+                            onClick={() => {
+                              updateActivePage((prev) => ({
+                                ...prev,
+                                subtitleMode: 'free',
+                                subtitleX: prev.subtitleX ?? 127,
+                                subtitleY: prev.subtitleY ?? 130,
+                                subtitleWidth: prev.subtitleWidth ?? 340,
+                                subtitleHeight: prev.subtitleHeight ?? 32,
+                              }));
+                              setSelectedElementId('subtitle');
+                            }}
+                          >
+                            ✋ Canva Free Drag
+                          </button>
+                          <button
+                            type="button"
+                            className={`pub-btn flex-1 text-xs py-1.5 flex items-center justify-center gap-1 ${
+                              activePage.subtitleMode !== 'free'
+                                ? 'pub-btn-primary'
+                                : 'pub-btn-ghost border border-stone-200'
+                            }`}
+                            onClick={() => {
+                              updateActivePage((prev) => ({ ...prev, subtitleMode: 'inline' }));
+                              if (selectedElementId === 'subtitle') setSelectedElementId(null);
+                            }}
+                          >
+                            ⬇ Fixed Inline
+                          </button>
+                        </div>
+                        {activePage.subtitleMode === 'free' && (
+                          <div className="flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-900 text-[11px] px-2 py-1 rounded mt-1.5">
+                            <span>✋ Canvas Drag & Resize active</span>
+                            <button
+                              type="button"
+                              className="text-[10px] font-bold text-amber-950 bg-amber-200/90 hover:bg-amber-300 px-1.5 py-0.5 rounded transition-colors"
+                              onClick={() => setSelectedElementId('subtitle')}
+                            >
+                              🎯 Focus on Canvas
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {activePage.type === 'cover' && (
@@ -3183,6 +3618,7 @@ export function PublicationsPage() {
             )}
           </div>
         </aside>
+        )}
       </div>
 
       <AdPresetModal

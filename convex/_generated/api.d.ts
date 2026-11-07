@@ -18,6 +18,7 @@ import type * as http from "../http.js";
 import type * as notificationActions from "../notificationActions.js";
 import type * as notifications from "../notifications.js";
 import type * as payments from "../payments.js";
+import type * as publications from "../publications.js";
 import type * as razorpay from "../razorpay.js";
 import type * as razorpayData from "../razorpayData.js";
 import type * as reporters from "../reporters.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   notificationActions: typeof notificationActions;
   notifications: typeof notifications;
   payments: typeof payments;
+  publications: typeof publications;
   razorpay: typeof razorpay;
   razorpayData: typeof razorpayData;
   reporters: typeof reporters;

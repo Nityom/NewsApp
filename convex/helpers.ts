@@ -14,7 +14,7 @@ export function cleanData<T>(value: T): T {
 
 export async function findByExternalId<TableName extends Extract<
   TableNamesInDataModel<DataModel>,
-  'articles' | 'reporters' | 'payments' | 'notifications'
+  'articles' | 'reporters' | 'payments' | 'notifications' | 'publications'
 >>(
   db: GenericDatabaseReader<DataModel>,
   table: TableName,

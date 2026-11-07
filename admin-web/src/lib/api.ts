@@ -1,6 +1,7 @@
 import type { DefaultFunctionArgs, FunctionReference } from 'convex/server';
 
 import type { AppNotification, Article, Payment, PublicationInfo, Reporter } from '../types';
+import type { Publication } from '../types/publication';
 
 type Query<Args extends DefaultFunctionArgs, Result> = FunctionReference<'query', 'public', Args, Result>;
 type Mutation<Args extends DefaultFunctionArgs, Result = void> = FunctionReference<'mutation', 'public', Args, Result>;
@@ -37,5 +38,12 @@ export const api = {
   settings: {
     getPublicationInfo: query<Record<string, never>, PublicationInfo | null>('settings:getPublicationInfo'),
     updatePublicationInfo: mutation<{ info: PublicationInfo }>('settings:updatePublicationInfo'),
+  },
+  publications: {
+    list: query<Record<string, never>, Publication[]>('publications:list'),
+    get: query<{ id: string }, Publication | null>('publications:get'),
+    upsert: mutation<{ publication: Publication }>('publications:upsert'),
+    patch: mutation<{ id: string; patch: Partial<Publication> }>('publications:patch'),
+    remove: mutation<{ id: string }>('publications:remove'),
   },
 };

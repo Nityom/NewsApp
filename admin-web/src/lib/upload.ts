@@ -1,7 +1,31 @@
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME ?? 'dmjetilgd';
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET ?? 'ih6tkxko';
 
-export async function uploadImage(file: File, folder = 'education-news/advertisements') {
+export function isLocalOrBase64Image(url?: string | null): boolean {
+  if (!url) return false;
+  return url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('file:');
+}
+
+export async function uploadImage(
+  file: File | Blob | string,
+  folder = 'education-news/publications'
+): Promise<string> {
+  // If it is already hosted in the cloud (not local/base64/blob), return as is
+  if (typeof file === 'string') {
+    if (file.startsWith('https://res.cloudinary.com/') || (file.startsWith('http') && !file.startsWith('http://localhost') && !file.startsWith('blob:'))) {
+      return file;
+    }
+    // If it's a blob: URI in browser, convert to Blob object
+    if (file.startsWith('blob:')) {
+      try {
+        const res = await fetch(file);
+        file = await res.blob();
+      } catch (err) {
+        console.warn('Could not fetch blob URL for upload, passing raw:', err);
+      }
+    }
+  }
+
   const body = new FormData();
   body.append('file', file);
   body.append('upload_preset', UPLOAD_PRESET);

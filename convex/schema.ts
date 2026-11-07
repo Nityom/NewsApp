@@ -32,4 +32,6 @@ export default defineSchema({
     .index('by_audience', ['audience'])
     .index('by_token', ['token']),
   settings: defineTable({ key: v.string(), data: v.any() }).index('by_key', ['key']),
+  publications: defineTable({ id: v.string(), data: v.any() })
+    .index('by_external_id', ['id']),
 });

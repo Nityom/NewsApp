@@ -4,7 +4,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react
 
 import { auth } from './firebase';
 
-const convex = new ConvexReactClient(
+export const convex = new ConvexReactClient(
   import.meta.env.VITE_CONVEX_URL ?? 'https://quirky-rooster-395.convex.cloud',
   { unsavedChangesWarning: false },
 );

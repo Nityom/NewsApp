@@ -20,6 +20,7 @@ import {
   Palette,
   Plus,
   Redo2,
+  RefreshCw,
   Scissors,
   Trash2,
   Undo2,
@@ -42,6 +43,8 @@ import {
   getPublication,
   savePublication,
 } from '../lib/publicationsStorage';
+import { syncAllPublications, syncPublicationToCloud } from '../lib/publicationsSync';
+import { uploadImage } from '../lib/upload';
 import type { PageType, Publication, PublicationPage } from '../types/publication';
 
 const stripHtml = (html?: string) => {
@@ -62,6 +65,8 @@ export function PublicationsPage() {
   const [isAdModalOpen, setIsAdModalOpen] = useState(false);
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [saveStatus, setSaveStatus] = useState<string>('');
+  const [syncing, setSyncing] = useState<boolean>(false);
+  const [syncStatus, setSyncStatus] = useState<string>('');
 
   // Undo / Redo History Stack
   const [historyPast, setHistoryPast] = useState<{ pub: Publication; pageIndex: number }[]>([]);
@@ -149,18 +154,49 @@ export function PublicationsPage() {
   const [printRenderIndex, setPrintRenderIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    loadPublications();
+    // 1. Instant local load
+    loadPublications().then(() => {
+      // 2. Background sync with Convex & Cloudinary without deleting on-device storage
+      syncAllPublications()
+        .then((result) => {
+          if (result.publications.length > 0) {
+            setPublications(result.publications);
+          }
+        })
+        .catch((err) => {
+          console.log('Background cloud sync skipped or offline:', err);
+        });
+    });
   }, []);
 
-  const loadPublications = async () => {
-    setLoading(true);
+  const loadPublications = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const list = await getAllPublications();
       setPublications(list);
     } catch (err) {
       console.error('Failed to load publications:', err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
+    }
+  };
+
+  const handleSyncCloud = async () => {
+    setSyncing(true);
+    setSyncStatus('Syncing with Convex & Cloudinary...');
+    try {
+      const result = await syncAllPublications((status) => setSyncStatus(status));
+      setPublications(result.publications);
+      if (result.errors.length > 0) {
+        setSyncStatus(`⚠️ Synced: ${result.errors[0]}`);
+      } else {
+        setSyncStatus(`☁️ All ${result.publications.length} publications synced!`);
+      }
+    } catch (err: any) {
+      setSyncStatus(`⚠️ Offline: ${err?.message || 'Sync failed'}`);
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncStatus(''), 4500);
     }
   };
 
@@ -260,11 +296,19 @@ export function PublicationsPage() {
 
   const handleSaveActivePub = async () => {
     if (!activePublication) return;
-    setSaveStatus('Saving changes...');
-    await savePublication(activePublication);
-    await loadPublications();
-    setSaveStatus('Saved successfully!');
-    setTimeout(() => setSaveStatus(''), 2500);
+    setSaveStatus('Saving to device...');
+    try {
+      await savePublication(activePublication);
+      setSaveStatus('Syncing to Cloud (Convex & Cloudinary)...');
+      const syncedPub = await syncPublicationToCloud(activePublication, (msg) => setSaveStatus(msg));
+      setActivePublication(syncedPub);
+      setSaveStatus('☁️ Saved & Synced to Cloud!');
+    } catch (err: any) {
+      console.warn('Cloud sync error, local copy saved:', err);
+      setSaveStatus('💾 Saved locally on device');
+    }
+    await loadPublications(false);
+    setTimeout(() => setSaveStatus(''), 3000);
   };
 
   // Page Operations
@@ -623,6 +667,7 @@ export function PublicationsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // 1. Instant local preview
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
@@ -654,16 +699,58 @@ export function PublicationsPage() {
       }
     };
     reader.readAsDataURL(file);
+
+    // 2. Background cloud upload
+    setSaveStatus('Uploading image to cloud...');
+    const folder =
+      target === 'logo'
+        ? 'education-news/publications/logos'
+        : target === 'ad'
+        ? 'education-news/publications/ads'
+        : 'education-news/publications/features';
+
+    uploadImage(file, folder)
+      .then((cloudUrl) => {
+        if (target === 'feature') {
+          updateActivePage((prev) => ({ ...prev, featureImageUrl: cloudUrl }));
+        } else if (target === 'ad') {
+          updateActivePage((prev) => ({
+            ...prev,
+            ad: { ...prev.ad, imageUrl: cloudUrl },
+          }));
+        } else if (target === 'logo') {
+          setActivePublication((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  masterHeader: {
+                    ...prev.masterHeader,
+                    centerLogoUrl: cloudUrl,
+                  },
+                }
+              : null
+          );
+        }
+        setSaveStatus('☁️ Image uploaded to cloud!');
+        setTimeout(() => setSaveStatus(''), 2500);
+      })
+      .catch((err) => {
+        console.warn('Background image upload to cloud failed, local preview preserved:', err);
+        setSaveStatus('💾 Image saved locally on device');
+        setTimeout(() => setSaveStatus(''), 2500);
+      });
   };
 
   // Extra Freeform Canvas Ad Image
   const handleAddCanvasAdImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const newElemId = `elem_ad_${Date.now()}`;
+
+    // 1. Instant local preview
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
-      const newElemId = `elem_ad_${Date.now()}`;
       const newElem = {
         id: newElemId,
         type: 'ad_image' as const,
@@ -682,6 +769,25 @@ export function PublicationsPage() {
       setActiveTab('ad');
     };
     reader.readAsDataURL(file);
+
+    // 2. Background cloud upload
+    setSaveStatus('Uploading ad image to cloud...');
+    uploadImage(file, 'education-news/publications/canvas')
+      .then((cloudUrl) => {
+        updateActivePage((prev) => ({
+          ...prev,
+          canvasElements: (prev.canvasElements || []).map((elem) =>
+            elem.id === newElemId ? { ...elem, imageUrl: cloudUrl } : elem
+          ),
+        }));
+        setSaveStatus('☁️ Ad image uploaded to cloud!');
+        setTimeout(() => setSaveStatus(''), 2500);
+      })
+      .catch((err) => {
+        console.warn('Background canvas ad upload failed, local preview preserved:', err);
+        setSaveStatus('💾 Image saved locally on device');
+        setTimeout(() => setSaveStatus(''), 2500);
+      });
   };
 
   // Single-page image export
@@ -796,8 +902,23 @@ export function PublicationsPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="pub-badge-local">
-                    <HardDrive size={13} /> Local Storage
+                  {syncStatus && (
+                    <span className="text-xs text-stone-600 font-medium px-2.5 py-1 bg-stone-100 rounded-md border border-stone-200">
+                      {syncStatus}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="pub-btn pub-btn-outline flex items-center gap-1.5 text-xs text-sky-700 border-sky-300 hover:bg-sky-50"
+                    onClick={handleSyncCloud}
+                    disabled={syncing}
+                    title="Sync on-device publications with Convex Cloud & Cloudinary"
+                  >
+                    <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
+                    <span>{syncing ? 'Syncing...' : 'Sync with Cloud'}</span>
+                  </button>
+                  <span className="pub-badge-local" title="Saved locally on this device & synced with Convex cloud">
+                    <HardDrive size={13} /> On-Device + Cloud
                   </span>
                   <button
                     type="button"

@@ -228,6 +228,9 @@ export function RichTextEditor({
           }
         }
 
+        const $pos = editor.state.doc.resolve(cutPos);
+        const parentAttrs = $pos.parent?.attrs;
+
         const slice1 = editor.state.doc.slice(0, cutPos);
         const div1 = document.createElement('div');
         div1.appendChild(serializer.serializeFragment(slice1.content));
@@ -237,20 +240,24 @@ export function RichTextEditor({
         const div2 = document.createElement('div');
         div2.appendChild(serializer.serializeFragment(slice2.content));
         nextHtml = div2.innerHTML.trim();
+
+        // Ensure proper paragraph structure preserving paragraph attributes (e.g. text alignment)
+        const formatHtml = (html: string, attrs?: Record<string, any>) => {
+          let h = html.trim();
+          if (!h) return '';
+          if (!h.startsWith('<')) {
+            let styleAttr = '';
+            if (attrs?.textAlign) {
+              styleAttr = ` style="text-align: ${attrs.textAlign}"`;
+            }
+            h = `<p${styleAttr}>${h}</p>`;
+          }
+          return h;
+        };
+
+        firstHtml = formatHtml(firstHtml, parentAttrs);
+        nextHtml = formatHtml(nextHtml, parentAttrs);
       }
-
-      // Ensure proper paragraph structure
-      const formatHtml = (html: string) => {
-        let h = html.trim();
-        if (!h) return '';
-        if (!h.startsWith('<')) {
-          h = `<p>${h}</p>`;
-        }
-        return h;
-      };
-
-      firstHtml = formatHtml(firstHtml);
-      nextHtml = formatHtml(nextHtml);
 
       // Verify that nextHtml actually contains text
       const plainNext = nextHtml.replace(/<[^>]*>/g, '').trim();

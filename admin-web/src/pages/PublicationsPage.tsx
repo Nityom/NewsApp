@@ -291,6 +291,21 @@ export function PublicationsPage() {
   };
 
   const splitContentForContinuation = (page: PublicationPage) => {
+    if (!page.content || !page.content.trim()) {
+      return { firstPage: '', nextPage: '' };
+    }
+
+    // If HTML paragraphs exist, split cleanly at paragraph boundaries (</p>)
+    if (page.content.includes('</p>')) {
+      const parts = page.content.split('</p>').map((p) => p.trim()).filter(Boolean);
+      if (parts.length > 1) {
+        const mid = Math.ceil(parts.length / 2);
+        const firstPage = parts.slice(0, mid).map((p) => (p.endsWith('>') ? p : `${p}</p>`)).join('');
+        const nextPage = parts.slice(mid).map((p) => (p.endsWith('>') ? p : `${p}</p>`)).join('');
+        return { firstPage, nextPage };
+      }
+    }
+
     const fontSize = page.fontSize || 14;
     const lineHeight = page.lineHeight || 1.6;
     const charactersPerLine = Math.max(12, Math.floor(500 / (fontSize * 0.55)));
@@ -341,44 +356,76 @@ export function PublicationsPage() {
       }
     }
 
+    // Comprehensive format inheritance: Ensure target page matches activePage EXACTLY
+    const formatProps: Partial<PublicationPage> = {
+      type: 'inner',
+      title: activePage.title,
+      titleColor: activePage.titleColor,
+      titleAlign: activePage.titleAlign,
+      subtitle: activePage.subtitle,
+      subtitleColor: activePage.subtitleColor,
+      subtitleAlign: activePage.subtitleAlign,
+      fontSize: activePage.fontSize || 14.5,
+      lineHeight: activePage.lineHeight || 1.65,
+      textAlign: activePage.textAlign || 'justify',
+      reporterName: activePage.reporterName,
+      reporterMode: activePage.reporterMode,
+      reporterNameSize: activePage.reporterNameSize,
+      reporterNameColor: activePage.reporterNameColor,
+      reporterNameAlign: activePage.reporterNameAlign,
+      reporterX: activePage.reporterX,
+      reporterY: activePage.reporterY,
+      reporterWidth: activePage.reporterWidth,
+      reporterHeight: activePage.reporterHeight,
+      decorativeBorder: activePage.decorativeBorder,
+      isSplitPage: activePage.isSplitPage,
+      splitDirection: activePage.splitDirection,
+      featureImagePosition: activePage.featureImagePosition,
+      customHeaderTitle: activePage.customHeaderTitle,
+      customHeaderRight: activePage.customHeaderRight,
+      section2Title: activePage.section2Title,
+      section2TitleColor: activePage.section2TitleColor,
+      section2TitleAlign: activePage.section2TitleAlign,
+      section2Subtitle: activePage.section2Subtitle,
+      section2SubtitleColor: activePage.section2SubtitleColor,
+      section2SubtitleAlign: activePage.section2SubtitleAlign,
+      section2ReporterName: activePage.section2ReporterName,
+      section2ReporterMode: activePage.section2ReporterMode,
+      section2ReporterNameSize: activePage.section2ReporterNameSize,
+      section2ReporterNameColor: activePage.section2ReporterNameColor,
+      section2ReporterNameAlign: activePage.section2ReporterNameAlign,
+      section2ReporterX: activePage.section2ReporterX,
+      section2ReporterY: activePage.section2ReporterY,
+      section2ReporterWidth: activePage.section2ReporterWidth,
+      section2ReporterHeight: activePage.section2ReporterHeight,
+    };
+
     let targetPageId = '';
 
     if (targetIndex >= 0) {
-      // Update existing page
+      // Update existing page with matching format and continued story content
       const existingPage = currentPages[targetIndex];
       targetPageId = existingPage.id;
       currentPages[targetIndex] = {
         ...existingPage,
+        ...formatProps,
         content: nextPart,
         continuationFromPageId: activePage.id,
       };
     } else {
-      // Create a new inner page immediately after current page
+      // Create a new inner page immediately after current page with identical format
       targetIndex = currentPageIndex + 1;
       targetPageId = `p_page_${Date.now()}_${targetIndex + 1}`;
       const newContinuationPage: PublicationPage = {
         id: targetPageId,
         pageNumber: targetIndex + 1,
-        type: 'inner',
-        title: activePage.title,
-        titleColor: activePage.titleColor,
-        subtitle: activePage.subtitle,
-        subtitleColor: activePage.subtitleColor,
-        subtitleAlign: activePage.subtitleAlign,
-        reporterName: activePage.reporterName,
-        reporterNameSize: activePage.reporterNameSize,
-        reporterNameColor: activePage.reporterNameColor,
-        reporterNameAlign: activePage.reporterNameAlign,
-        reporterX: activePage.reporterX,
-        reporterY: activePage.reporterY,
-        reporterWidth: activePage.reporterWidth,
-        reporterHeight: activePage.reporterHeight,
+        ...formatProps,
         content: nextPart,
-        fontSize: activePage.fontSize,
-        lineHeight: activePage.lineHeight,
-        textAlign: activePage.textAlign,
-        featureImagePosition: 'right',
-        decorativeBorder: true,
+        fontSize: activePage.fontSize || 14.5,
+        lineHeight: activePage.lineHeight || 1.65,
+        textAlign: activePage.textAlign || 'justify',
+        title: activePage.title,
+        type: 'inner',
         ad: { type: 'none' },
         continuationFromPageId: activePage.id,
       };

@@ -115,4 +115,6 @@ export interface PublicationInfo {
   year: string;
   issueNumber: string;
   price: string;
+  pageLabel?: string;
+  date?: string;
 }

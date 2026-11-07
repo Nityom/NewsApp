@@ -21,6 +21,7 @@ import {
   Plus,
   Redo2,
   RefreshCw,
+  Save,
   Scissors,
   Trash2,
   Undo2,
@@ -29,6 +30,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
+import { useMutation, useQuery } from 'convex/react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarStudio } from '../components/calendar/CalendarStudio';
@@ -36,6 +38,7 @@ import { AdPresetModal } from '../components/publications/AdPresetModal';
 import { PublicationPageSheet } from '../components/publications/PublicationPageSheet';
 import { RichTextEditor } from '../components/RichTextEditor';
 import { exportBookletPDF, exportPageAsImage, type ExportProgress } from '../lib/publicationExport';
+import { api } from '../lib/api';
 import {
   deletePublication,
   duplicatePublication,
@@ -67,6 +70,54 @@ export function PublicationsPage() {
   const [saveStatus, setSaveStatus] = useState<string>('');
   const [syncing, setSyncing] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<string>('');
+
+  // Global Publication Info Settings from Convex
+  const publicationSettings = useQuery(api.settings.getPublicationInfo, {});
+  const updatePublicationSettings = useMutation(api.settings.updatePublicationInfo);
+
+  // Sync details from global Settings into active publication
+  const handleSyncFromSettings = () => {
+    if (!activePublication) return;
+    setActivePublication({
+      ...activePublication,
+      masterHeader: {
+        ...activePublication.masterHeader,
+        year: publicationSettings?.year || activePublication.masterHeader.year || '3',
+        issueNumber: publicationSettings?.issueNumber || activePublication.masterHeader.issueNumber || '38',
+        price: publicationSettings?.price || activePublication.masterHeader.price || 'निःशुल्क',
+      },
+    });
+    if (activePage && publicationSettings?.pageLabel) {
+      updateActivePage((prev) => ({
+        ...prev,
+        pageLabel: publicationSettings.pageLabel,
+      }));
+    }
+    setSaveStatus('✔ Synced details from Settings');
+    setTimeout(() => setSaveStatus(''), 2500);
+  };
+
+  // Push current publication's strip details to global Settings
+  const handleSaveToSettings = async () => {
+    if (!activePublication) return;
+    try {
+      setSaveStatus('Saving to Settings...');
+      await updatePublicationSettings({
+        info: {
+          year: activePublication.masterHeader.year || '3',
+          issueNumber: activePublication.masterHeader.issueNumber || '38',
+          price: activePublication.masterHeader.price || 'निःशुल्क',
+          pageLabel: activePage?.pageLabel || '1',
+        },
+      });
+      setSaveStatus('✔ Global Settings updated!');
+      setTimeout(() => setSaveStatus(''), 2500);
+    } catch (err) {
+      console.error('Failed to update Settings:', err);
+      setSaveStatus('❌ Failed to update Settings');
+      setTimeout(() => setSaveStatus(''), 2500);
+    }
+  };
 
   // Undo / Redo History Stack
   const [historyPast, setHistoryPast] = useState<{ pub: Publication; pageIndex: number }[]>([]);
@@ -236,6 +287,12 @@ export function PublicationsPage() {
         themeColor: 'festive-red',
         primaryColor: '#bd3029',
         secondaryColor: '#f0d928',
+        year: publicationSettings?.year || '3',
+        issueNumber: publicationSettings?.issueNumber || '38',
+        volumeDate: new Date().toLocaleDateString('en-GB'),
+        price: publicationSettings?.price || 'निःशुल्क',
+        showYellowStrip: true,
+        showPageNumbers: true,
       },
       pages: [
         {
@@ -1353,6 +1410,7 @@ export function PublicationsPage() {
               page={activePage}
               masterHeader={activePublication.masterHeader}
               totalPages={activePublication.pages.length}
+              settings={publicationSettings}
               scale={canvasZoom}
               interactive={true}
               selectedElementId={selectedElementId}
@@ -1523,13 +1581,25 @@ export function PublicationsPage() {
                         <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-600 inline-block" />
                         Frontpage Yellow Strip (नोंदणी पट्टी)
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('header')}
-                        className="text-[11px] text-yellow-800 hover:text-yellow-950 font-semibold underline"
-                      >
-                        All Settings ➔
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {publicationSettings && (
+                          <button
+                            type="button"
+                            onClick={handleSyncFromSettings}
+                            className="text-[10px] text-amber-900 bg-yellow-200/90 hover:bg-yellow-300 px-1.5 py-0.5 rounded font-semibold border border-yellow-400 flex items-center gap-1 cursor-pointer"
+                            title="Sync वर्ष, अंक, पृष्ठ, मूल्य from Settings"
+                          >
+                            <RefreshCw size={10} /> Sync Settings
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('header')}
+                          className="text-[11px] text-yellow-800 hover:text-yellow-950 font-semibold underline"
+                        >
+                          All Settings ➔
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-xs mb-2">
@@ -2839,22 +2909,34 @@ export function PublicationsPage() {
                       <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 border border-yellow-600 inline-block" />
                       Frontpage Yellow Strip (नोंदणी पट्टी)
                     </span>
-                    <label className="flex items-center gap-1.5 text-xs text-stone-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={activePublication.masterHeader.showYellowStrip !== false}
-                        onChange={(e) =>
-                          setActivePublication({
-                            ...activePublication,
-                            masterHeader: {
-                              ...activePublication.masterHeader,
-                              showYellowStrip: e.target.checked,
-                            },
-                          })
-                        }
-                      />
-                      <span>Show on Frontpage</span>
-                    </label>
+                    <div className="flex items-center gap-2">
+                      {publicationSettings && (
+                        <button
+                          type="button"
+                          onClick={handleSyncFromSettings}
+                          title="Apply global Settings values for वर्ष, अंक, पृष्ठ, मूल्य"
+                          className="text-[11px] text-amber-900 bg-yellow-200/90 hover:bg-yellow-300 px-2 py-0.5 rounded font-semibold flex items-center gap-1 border border-yellow-400 cursor-pointer"
+                        >
+                          <RefreshCw size={11} /> Sync from Settings
+                        </button>
+                      )}
+                      <label className="flex items-center gap-1.5 text-xs text-stone-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={activePublication.masterHeader.showYellowStrip !== false}
+                          onChange={(e) =>
+                            setActivePublication({
+                              ...activePublication,
+                              masterHeader: {
+                                ...activePublication.masterHeader,
+                                showYellowStrip: e.target.checked,
+                              },
+                            })
+                          }
+                        />
+                        <span>Show on Frontpage</span>
+                      </label>
+                    </div>
                   </div>
 
                   <p className="text-[11px] text-stone-600 mb-2">
@@ -2961,6 +3043,22 @@ export function PublicationsPage() {
                   <div className="mt-2 p-1.5 bg-[#ffe600] border-y border-black text-center text-[10.5px] font-bold text-black select-none truncate">
                     {activePublication.masterHeader.customStripText?.trim() ||
                       `वर्ष : ${activePublication.masterHeader.year || '3'} | अंक : ${activePublication.masterHeader.issueNumber || '38'} | पृष्ठ : 1 | दिनांक ${activePublication.masterHeader.volumeDate || activePublication.masterHeader.issueDate || '7/11/2026'} | मूल्य : ${activePublication.masterHeader.price || 'निःशुल्क'}`}
+                  </div>
+
+                  {/* Two-way Connection Bar with Global Settings */}
+                  <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-yellow-200 text-xs bg-yellow-100/70 -mx-3 -mb-3 p-2.5 rounded-b-lg">
+                    <span className="text-[11px] text-yellow-950 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-600 inline-block" />
+                      Settings: वर्ष {publicationSettings?.year || '—'} | अंक {publicationSettings?.issueNumber || '—'} | पृष्ठ {publicationSettings?.pageLabel || '1'} | मूल्य {publicationSettings?.price || '—'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSaveToSettings}
+                      title="Save these publication values as the new global defaults in Settings"
+                      className="text-[11px] text-stone-800 hover:text-stone-950 bg-white hover:bg-yellow-50 border border-yellow-400 px-2 py-0.5 rounded font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
+                    >
+                      <Save size={11} /> Save to Settings
+                    </button>
                   </div>
                 </div>
 
@@ -3091,6 +3189,7 @@ export function PublicationsPage() {
             page={printRenderPage}
             masterHeader={activePublication.masterHeader}
             totalPages={activePublication.pages.length}
+            settings={publicationSettings}
             scale={1}
             interactive={false}
           />

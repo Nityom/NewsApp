@@ -7,6 +7,12 @@ interface PublicationPageSheetProps {
   page: PublicationPage;
   masterHeader: PublicationMasterHeader;
   totalPages?: number;
+  settings?: {
+    year?: string;
+    issueNumber?: string;
+    price?: string;
+    pageLabel?: string;
+  } | null;
   scale?: number;
   interactive?: boolean;
   selectedElementId?: string | null;
@@ -24,6 +30,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
   page,
   masterHeader,
   totalPages,
+  settings,
   scale = 1,
   interactive = false,
   selectedElementId,
@@ -35,6 +42,13 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
   const isCover = page.type === 'cover';
   const isFrontPage = page.pageNumber === 1 || isCover;
   const hasAd = page.ad && page.ad.type !== 'none';
+
+  // Resolved values connected to global settings
+  const effYear = masterHeader.year || settings?.year || '3';
+  const effIssue = masterHeader.issueNumber || settings?.issueNumber || '38';
+  const effPrice = masterHeader.price || settings?.price || 'निःशुल्क';
+  const effPage = page.pageLabel || (page.pageNumber === 1 && settings?.pageLabel ? settings.pageLabel : page.pageNumber || 1);
+  const effDate = masterHeader.volumeDate || masterHeader.issueDate || '7/11/2026';
 
   // Feature Image Coordinates (defaults if not yet set)
   const featX = page.featureImageX ?? (isCover ? 60 : 380);
@@ -277,7 +291,7 @@ export const PublicationPageSheet: React.FC<PublicationPageSheetProps> = ({
                 <span className="text-[11.5px] font-bold block">{masterHeader.customStripText.trim()}</span>
               ) : (
                 <span className="text-[11.5px] font-bold whitespace-nowrap block">
-                  वर्ष : {masterHeader.year || '3'} &nbsp;|&nbsp; अंक : {masterHeader.issueNumber || '38'} &nbsp;|&nbsp; पृष्ठ : {page.pageLabel || page.pageNumber || 1} &nbsp;|&nbsp; दिनांक {masterHeader.volumeDate || masterHeader.issueDate || '7/11/2026'} &nbsp;|&nbsp; मूल्य : {masterHeader.price || 'निःशुल्क'}
+                  वर्ष : {effYear} &nbsp;|&nbsp; अंक : {effIssue} &nbsp;|&nbsp; पृष्ठ : {effPage} &nbsp;|&nbsp; दिनांक {effDate} &nbsp;|&nbsp; मूल्य : {effPrice}
                 </span>
               )}
             </div>
